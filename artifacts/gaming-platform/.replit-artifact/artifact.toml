@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "Gaming Platform"
+version = "1.0.0"
+id = "artifacts/gaming-platform"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+localPort = 25951
+name = "expo"
+paths = ["/"]
+
+[services.development]
+run = "pnpm --filter @workspace/gaming-platform run dev"
+
+[services.env]
+PORT = "25951"
+BASE_PATH = "/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/gaming-platform", "run", "build"]
+run = ["pnpm", "--filter", "@workspace/gaming-platform", "run", "serve"]

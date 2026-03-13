@@ -1,0 +1,77 @@
+Create a fully structured professional online gaming platform with a modern casino-style interface.
+
+Technology stack:
+Frontend: React with Next.js and Tailwind CSS
+Backend: Node.js with Express
+Database: PostgreSQL
+Real-time communication: Socket.io
+Authentication: JWT based login and secure session management
+
+UI/UX design requirements:
+- Dark themed modern gaming interface
+- Smooth animations and transitions
+- Neon accent colors similar to modern gaming platforms
+- Fully responsive design for desktop and mobile
+- Professional game lobby layout with animated cards
+
+Core website pages:
+1. Home page with featured games and platform overview
+2. User registration and login pages
+3. User dashboard showing profile and statistics
+4. Game lobby displaying all available games
+5. Individual game pages
+6. Leaderboard page
+7. Game history page
+
+User system:
+- secure signup and login
+- user profile with avatar and username
+- points based wallet system
+- transaction history
+- player statistics and ranking
+
+Games to implement:
+1. Crash style multiplier game
+   - multiplier increases in real time
+   - server generates a random crash point
+   - player can start and stop the round to collect points
+   - animated multiplier graph
+   - multiplayer view showing active players
+
+2. Dice prediction game
+   - random number generator
+   - players predict high or low
+   - instant result and payout calculation
+
+3. Coin flip game
+   - heads or tails prediction
+   - animated coin flip result
+
+Game engine requirements:
+- centralized server side game logic
+- random number generation system
+- reusable game engine module
+- real-time updates to all connected players
+
+Admin panel:
+- secure admin login
+- user management system
+- adjust player balances
+- view transaction logs
+- view active players
+- analytics dashboard
+
+Security features:
+- server side validation of game results
+- rate limiting
+- input validation
+- anti manipulation logic
+
+Project structure:
+frontend/
+backend/
+database/
+game-engine/
+admin-panel/
+
+Create the project as a working prototype with clear comments explaining how each module works and how new games can be added later.
