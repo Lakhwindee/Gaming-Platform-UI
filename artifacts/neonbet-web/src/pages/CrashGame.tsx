@@ -5,10 +5,10 @@ type Phase = 'waiting' | 'flying' | 'crashed';
 
 const HISTORY_ITEMS = [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01];
 
-// Slow curve: e^(0.07 * t)
-// 1x→2x ≈ 10s, 1x→5x ≈ 23s, 1x→10x ≈ 33s
+// Exact: e^(0.077 * t)
+// 1x→2x = exactly 9s, 1x→5x ≈ 21s, 1x→10x ≈ 30s
 function getMultiplier(elapsedSec: number): number {
-  return Math.floor(Math.pow(Math.E, 0.07 * elapsedSec) * 100) / 100;
+  return Math.floor(Math.pow(Math.E, 0.077 * elapsedSec) * 100) / 100;
 }
 
 export default function CrashGame() {
