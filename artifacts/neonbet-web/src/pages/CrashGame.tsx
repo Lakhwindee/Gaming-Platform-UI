@@ -583,16 +583,6 @@ export default function CrashGame() {
           angle += ct * 3.5;
         }
 
-        // ── SHAKE (real Aviator vibration feel) ─────────────────────────────
-        let sx = 0, sy = 0;
-        if (isflying) {
-          sx = Math.sin(t * 47.3) * 1.8 + Math.cos(t * 31.7) * 1.2 + Math.sin(t * 73.1) * 0.8;
-          sy = Math.cos(t * 53.1) * 1.8 + Math.sin(t * 37.9) * 1.2 + Math.cos(t * 61.7) * 0.8;
-          // Stronger shake at high multipliers
-          const shakeMult = Math.min(m / 5, 2.5);
-          sx *= shakeMult; sy *= shakeMult;
-        }
-
         // Contrail glow behind plane
         if (isflying) {
           const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 28);
@@ -602,7 +592,7 @@ export default function CrashGame() {
           ctx.beginPath(); ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2); ctx.fill();
         }
 
-        drawJet(ctx, pos.x + sx, pos.y + sy, angle, t, iscrashed);
+        drawJet(ctx, pos.x, pos.y, angle, t, iscrashed);
       } else {
         // Waiting — show stationary jet at origin
         drawJet(ctx, ORIG_X + 20, ORIG_Y - 10, -0.18, t, false);
