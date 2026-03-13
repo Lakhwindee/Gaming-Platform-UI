@@ -484,40 +484,80 @@ export default function CrashGame() {
       }
       ctx.globalAlpha = 1;
 
-      // ── FLIGHT PATH CURVE ─────────────────────────────────────────────────
-      // Add path point during flight
-      if (isflying && now - lastPathRef.current > 40) {
-        const pos = getPlanePos(elapsed, m, W, H);
-        pathRef.current.push(pos);
-        crashPosRef.current = pos;
-        lastPathRef.current = now;
+      // ── FLIGHT PATH CURVE — always starts from fixed origin ───────────────
+      // Fixed origin = bottom-left corner where plane starts
+      const ORIG_X = W * 0.09;
+      const ORIG_Y = H * 0.88;
+
+      // Update crash position during flight
+      if (isflying) {
+        crashPosRef.current = getPlanePos(elapsed, m, W, H);
       }
 
-      const pts = pathRef.current;
-      if (pts.length >= 2) {
-        // Glow outer
-        ctx.shadowColor = '#FF6600'; ctx.shadowBlur = 18;
-        ctx.strokeStyle = 'rgba(255,100,0,0.4)'; ctx.lineWidth = 8;
+      // Draw the path mathematically (never relies on accumulated points)
+      if (isflying || iscrashed) {
+        const drawElapsed = isflying ? elapsed : elapsed; // keeps last elapsed for crashed
+        const STEPS = 90;
+
+        // Outer glow
+        ctx.shadowColor = '#FF5500'; ctx.shadowBlur = 22;
+        ctx.strokeStyle = 'rgba(255,80,0,0.35)'; ctx.lineWidth = 10;
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-        pts.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
-        // Core line
-        ctx.shadowBlur = 8;
-        ctx.strokeStyle = '#FF8820'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
-        pts.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= STEPS; i++) {
+          const ft = drawElapsed * (i / STEPS);
+          const fm = getMultiplier(ft);
+          const p = getPlanePos(ft, fm, W, H);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+
+        // Mid glow
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = 'rgba(255,140,20,0.7)'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= STEPS; i++) {
+          const ft = drawElapsed * (i / STEPS);
+          const fm = getMultiplier(ft);
+          const p = getPlanePos(ft, fm, W, H);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+
+        // Core bright line
+        ctx.shadowBlur = 4;
+        ctx.strokeStyle = '#FFCC44'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= STEPS; i++) {
+          const ft = drawElapsed * (i / STEPS);
+          const fm = getMultiplier(ft);
+          const p = getPlanePos(ft, fm, W, H);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Y-axis multiplier markers
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
-        ctx.setLineDash([4, 6]);
+        // Origin dot
+        ctx.fillStyle = '#FFCC44'; ctx.shadowColor = '#FF8800'; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.arc(ORIG_X, ORIG_Y, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Multiplier Y-axis guide lines
+        const curPos = getPlanePos(drawElapsed, m, W, H);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+        ctx.setLineDash([4, 8]);
+        ctx.font = 'bold 11px Inter,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
         [2, 5, 10, 25].forEach(mv => {
           if (m >= mv) {
-            const pos2 = getPlanePos(99, mv, W, H);
-            ctx.beginPath(); ctx.moveTo(60, pos2.y); ctx.lineTo(pts[pts.length - 1].x, pos2.y); ctx.stroke();
-            ctx.font = '11px Inter,sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-            ctx.fillText(`${mv}x`, 4, pos2.y);
+            // Find what elapsed time corresponds to this multiplier
+            let guideT = 0;
+            for (let s = 0; s < 300; s++) {
+              if (getMultiplier(s * 0.1) >= mv) { guideT = s * 0.1; break; }
+            }
+            const gPos = getPlanePos(guideT, mv, W, H);
+            ctx.beginPath(); ctx.moveTo(ORIG_X, gPos.y); ctx.lineTo(curPos.x + 10, gPos.y); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            ctx.fillText(`${mv}x`, ORIG_X - 36, gPos.y);
           }
         });
         ctx.setLineDash([]);
@@ -531,33 +571,41 @@ export default function CrashGame() {
 
         if (!iscrashed) crashPosRef.current = pos;
 
-        // Compute angle from last path segment
-        let angle = -0.45;
-        if (pts.length >= 2) {
-          const last = pts[pts.length - 1];
-          const prev = pts[pts.length - 2];
-          angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-        }
+        // Compute angle mathematically from the curve derivative
+        const dT = 0.08;
+        const posA = getPlanePos(Math.max(elapsed - dT, 0), getMultiplier(Math.max(elapsed - dT, 0.001)), W, H);
+        const posB = getPlanePos(elapsed + dT, getMultiplier(elapsed + dT), W, H);
+        let angle = Math.atan2(posB.y - posA.y, posB.x - posA.x);
 
+        // Crash spin
         if (iscrashed) {
           const ct = (now - crashTRef.current) / 1000;
-          angle += ct * 3; // spin on crash
+          angle += ct * 3.5;
         }
 
-        // Contrail
-        if (isflying && pts.length > 3) {
-          const last = pts[pts.length - 1];
-          const cG = ctx.createRadialGradient(last.x, last.y, 0, last.x, last.y, 22);
-          cG.addColorStop(0, 'rgba(200,220,255,0.18)');
-          cG.addColorStop(1, 'rgba(200,220,255,0)');
+        // ── SHAKE (real Aviator vibration feel) ─────────────────────────────
+        let sx = 0, sy = 0;
+        if (isflying) {
+          sx = Math.sin(t * 47.3) * 1.8 + Math.cos(t * 31.7) * 1.2 + Math.sin(t * 73.1) * 0.8;
+          sy = Math.cos(t * 53.1) * 1.8 + Math.sin(t * 37.9) * 1.2 + Math.cos(t * 61.7) * 0.8;
+          // Stronger shake at high multipliers
+          const shakeMult = Math.min(m / 5, 2.5);
+          sx *= shakeMult; sy *= shakeMult;
+        }
+
+        // Contrail glow behind plane
+        if (isflying) {
+          const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 28);
+          cG.addColorStop(0, 'rgba(180,210,255,0.22)');
+          cG.addColorStop(1, 'rgba(180,210,255,0)');
           ctx.fillStyle = cG;
-          ctx.beginPath(); ctx.arc(last.x, last.y, 22, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2); ctx.fill();
         }
 
-        drawJet(ctx, pos.x, pos.y, angle, t, iscrashed);
+        drawJet(ctx, pos.x + sx, pos.y + sy, angle, t, iscrashed);
       } else {
-        // Waiting — show stationary jet on runway position
-        drawJet(ctx, W * 0.15, H * 0.78, -0.18, t, false);
+        // Waiting — show stationary jet at origin
+        drawJet(ctx, ORIG_X + 20, ORIG_Y - 10, -0.18, t, false);
       }
 
       // ── EXPLOSION PARTICLES ───────────────────────────────────────────────
