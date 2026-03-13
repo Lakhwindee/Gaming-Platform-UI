@@ -5,10 +5,10 @@ type Phase = 'waiting' | 'flying' | 'crashed';
 
 const HISTORY_ITEMS = [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01];
 
-// Aviator-exact curve: e^(0.14 * t)
-// 1x→2x ≈ 5s, 1x→5x ≈ 11s, 1x→10x ≈ 16s — matches real Aviator timing
+// Balanced curve: e^(0.10 * t)
+// 1x→2x ≈ 7s, 1x→5x ≈ 16s, 1x→10x ≈ 23s
 function getMultiplier(elapsedSec: number): number {
-  return Math.floor(Math.pow(Math.E, 0.14 * elapsedSec) * 100) / 100;
+  return Math.floor(Math.pow(Math.E, 0.10 * elapsedSec) * 100) / 100;
 }
 
 export default function CrashGame() {
