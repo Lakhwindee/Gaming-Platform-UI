@@ -60,7 +60,7 @@ export default function History() {
           <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎮</div>
           <h3 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '12px' }}>No games played yet</h3>
           <p style={{ color: 'var(--text2)', marginBottom: '24px' }}>Play Crash, Dice, or Coin Flip to see your history here.</p>
-          <button onClick={() => navigate('lobby')} style={{
+          <button onClick={() => navigate('fastgames')} style={{
             background: 'var(--neon-blue)', color: '#000', border: 'none',
             borderRadius: 'var(--radius)', padding: '14px 32px',
             fontWeight: 800, fontSize: '16px', cursor: 'pointer',

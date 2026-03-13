@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import Home from './pages/Home';
-import Casino from './pages/Casino';
 import FastGames from './pages/FastGames';
-import Sports from './pages/Sports';
-import LiveCasino from './pages/LiveCasino';
 import Promotions from './pages/Promotions';
 import Leaderboard from './pages/Leaderboard';
 import History from './pages/History';
@@ -24,15 +21,12 @@ import './index.css';
 
 const NAV_SECTIONS = [
   { label: 'MAIN', items: [
-    { id: 'home', icon: '🏠', label: 'Home' },
-    { id: 'promotions', icon: '🎁', label: 'Promotions' },
+    { id: 'home',        icon: '🏠', label: 'Home' },
+    { id: 'promotions',  icon: '🎁', label: 'Promotions' },
     { id: 'leaderboard', icon: '🏆', label: 'Leaderboard' },
   ]},
   { label: 'GAMES', items: [
-    { id: 'casino', icon: '🎰', label: 'Casino' },
     { id: 'fastgames', icon: '⚡', label: 'Fast Games' },
-    { id: 'livecasino', icon: '🎥', label: 'Live Casino' },
-    { id: 'sports', icon: '⚽', label: 'Sports Betting' },
   ]},
   { label: 'ACCOUNT', items: [
     { id: 'history', icon: '📋', label: 'My History' },
@@ -60,7 +54,6 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
       overflowY: 'auto', overflowX: 'hidden',
       zIndex: 50,
     }}>
-      {/* Logo */}
       <div style={{
         padding: '20px 16px', display: 'flex',
         alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between',
@@ -86,7 +79,6 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
         </button>
       </div>
 
-      {/* Balance */}
       {state.user && (
         <div style={{
           padding: '14px', margin: '12px', borderRadius: 'var(--radius)',
@@ -122,7 +114,6 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
         </div>
       )}
 
-      {/* Nav */}
       <nav style={{ flex: 1, padding: '8px' }}>
         {NAV_SECTIONS.map(section => (
           <div key={section.label} style={{ marginBottom: '16px' }}>
@@ -155,7 +146,6 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
         ))}
       </nav>
 
-      {/* Bottom */}
       <div style={{ padding: '12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
         {!state.user ? (
           <button onClick={onAuthOpen} style={{
@@ -186,7 +176,7 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
 }
 
 function TopBar({ onAuthOpen }: { onAuthOpen: () => void }) {
-  const { state, navigate, toggleWallet, toggleChat } = useGame();
+  const { state, playGame, toggleWallet, toggleChat } = useGame();
   const [searchQ, setSearchQ] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
   const unread = state.notifications.length;
@@ -197,7 +187,6 @@ function TopBar({ onAuthOpen }: { onAuthOpen: () => void }) {
       display: 'flex', alignItems: 'center', padding: '0 20px', gap: '16px',
       position: 'sticky', top: 0, zIndex: 40,
     }}>
-      {/* Search */}
       <div style={{ flex: 1, maxWidth: '400px', position: 'relative' }}>
         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }}>🔍</span>
         <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
@@ -211,14 +200,14 @@ function TopBar({ onAuthOpen }: { onAuthOpen: () => void }) {
 
       <div style={{ flex: 1 }} />
 
-      {/* Quick game links */}
       <div style={{ display: 'flex', gap: '6px' }}>
         {[
-          { id: 'crash', label: '📈 Crash' },
-          { id: 'mines', label: '💣 Mines' },
-          { id: 'plinko', label: '🎯 Plinko' },
+          { id: 'crash',   label: '✈️ Crash' },
+          { id: 'mines',   label: '💣 Mines' },
+          { id: 'plinko',  label: '🎯 Plinko' },
+          { id: 'slots',   label: '🎰 Slots' },
         ].map(g => (
-          <button key={g.id} onClick={() => navigate('fastgames')} style={{
+          <button key={g.id} onClick={() => playGame(g.id)} style={{
             background: 'var(--bg3)', border: '1px solid var(--border)',
             borderRadius: '8px', padding: '6px 12px', color: 'var(--text2)',
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
@@ -226,14 +215,12 @@ function TopBar({ onAuthOpen }: { onAuthOpen: () => void }) {
         ))}
       </div>
 
-      {/* Chat button */}
       <button onClick={toggleChat} style={{
         background: 'var(--bg3)', border: '1px solid var(--border)',
         borderRadius: '10px', padding: '8px 14px', color: 'var(--text2)',
         fontSize: '13px', fontWeight: 600, cursor: 'pointer',
       }}>💬 Chat</button>
 
-      {/* Notifications */}
       <div style={{ position: 'relative' }}>
         <button onClick={() => setShowNotifs(!showNotifs)} style={{
           background: 'var(--bg3)', border: '1px solid var(--border)',
@@ -288,30 +275,27 @@ function TopBar({ onAuthOpen }: { onAuthOpen: () => void }) {
 }
 
 function AppContent() {
-  const { state, navigate } = useGame();
+  const { state } = useGame();
   const [authOpen, setAuthOpen] = useState(false);
 
   const renderPage = () => {
-    if (state.activeGame === 'crash') return <CrashGame />;
-    if (state.activeGame === 'dice') return <DiceGame />;
+    if (state.activeGame === 'crash')   return <CrashGame />;
+    if (state.activeGame === 'dice')    return <DiceGame />;
     if (state.activeGame === 'coinflip') return <CoinFlipGame />;
-    if (state.activeGame === 'mines') return <MinesGame />;
-    if (state.activeGame === 'plinko') return <PlinkoGame />;
-    if (state.activeGame === 'tower') return <TowerGame />;
-    if (state.activeGame === 'hilo') return <HiLoGame />;
-    if (state.activeGame === 'slots') return <SlotsGame />;
+    if (state.activeGame === 'mines')   return <MinesGame />;
+    if (state.activeGame === 'plinko')  return <PlinkoGame />;
+    if (state.activeGame === 'tower')   return <TowerGame />;
+    if (state.activeGame === 'hilo')    return <HiLoGame />;
+    if (state.activeGame === 'slots')   return <SlotsGame />;
 
     switch (state.page) {
-      case 'home': return <Home />;
-      case 'casino': return <Casino />;
-      case 'fastgames': return <FastGames />;
-      case 'sports': return <Sports />;
-      case 'livecasino': return <LiveCasino />;
-      case 'promotions': return <Promotions />;
+      case 'home':        return <Home />;
+      case 'fastgames':   return <FastGames />;
+      case 'promotions':  return <Promotions />;
       case 'leaderboard': return <Leaderboard />;
-      case 'history': return <History />;
-      case 'profile': return <Profile onAuthOpen={() => setAuthOpen(true)} />;
-      default: return <Home />;
+      case 'history':     return <History />;
+      case 'profile':     return <Profile onAuthOpen={() => setAuthOpen(true)} />;
+      default:            return <Home />;
     }
   };
 

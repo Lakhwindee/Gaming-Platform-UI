@@ -58,7 +58,7 @@ export default function CoinFlipGame() {
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px', animation: 'slideIn 0.3s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-        <button onClick={() => navigate('lobby')} style={{
+        <button onClick={() => navigate('fastgames')} style={{
           background: 'var(--bg3)', border: '1px solid var(--border)',
           borderRadius: '10px', padding: '8px 16px', color: 'var(--text2)', cursor: 'pointer',
         }}>← Back</button>
