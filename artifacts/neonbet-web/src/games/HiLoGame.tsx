@@ -85,7 +85,7 @@ export default function HiLoGame() {
       setGameOver(true);
       setPlaying(false);
       addHistory({ id: makeId(), game: 'hilo', wager: bet, multiplier: 0, payout: 0, won: false, timestamp: Date.now() });
-      addNotification(`💔 Wrong! Lost ${bet.toLocaleString()} pts`, 'info');
+      addNotification(`💔 Wrong! Lost ₹${bet.toLocaleString()}`, 'info');
     }
   }
 
@@ -96,7 +96,7 @@ export default function HiLoGame() {
     setPlaying(false);
     setWon(true);
     addHistory({ id: makeId(), game: 'hilo', wager: bet, multiplier: currentMult, payout, won: true, timestamp: Date.now() });
-    addNotification(`🃏 Cashed out at ${currentMult}x! +${(payout - bet).toLocaleString()} pts`, 'win');
+    addNotification(`🃏 Cashed out at ${currentMult}x! +₹${(payout - bet).toLocaleString()}`, 'win');
   }
 
   function renderCard(card: Card | null, big = false) {
@@ -174,7 +174,7 @@ export default function HiLoGame() {
                     color: won ? 'var(--neon-green)' : 'var(--neon-red)',
                     fontWeight: 800, fontSize: '20px', animation: 'scaleIn 0.3s ease',
                   }}>
-                    {won ? `🎉 Won ${Math.floor(bet * currentMult).toLocaleString()} pts!` : '💔 Wrong guess!'}
+                    {won ? `🎉 Won ₹${Math.floor(bet * currentMult).toLocaleString()}!` : '💔 Wrong guess!'}
                   </div>
                 )}
 

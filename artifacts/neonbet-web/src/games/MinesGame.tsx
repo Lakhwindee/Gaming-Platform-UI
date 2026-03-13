@@ -56,7 +56,7 @@ export default function MinesGame() {
       setGameOver(true);
       setPlaying(false);
       addHistory({ id: makeId(), game: 'mines', wager: bet, multiplier: 0, payout: 0, won: false, timestamp: Date.now() });
-      addNotification(`💣 Mine hit! Lost ${bet.toLocaleString()} pts`, 'info');
+      addNotification(`💣 Mine hit! Lost ₹${bet.toLocaleString()}`, 'info');
     } else {
       const newRevealed = revealed + 1;
       const mult = calcMultiplier(newRevealed, mineCount);
@@ -79,7 +79,7 @@ export default function MinesGame() {
     setGameOver(true);
     setCells(prev => prev.map((c, i) => minePositions.has(i) ? 'mine' : c === 'hidden' ? 'hidden' : c));
     addHistory({ id: makeId(), game: 'mines', wager: bet, multiplier: mult, payout, won: true, timestamp: Date.now() });
-    addNotification(`💎 Cashed out at ${mult}x! +${(payout - bet).toLocaleString()} pts`, 'win');
+    addNotification(`💎 Cashed out at ${mult}x! +₹${(payout - bet).toLocaleString()}`, 'win');
   }
 
   const potentialWin = Math.floor(bet * currentMult);
@@ -117,7 +117,7 @@ export default function MinesGame() {
                 fontSize: '28px', fontWeight: 900,
                 color: won ? 'var(--neon-green)' : 'var(--neon-red)',
               }}>
-                {won ? `🎉 Won ${potentialWin.toLocaleString()} pts!` : '💥 Mine hit!'}
+                {won ? `🎉 Won ₹${potentialWin.toLocaleString()}!` : '💥 Mine hit!'}
               </div>
             )}
 
@@ -199,7 +199,7 @@ export default function MinesGame() {
                 borderRadius: 'var(--radius)', padding: '16px', fontWeight: 800, fontSize: '16px', cursor: 'pointer',
                 marginBottom: '8px',
               }}>
-                💰 Cash Out {potentialWin.toLocaleString()} pts
+                💰 Cash Out ₹{potentialWin.toLocaleString()}
               </button>
             ) : (
               <button onClick={startGame} disabled={playing && !gameOver} style={{
@@ -216,14 +216,14 @@ export default function MinesGame() {
             {playing && revealed > 0 && !gameOver && (
               <div style={{ padding: '12px', borderRadius: '10px', background: 'var(--neon-green)10', border: '1px solid var(--neon-green)30', textAlign: 'center' }}>
                 <div style={{ color: 'var(--text2)', fontSize: '12px' }}>If you cash out now</div>
-                <div style={{ color: 'var(--neon-green)', fontWeight: 900, fontSize: '22px' }}>+{profit.toLocaleString()} pts</div>
+                <div style={{ color: 'var(--neon-green)', fontWeight: 900, fontSize: '22px' }}>+₹{profit.toLocaleString()}</div>
               </div>
             )}
 
             {state.user && (
               <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
-                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>{state.user.balance.toLocaleString()} pts</span>
+                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>₹{state.user.balance.toLocaleString()}</span>
               </div>
             )}
           </div>

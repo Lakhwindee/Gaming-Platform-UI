@@ -47,7 +47,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
             <span style={{ color: 'var(--neon-blue)' }}>Neon</span>Bet
           </div>
           <div style={{ color: 'var(--text3)', fontSize: '13px', marginTop: '4px' }}>
-            Start with 10,000 pts free!
+            Start with ₹10,000 free!
           </div>
         </div>
 

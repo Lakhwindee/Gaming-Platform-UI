@@ -80,7 +80,7 @@ export default function TowerGame() {
       setGameOver(true);
       setPlaying(false);
       addHistory({ id: makeId(), game: 'tower', wager: bet, multiplier: 0, payout: 0, won: false, timestamp: Date.now() });
-      addNotification(`💥 Tower fell! Lost ${bet.toLocaleString()} pts`, 'info');
+      addNotification(`💥 Tower fell! Lost ₹${bet.toLocaleString()}`, 'info');
     } else {
       const nextLevel = currentLevel + 1;
       if (nextLevel >= TOTAL_LEVELS) {
@@ -92,7 +92,7 @@ export default function TowerGame() {
         setPlaying(false);
         setWon(true);
         addHistory({ id: makeId(), game: 'tower', wager: bet, multiplier: mult, payout, won: true, timestamp: Date.now() });
-        addNotification(`🗼 Tower complete! ${mult}x — +${(payout - bet).toLocaleString()} pts`, 'win');
+        addNotification(`🗼 Tower complete! ${mult}x — +₹${(payout - bet).toLocaleString()}`, 'win');
       } else {
         setCurrentLevel(nextLevel);
       }
@@ -106,7 +106,7 @@ export default function TowerGame() {
     setPlaying(false);
     setWon(true);
     addHistory({ id: makeId(), game: 'tower', wager: bet, multiplier: currentMult, payout, won: true, timestamp: Date.now() });
-    addNotification(`💰 Cashed out at ${currentMult}x! +${(payout - bet).toLocaleString()} pts`, 'win');
+    addNotification(`💰 Cashed out at ${currentMult}x! +₹${(payout - bet).toLocaleString()}`, 'win');
   }
 
   const diffColors = { easy: 'var(--neon-green)', medium: 'var(--neon-blue)', hard: 'var(--neon-red)' };
@@ -225,7 +225,7 @@ export default function TowerGame() {
                 color: currentLevel > 0 ? '#000' : 'var(--text2)',
                 border: 'none', borderRadius: 'var(--radius)', padding: '14px', fontWeight: 800, fontSize: '15px', cursor: currentLevel > 0 ? 'pointer' : 'not-allowed',
               }}>
-                {currentLevel > 0 ? `💰 Cash Out ${Math.floor(bet * currentMult).toLocaleString()} pts` : 'Climb to cash out'}
+                {currentLevel > 0 ? `💰 Cash Out ₹${Math.floor(bet * currentMult).toLocaleString()}` : 'Climb to cash out'}
               </button>
             )}
           </div>

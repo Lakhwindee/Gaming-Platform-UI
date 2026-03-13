@@ -131,7 +131,7 @@ export default function PlinkoGame() {
           setDropping(false);
           if (state.user) {
             addHistory({ id: makeId(), game: 'plinko', wager: bet, multiplier: mult, payout, won, timestamp: Date.now() });
-            if (won) addNotification(`🎯 Plinko landed on ${mult}x! +${(payout - bet).toLocaleString()} pts`, 'win');
+            if (won) addNotification(`🎯 Plinko landed on ${mult}x! +₹${(payout - bet).toLocaleString()}`, 'win');
           }
           return false;
         }
@@ -176,7 +176,7 @@ export default function PlinkoGame() {
               textAlign: 'center', animation: 'scaleIn 0.3s ease',
             }}>
               <span style={{ color: lastResult.won ? 'var(--neon-green)' : 'var(--neon-red)', fontWeight: 800, fontSize: '20px' }}>
-                {lastResult.won ? '🎉' : '😞'} {lastResult.mult}x — {lastResult.won ? '+' : ''}{(lastResult.payout - bet).toLocaleString()} pts
+                {lastResult.won ? '🎉' : '😞'} {lastResult.mult}x — {lastResult.won ? '+' : ''}₹{(lastResult.payout - bet).toLocaleString()}
               </span>
             </div>
           )}
@@ -223,7 +223,7 @@ export default function PlinkoGame() {
             {state.user && (
               <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
-                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>{state.user.balance.toLocaleString()} pts</span>
+                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>₹{state.user.balance.toLocaleString()}</span>
               </div>
             )}
           </div>

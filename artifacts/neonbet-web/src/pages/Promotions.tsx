@@ -21,9 +21,9 @@ const BONUSES = [
   },
   {
     title: '70 Free Spins', subtitle: 'Deposit Reward',
-    desc: 'Deposit 1,500+ pts and get 70 free spins on selected slot games!',
+    desc: 'Deposit 1,500+ and get 70 free spins on selected slot games!',
     icon: '🎰', color: '#a855f7', tag: 'CASINO', expires: 'Limited time',
-    steps: ['Deposit at least 1,500 pts', 'Free spins credited within 24h', 'Play on selected slots'],
+    steps: ['Deposit at least ₹1,500', 'Free spins credited within 24h', 'Play on selected slots'],
   },
   {
     title: 'Refer & Earn', subtitle: 'Referral Program',
@@ -142,7 +142,7 @@ export default function Promotions() {
                     {isActive && <div style={{ fontSize: '10px', color: v.color, fontWeight: 700 }}>CURRENT</div>}
                   </div>
                 </div>
-                <div style={{ textAlign: 'center', color: 'var(--text2)', fontWeight: 600 }}>{v.wagered} pts</div>
+                <div style={{ textAlign: 'center', color: 'var(--text2)', fontWeight: 600 }}>₹{v.wagered}</div>
                 <div style={{ textAlign: 'center', color: 'var(--neon-green)', fontWeight: 800 }}>{v.cashback}</div>
                 <div style={{ textAlign: 'center', color: 'var(--neon-blue)', fontWeight: 700 }}>{v.bonus}</div>
                 <div style={{ textAlign: 'center', color: 'var(--neon-gold)', fontWeight: 700 }}>{v.withdraw}</div>

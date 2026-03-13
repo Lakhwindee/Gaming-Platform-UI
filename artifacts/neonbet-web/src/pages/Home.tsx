@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGame } from '../context/GameContext';
 
 const BANNERS = [
-  { title: '500% Welcome Bonus', sub: 'Up to 50,000 pts on first deposit', btn: 'Claim Now', color: 'var(--neon-blue)', bg: 'linear-gradient(135deg, #00d4ff15, #00d4ff05)', icon: '🎁' },
+  { title: '500% Welcome Bonus', sub: 'Up to ₹50,000 on first deposit', btn: 'Claim Now', color: 'var(--neon-blue)', bg: 'linear-gradient(135deg, #00d4ff15, #00d4ff05)', icon: '🎁' },
   { title: 'Lucky Jet is LIVE', sub: 'Play the hottest crash game — up to 1000x', btn: 'Play Now', color: 'var(--neon-green)', bg: 'linear-gradient(135deg, #00ff8815, #00ff8805)', icon: '🚀' },
   { title: 'Monthly Jackpot', sub: '₹30,000 prize pool — compete now!', btn: 'Join Tournament', color: 'var(--neon-gold)', bg: 'linear-gradient(135deg, #ffd70015, #ffd70005)', icon: '🏆' },
   { title: 'VIP Cashback', sub: 'Get up to 30% back on losses every week', btn: 'Learn More', color: 'var(--neon-purple)', bg: 'linear-gradient(135deg, #a855f715, #a855f705)', icon: '💎' },
@@ -252,7 +252,7 @@ export default function Home() {
               marginBottom: '10px',
             }}>
               <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '6px' }}>🎁 500% Welcome Bonus</div>
-              <div style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '12px' }}>Get up to 50,000 pts on your first deposit!</div>
+              <div style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '12px' }}>Get up to ₹50,000 on your first deposit!</div>
               <button onClick={() => navigate('promotions')} style={{
                 background: 'var(--neon-purple)', color: '#fff', border: 'none',
                 borderRadius: '8px', padding: '8px 16px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',

@@ -80,7 +80,7 @@ export default function Sports() {
         payout: won ? Math.floor(b.amount * b.odds) : 0,
         won, timestamp: Date.now(),
       });
-      if (won) addNotification(`🎉 Sports bet won! +${Math.floor(b.amount * b.odds).toLocaleString()} pts`, 'win');
+      if (won) addNotification(`🎉 Sports bet won! +₹${Math.floor(b.amount * b.odds).toLocaleString()}`, 'win');
     });
     setBetSlip([]);
   }

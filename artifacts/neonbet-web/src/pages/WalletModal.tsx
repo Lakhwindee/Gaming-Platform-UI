@@ -26,7 +26,7 @@ export default function WalletModal() {
     setProcessing(true);
     setTimeout(() => {
       setProcessing(false);
-      addNotification(tab === 'deposit' ? `💰 ${amount.toLocaleString()} pts deposited successfully!` : `💸 ${amount.toLocaleString()} pts withdrawal requested!`, 'bonus');
+      addNotification(tab === 'deposit' ? `💰 ₹${amount.toLocaleString()} deposited successfully!` : `💸 ₹${amount.toLocaleString()} withdrawal requested!`, 'bonus');
       toggleWallet();
     }, 1500);
   }
@@ -56,7 +56,7 @@ export default function WalletModal() {
             }}>
               <span style={{ color: 'var(--text3)', fontSize: '12px' }}>Balance:</span>
               <span style={{ color: 'var(--neon-gold)', fontWeight: 800, fontSize: '16px' }}>
-                {state.user.balance.toLocaleString()} pts
+                ₹{state.user.balance.toLocaleString()}
               </span>
             </div>
           )}
@@ -100,7 +100,7 @@ export default function WalletModal() {
           </div>
 
           {/* Amount */}
-          <label style={{ color: 'var(--text3)', fontSize: '12px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>AMOUNT (PTS)</label>
+          <label style={{ color: 'var(--text3)', fontSize: '12px', fontWeight: 700, letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>AMOUNT (₹)</label>
           <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} style={{
             width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
             borderRadius: 'var(--radius)', padding: '14px 16px', color: 'var(--text)', fontSize: '18px', fontWeight: 800,
@@ -127,7 +127,7 @@ export default function WalletModal() {
               borderRadius: 'var(--radius)', padding: '12px 14px', marginBottom: '14px',
               fontSize: '13px', color: 'var(--neon-green)',
             }}>
-              🎁 Bonus: Get 500% on first deposit! +{(amount * 5).toLocaleString()} pts extra
+              🎁 Bonus: Get 500% on first deposit! +₹{(amount * 5).toLocaleString()} extra
             </div>
           )}
 
@@ -137,7 +137,7 @@ export default function WalletModal() {
             color: processing ? 'var(--text2)' : (tab === 'deposit' ? '#000' : '#fff'),
             fontWeight: 800, fontSize: '16px', cursor: processing ? 'not-allowed' : 'pointer',
           }}>
-            {processing ? '⏳ Processing...' : (tab === 'deposit' ? `⬆ Deposit ${amount.toLocaleString()} pts` : `⬇ Withdraw ${amount.toLocaleString()} pts`)}
+            {processing ? '⏳ Processing...' : (tab === 'deposit' ? `⬆ Deposit ₹${amount.toLocaleString()}` : `⬇ Withdraw ₹${amount.toLocaleString()}`)}
           </button>
         </div>
       </div>

@@ -125,7 +125,7 @@ export default function CoinFlipGame() {
                     color: won ? 'var(--neon-green)' : 'var(--neon-red)',
                     fontWeight: 800, fontSize: '28px', animation: 'scaleIn 0.3s ease',
                   }}>
-                    {won ? `🎉 Won ${payout.toLocaleString()} pts!` : `💥 Lost ${bet.toLocaleString()} pts`}
+                    {won ? `🎉 Won ₹${payout.toLocaleString()}!` : `💥 Lost ₹${bet.toLocaleString()}`}
                   </div>
                 </div>
               )}
@@ -261,7 +261,7 @@ export default function CoinFlipGame() {
               }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Your Balance</span>
                 <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>
-                  {state.user.balance.toLocaleString()} pts
+                  ₹{state.user.balance.toLocaleString()}
                 </span>
               </div>
             )}

@@ -25,7 +25,7 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
           }}>
             Sign In / Register
           </button>
-          <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Free to play · 10,000 pts starter balance</p>
+          <p style={{ color: 'var(--text3)', fontSize: '13px' }}>Free to play · ₹10,000 starter balance</p>
         </div>
       </div>
     );
@@ -102,7 +102,7 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
               <div style={{ color: 'var(--neon-gold)', fontWeight: 900, fontSize: '32px', letterSpacing: '-1px' }}>
                 {user.balance.toLocaleString()}
               </div>
-              <div style={{ color: 'var(--text3)', fontSize: '13px' }}>pts</div>
+              <div style={{ color: 'var(--text3)', fontSize: '13px' }}></div>
             </div>
           </div>
 
@@ -166,7 +166,7 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
                 color: profit >= 0 ? 'var(--neon-green)' : 'var(--neon-red)',
                 letterSpacing: '-1px',
               }}>
-                {profit >= 0 ? '+' : ''}{profit.toLocaleString()} pts
+                {profit >= 0 ? '+' : ''}₹{profit.toLocaleString()}
               </div>
             </div>
             <div style={{ fontSize: '64px' }}>{profit >= 0 ? '📈' : '📉'}</div>

@@ -128,10 +128,10 @@ export default function CrashGame() {
     setHasActiveBet(false);
     const payout = Math.floor(betAmount * atMult);
     const profit = payout - betAmount;
-    setResultMsg({ text: `Cashed out at ${atMult.toFixed(2)}x! +${profit.toLocaleString()} pts`, win: true });
+    setResultMsg({ text: `Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, win: true });
     if (state.user) {
       addHistory({ id: makeId(), game: 'crash', wager: betAmount, multiplier: atMult, payout, won: true, timestamp: Date.now() });
-      addNotification(`✈️ Cashed out at ${atMult.toFixed(2)}x! +${profit.toLocaleString()} pts`, 'win');
+      addNotification(`✈️ Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
     }
   }
 
@@ -142,7 +142,7 @@ export default function CrashGame() {
     setHistory(prev => [Math.floor(finalMult * 100) / 100, ...prev].slice(0, 15));
 
     if (hasActiveBetRef.current && !cashedOutRef.current) {
-      setResultMsg({ text: `Crashed at ${finalMult.toFixed(2)}x! Lost ${betAmount.toLocaleString()} pts`, win: false });
+      setResultMsg({ text: `Crashed at ${finalMult.toFixed(2)}x! Lost ₹${betAmount.toLocaleString()}`, win: false });
       if (state.user) {
         addHistory({ id: makeId(), game: 'crash', wager: betAmount, multiplier: finalMult, payout: 0, won: false, timestamp: Date.now() });
       }
@@ -410,7 +410,7 @@ export default function CrashGame() {
                     <span style={{ fontWeight: 600, fontSize: '14px' }}>{b.user}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text2)', fontSize: '13px' }}>{b.amount.toLocaleString()} pts</span>
+                    <span style={{ color: 'var(--text2)', fontSize: '13px' }}>₹{b.amount.toLocaleString()}</span>
                     {b.status === 'cashed' && <span style={{ color: 'var(--neon-green)', fontWeight: 700, fontSize: '13px' }}>✓ {b.cashout?.toFixed(2)}x</span>}
                     {b.status === 'crashed' && <span style={{ color: 'var(--neon-red)', fontWeight: 700, fontSize: '13px' }}>✗ Lost</span>}
                     {b.status === 'active' && <span style={{ color: 'var(--neon-blue)', fontSize: '12px', fontStyle: 'italic' }}>In flight...</span>}
@@ -461,7 +461,7 @@ export default function CrashGame() {
                 border: 'none', borderRadius: 'var(--radius)', padding: '16px',
                 fontWeight: 800, fontSize: '16px', cursor: phase === 'waiting' ? 'pointer' : 'not-allowed',
               }}>
-                {phase === 'waiting' ? `✈️ Bet ${betAmount.toLocaleString()} pts` : 'Round in progress...'}
+                {phase === 'waiting' ? `✈️ Bet ₹${betAmount.toLocaleString()}` : 'Round in progress...'}
               </button>
             ) : (
               <button onClick={cashOut} disabled={phase !== 'flying' || !!cashedOutAt} style={{
@@ -491,7 +491,7 @@ export default function CrashGame() {
                 </div>
                 {hasActiveBet && !cashedOutAt && (
                   <div style={{ color: 'var(--neon-green)', fontSize: '14px', fontWeight: 700, marginTop: '6px' }}>
-                    → {Math.floor(betAmount * multiplier).toLocaleString()} pts
+                    → ₹{Math.floor(betAmount * multiplier).toLocaleString()}
                   </div>
                 )}
               </div>
@@ -505,7 +505,7 @@ export default function CrashGame() {
               }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
                 <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>
-                  {state.user.balance.toLocaleString()} pts
+                  ₹{state.user.balance.toLocaleString()}
                 </span>
               </div>
             )}

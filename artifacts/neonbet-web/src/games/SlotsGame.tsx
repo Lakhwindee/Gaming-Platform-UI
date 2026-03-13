@@ -80,7 +80,7 @@ export default function SlotsGame() {
         setLastResult({ mult, payout, winLines });
         setSpinCount(s => s + 1);
         addHistory({ id: makeId(), game: 'slots', wager: bet, multiplier: mult, payout, won: payout >= bet, timestamp: Date.now() });
-        if (payout >= bet) addNotification(`🎰 Slots hit ${mult}x! +${(payout - bet).toLocaleString()} pts`, 'win');
+        if (payout >= bet) addNotification(`🎰 Slots hit ${mult}x! +₹${(payout - bet).toLocaleString()}`, 'win');
         setSpinning(false);
       }
     }, 80);
@@ -153,7 +153,7 @@ export default function SlotsGame() {
               }}>
                 {lastResult.mult > 0 ? (
                   <span style={{ color: 'var(--neon-green)', fontWeight: 800, fontSize: '18px' }}>
-                    🎉 {lastResult.mult}x — Won {lastResult.payout.toLocaleString()} pts!
+                    🎉 {lastResult.mult}x — Won ₹{lastResult.payout.toLocaleString()}!
                   </span>
                 ) : (
                   <span style={{ color: 'var(--text2)', fontSize: '15px' }}>No win this time. Try again!</span>
@@ -222,7 +222,7 @@ export default function SlotsGame() {
             {state.user && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--bg3)', borderRadius: '10px', marginBottom: '12px' }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
-                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>{state.user.balance.toLocaleString()} pts</span>
+                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>₹{state.user.balance.toLocaleString()}</span>
               </div>
             )}
 

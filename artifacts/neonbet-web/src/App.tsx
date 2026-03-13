@@ -104,8 +104,7 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
                 }}>{state.user.vipLevel}</span>
               </div>
               <div style={{ color: 'var(--neon-gold)', fontWeight: 900, fontSize: '22px', marginBottom: '8px' }}>
-                {state.user.balance.toLocaleString()}
-                <span style={{ fontSize: '12px', color: 'var(--text3)', fontWeight: 500, marginLeft: '4px' }}>pts</span>
+                ₹{state.user.balance.toLocaleString()}
               </div>
               <button onClick={toggleWallet} style={{
                 width: '100%', background: 'var(--neon-green)', color: '#000',
@@ -116,7 +115,7 @@ function Sidebar({ onAuthOpen }: { onAuthOpen: () => void }) {
           ) : (
             <div style={{ textAlign: 'center' }}>
               <div style={{ color: 'var(--neon-gold)', fontWeight: 900, fontSize: '13px' }}>
-                {(state.user.balance / 1000).toFixed(1)}K
+                ₹{(state.user.balance / 1000).toFixed(1)}K
               </div>
             </div>
           )}
