@@ -26,8 +26,8 @@ function getPlanePos(elapsed: number, mult: number, W: number, H: number) {
   return { x, y };
 }
 
-// ─── PRIVATE JET ─────────────────────────────────────────────────────────────
-function drawJet(
+// ─── AVIATOR-STYLE PLANE (simple & clean) ────────────────────────────────────
+function drawPlane(
   ctx: CanvasRenderingContext2D,
   cx: number,
   cy: number,
@@ -40,218 +40,85 @@ function drawJet(
   ctx.rotate(angle);
 
   if (crashed) {
-    ctx.rotate(Math.sin(t * 18) * 0.4);
-    ctx.globalAlpha = Math.max(0, 1 - (t % 2) * 0.8);
+    ctx.globalAlpha = Math.max(0, 1 - (t % 2));
   }
 
-  // ── ENGINE GLOW ─────────────────────────────────────────────────────────────
-  const eGlow = Math.abs(Math.sin(t * 9)) * 0.35 + 0.65;
-  ctx.shadowColor = '#FF8820';
-  ctx.shadowBlur = 28;
-  ctx.fillStyle = `rgba(255,130,20,${eGlow})`;
-  ctx.beginPath(); ctx.ellipse(-38, -22, 8, 5, 0.28, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(-38,  22, 8, 5,-0.28, 0, Math.PI * 2); ctx.fill();
+  // ── EXHAUST GLOW (rear) ──────────────────────────────────────────────────────
+  const eg = 0.55 + 0.45 * Math.sin(t * 10);
+  ctx.shadowColor = '#FF7000'; ctx.shadowBlur = 22;
+  ctx.fillStyle = `rgba(255,110,0,${eg})`;
+  ctx.beginPath(); ctx.ellipse(-42, 0, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
 
-  // ── WINGS ────────────────────────────────────────────────────────────────────
-  const wG = ctx.createLinearGradient(0, -58, 0, 2);
-  wG.addColorStop(0, '#9AAABB');
-  wG.addColorStop(0.5, '#C8D4DC');
-  wG.addColorStop(1, '#E0E8F0');
-  ctx.fillStyle = wG;
-  // Upper wing
+  // ── WINGS (clean swept) ───────────────────────────────────────────────────────
+  ctx.fillStyle = '#BDC8D8';
+  // Top wing
   ctx.beginPath();
-  ctx.moveTo( 8, -8);
-  ctx.lineTo(-20, -8);
-  ctx.lineTo(-42, -58);
-  ctx.lineTo(-14, -58);
+  ctx.moveTo( 6, -4);
+  ctx.lineTo(-14, -5);
+  ctx.lineTo(-32, -40);
+  ctx.lineTo(-10, -40);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
-  ctx.stroke();
-  // Winglet upper
-  ctx.fillStyle = '#B8C8D4';
+  // Bottom wing (mirror)
   ctx.beginPath();
-  ctx.moveTo(-14, -58);
-  ctx.lineTo(-42, -58);
-  ctx.lineTo(-44, -70);
-  ctx.lineTo(-18, -63);
+  ctx.moveTo( 6,  4);
+  ctx.lineTo(-14,  5);
+  ctx.lineTo(-32,  40);
+  ctx.lineTo(-10,  40);
   ctx.closePath();
   ctx.fill();
-
-  // Lower wing (mirrored)
-  ctx.fillStyle = wG;
-  ctx.beginPath();
-  ctx.moveTo( 8,  8);
-  ctx.lineTo(-20,  8);
-  ctx.lineTo(-42,  58);
-  ctx.lineTo(-14,  58);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
-  ctx.stroke();
-  // Winglet lower
-  ctx.fillStyle = '#B8C8D4';
-  ctx.beginPath();
-  ctx.moveTo(-14,  58);
-  ctx.lineTo(-42,  58);
-  ctx.lineTo(-44,  70);
-  ctx.lineTo(-18,  63);
-  ctx.closePath();
-  ctx.fill();
-
-  // ── ENGINES ─────────────────────────────────────────────────────────────────
-  function drawEngine(ey: number, sign: number) {
-    const eG = ctx.createLinearGradient(-44, ey * sign - 8, -22, ey * sign + 8);
-    eG.addColorStop(0, '#4A5868');
-    eG.addColorStop(0.4, '#7A8898');
-    eG.addColorStop(1, '#3A4858');
-    ctx.fillStyle = eG;
-    ctx.beginPath(); ctx.ellipse(-28, ey * sign, 9, 17, 0.26 * sign, 0, Math.PI * 2); ctx.fill();
-    // Inlet ring
-    ctx.strokeStyle = '#505868'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.ellipse(-28, ey * sign - 14 * sign, 8, 6, 0.26 * sign, 0, Math.PI * 2); ctx.stroke();
-    // Inlet dark
-    ctx.fillStyle = '#1A2028';
-    ctx.beginPath(); ctx.ellipse(-28, ey * sign - 14 * sign, 6, 5, 0.26 * sign, 0, Math.PI * 2); ctx.fill();
-    // Exhaust nozzle
-    ctx.fillStyle = '#606878';
-    ctx.beginPath(); ctx.ellipse(-38, ey * sign + 6 * sign, 6, 7, 0.26 * sign, 0, Math.PI * 2); ctx.fill();
-  }
-  drawEngine(22, -1);
-  drawEngine(22,  1);
 
   // ── FUSELAGE ─────────────────────────────────────────────────────────────────
-  const fG = ctx.createLinearGradient(0, -13, 0, 13);
-  fG.addColorStop(0, '#F2F6FA');
-  fG.addColorStop(0.18, '#E8EEF4');
-  fG.addColorStop(0.55, '#CCD4DE');
-  fG.addColorStop(0.85, '#98A8B8');
-  fG.addColorStop(1, '#6A7A8A');
-  ctx.fillStyle = fG;
+  const fg = ctx.createLinearGradient(0, -10, 0, 10);
+  fg.addColorStop(0, '#FFFFFF');
+  fg.addColorStop(0.35, '#EEF2FA');
+  fg.addColorStop(0.75, '#C0CCD8');
+  fg.addColorStop(1,  '#8898A8');
+  ctx.fillStyle = fg;
   ctx.beginPath();
-  ctx.moveTo(68, 0);
-  ctx.bezierCurveTo(68, -6, 52, -13, 22, -13);
-  ctx.lineTo(-56, -11);
-  ctx.bezierCurveTo(-70, -11, -78, -7, -80, -3);
-  ctx.lineTo(-80,  3);
-  ctx.bezierCurveTo(-78,  7, -70, 11, -56, 11);
-  ctx.lineTo(22, 13);
-  ctx.bezierCurveTo(52, 13, 68, 6, 68, 0);
+  ctx.moveTo(48, 0);
+  ctx.bezierCurveTo(46, -8, 28, -10, 0, -10);
+  ctx.lineTo(-38, -8);
+  ctx.lineTo(-46,  0);
+  ctx.lineTo(-38,  8);
+  ctx.lineTo(  0, 10);
+  ctx.bezierCurveTo(28, 10, 46, 8, 48, 0);
   ctx.closePath();
   ctx.fill();
 
-  // Fuselage highlight
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.beginPath();
-  ctx.moveTo(62, -2);
-  ctx.bezierCurveTo(56, -9, 38, -11, 12, -11);
-  ctx.lineTo(-48, -10);
-  ctx.bezierCurveTo(-60, -10, -68, -8, -74, -5);
-  ctx.bezierCurveTo(-62, -6, -38, -7, 8, -7);
-  ctx.bezierCurveTo(36, -7, 54, -5, 62, -2);
+  ctx.moveTo(42, -2);
+  ctx.bezierCurveTo(36, -7, 20, -9, 0, -9);
+  ctx.lineTo(-30, -7);
+  ctx.bezierCurveTo(-20, -7, 0, -6, 20, -5);
+  ctx.bezierCurveTo(30, -4, 38, -3, 42, -2);
   ctx.fill();
 
-  // Bottom shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
-  ctx.beginPath();
-  ctx.moveTo(50, 5);
-  ctx.lineTo(-54, 9);
-  ctx.bezierCurveTo(-66, 10, -74, 9, -78, 6);
-  ctx.bezierCurveTo(-70, 11, -50, 11, 22, 11);
-  ctx.bezierCurveTo(42, 11, 56, 8, 62, 5);
-  ctx.fill();
+  // ── COCKPIT WINDOW ───────────────────────────────────────────────────────────
+  ctx.fillStyle = 'rgba(70,145,220,0.78)';
+  ctx.beginPath(); ctx.ellipse(18, -3, 12, 7, -0.1, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.beginPath(); ctx.ellipse(15, -5, 5, 3, -0.1, 0, Math.PI * 2); ctx.fill();
 
-  // ── LIVERY (blue stripe + gold trim) ────────────────────────────────────────
-  ctx.fillStyle = 'rgba(20, 90, 200, 0.82)';
+  // ── VERTICAL TAIL FIN ────────────────────────────────────────────────────────
+  ctx.fillStyle = '#AAB8C4';
   ctx.beginPath();
-  ctx.moveTo(48, -2.5);
-  ctx.lineTo(-56, -3.5);
-  ctx.bezierCurveTo(-68, -3.5, -76, -1, -78,  0);
-  ctx.bezierCurveTo(-76,  1, -68, 3.5, -56, 3.5);
-  ctx.lineTo(48, 2.5);
-  ctx.closePath();
-  ctx.fill();
-  // Gold trim lines
-  ctx.strokeStyle = 'rgba(255,210,40,0.9)'; ctx.lineWidth = 1.2;
-  ctx.beginPath(); ctx.moveTo(48, -3.5); ctx.lineTo(-56, -4.5); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(48,  3.5); ctx.lineTo(-56,  4.5); ctx.stroke();
-
-  // ── WINDOWS ─────────────────────────────────────────────────────────────────
-  for (let i = 0; i < 10; i++) {
-    const wx = 38 - i * 11;
-    ctx.fillStyle = '#1E4E78';
-    ctx.beginPath(); ctx.ellipse(wx, -3.5, 4.5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#3A80C0';
-    ctx.beginPath(); ctx.ellipse(wx, -3.5, 3.5, 4.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,240,170,0.38)';
-    ctx.beginPath(); ctx.ellipse(wx, -3.5, 3, 4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.beginPath(); ctx.ellipse(wx - 1.5, -5, 1.2, 1.8, 0.3, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // ── NOSE CONE (radar) ────────────────────────────────────────────────────────
-  ctx.fillStyle = '#14181E';
-  ctx.beginPath();
-  ctx.moveTo(68, 0);
-  ctx.bezierCurveTo(64, -4, 52, -7, 46, -6);
-  ctx.lineTo(46, 6);
-  ctx.bezierCurveTo(52, 7, 64, 4, 68, 0);
-  ctx.fill();
-  // Pitot tube
-  ctx.strokeStyle = '#888898'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(68, -3); ctx.lineTo(80, -3); ctx.stroke();
-
-  // ── VERTICAL TAIL FIN ───────────────────────────────────────────────────────
-  const vfG = ctx.createLinearGradient(-60, -38, -55, 0);
-  vfG.addColorStop(0, '#C8D4DC');
-  vfG.addColorStop(1, '#98A8B8');
-  ctx.fillStyle = vfG;
-  ctx.beginPath();
-  ctx.moveTo(-56, -9);
-  ctx.lineTo(-75, -9);
-  ctx.bezierCurveTo(-78, -9, -80, -7, -80, -3);
-  ctx.lineTo(-72, -38);
-  ctx.bezierCurveTo(-70, -42, -62, -42, -60, -38);
-  ctx.lineTo(-57, -9);
-  ctx.closePath();
-  ctx.fill();
-  // Tail livery stripe
-  ctx.fillStyle = 'rgba(20,90,200,0.75)';
-  ctx.beginPath();
-  ctx.moveTo(-57, -9);
-  ctx.lineTo(-60, -32);
-  ctx.bezierCurveTo(-61, -38, -67, -40, -68, -36);
-  ctx.lineTo(-72, -28);
-  ctx.lineTo(-68, -9);
+  ctx.moveTo(-34, -6);
+  ctx.lineTo(-44, -6);
+  ctx.lineTo(-40, -24);
+  ctx.lineTo(-32, -12);
   ctx.closePath();
   ctx.fill();
 
-  // ── HORIZONTAL STABILIZERS ──────────────────────────────────────────────────
-  ctx.fillStyle = '#B8C8D4';
-  ctx.beginPath();
-  ctx.moveTo(-65, -8); ctx.lineTo(-78, -8); ctx.lineTo(-86, -26); ctx.lineTo(-70, -18); ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(-65,  8); ctx.lineTo(-78,  8); ctx.lineTo(-86,  26); ctx.lineTo(-70,  18); ctx.closePath();
-  ctx.fill();
+  // ── HORIZONTAL STABILIZERS ───────────────────────────────────────────────────
+  ctx.fillStyle = '#AAB8C4';
+  ctx.beginPath(); ctx.moveTo(-36, -3); ctx.lineTo(-46, -3); ctx.lineTo(-50, -16); ctx.lineTo(-38, -9); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-36,  3); ctx.lineTo(-46,  3); ctx.lineTo(-50,  16); ctx.lineTo(-38,  9); ctx.closePath(); ctx.fill();
 
-  // ── NAVIGATION LIGHTS ───────────────────────────────────────────────────────
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = '#FF2020'; ctx.shadowColor = '#FF2020';
-  ctx.beginPath(); ctx.arc(-28, -62, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#20FF40'; ctx.shadowColor = '#20FF40';
-  ctx.beginPath(); ctx.arc(-28,  62, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#FFFFFF'; ctx.shadowColor = '#FFFFFF';
-  ctx.beginPath(); ctx.arc(-80, 0, 2.5, 0, Math.PI * 2); ctx.fill();
-  // Strobe flash
-  if (Math.sin(t * 5) > 0.7) {
-    ctx.shadowBlur = 30;
-    ctx.beginPath(); ctx.arc(10, -12, 3.5, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
-
   ctx.restore();
 }
 
@@ -294,6 +161,7 @@ export default function CrashGame() {
   const particlesRef    = useRef<Particle[]>([]);
   const crashPosRef     = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const crashTRef       = useRef(0);
+  const smoothAngleRef  = useRef(-0.3);
 
   function generateCrashPoint() {
     const r = Math.random();
@@ -571,11 +439,14 @@ export default function CrashGame() {
 
         if (!iscrashed) crashPosRef.current = pos;
 
-        // Compute angle mathematically from the curve derivative
-        const dT = 0.08;
+        // Compute angle from curve derivative, then smooth it with lerp
+        const dT = 0.25;
         const posA = getPlanePos(Math.max(elapsed - dT, 0), getMultiplier(Math.max(elapsed - dT, 0.001)), W, H);
         const posB = getPlanePos(elapsed + dT, getMultiplier(elapsed + dT), W, H);
-        let angle = Math.atan2(posB.y - posA.y, posB.x - posA.x);
+        const rawAngle = Math.atan2(posB.y - posA.y, posB.x - posA.x);
+        // Lerp toward target angle — 0.08 = very smooth, 1.0 = instant
+        smoothAngleRef.current += (rawAngle - smoothAngleRef.current) * 0.08;
+        let angle = smoothAngleRef.current;
 
         // Crash spin
         if (iscrashed) {
@@ -592,10 +463,10 @@ export default function CrashGame() {
           ctx.beginPath(); ctx.arc(pos.x, pos.y, 28, 0, Math.PI * 2); ctx.fill();
         }
 
-        drawJet(ctx, pos.x, pos.y, angle, t, iscrashed);
+        drawPlane(ctx, pos.x, pos.y, angle, t, iscrashed);
       } else {
-        // Waiting — show stationary jet at origin
-        drawJet(ctx, ORIG_X + 20, ORIG_Y - 10, -0.18, t, false);
+        // Waiting — show stationary plane at origin
+        drawPlane(ctx, ORIG_X + 20, ORIG_Y - 10, -0.22, t, false);
       }
 
       // ── EXPLOSION PARTICLES ───────────────────────────────────────────────
