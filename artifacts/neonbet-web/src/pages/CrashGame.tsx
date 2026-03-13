@@ -2,13 +2,205 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame, makeId } from '../context/GameContext';
 
 type Phase = 'waiting' | 'flying' | 'crashed';
+type Bullet = { x: number; y: number; speed: number; opacity: number };
 
 const HISTORY_ITEMS = [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01];
 
-// Exact: e^(0.077 * t)
-// 1x→2x = exactly 9s, 1x→5x ≈ 21s, 1x→10x ≈ 30s
 function getMultiplier(elapsedSec: number): number {
   return Math.floor(Math.pow(Math.E, 0.077 * elapsedSec) * 100) / 100;
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawCowboyDog(ctx: CanvasRenderingContext2D, cx: number, cy: number, elapsed: number) {
+  const bob = Math.sin(elapsed * 6) * 2;
+  const by = cy + bob;
+
+  ctx.save();
+
+  // === BOOTS ===
+  ctx.fillStyle = '#1a1208';
+  roundRect(ctx, cx - 10, by + 4, 9, 6, 2); ctx.fill();
+  roundRect(ctx, cx + 1, by + 4, 9, 6, 2); ctx.fill();
+
+  // === LEGS ===
+  ctx.fillStyle = '#3a2d14';
+  roundRect(ctx, cx - 8, by - 8, 7, 14, 2); ctx.fill();
+  roundRect(ctx, cx + 1, by - 8, 7, 14, 2); ctx.fill();
+
+  // === BODY (vest) ===
+  ctx.fillStyle = '#7B3F10';
+  roundRect(ctx, cx - 11, by - 28, 22, 22, 4); ctx.fill();
+  ctx.fillStyle = '#5C2C08';
+  roundRect(ctx, cx - 6, by - 27, 12, 18, 2); ctx.fill();
+
+  // Vest buttons
+  ctx.fillStyle = '#ffd700';
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(cx, by - 24 + i * 6, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // === LEFT ARM (static, resting) ===
+  ctx.strokeStyle = '#C8956A';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 11, by - 24);
+  ctx.lineTo(cx - 16, by - 14);
+  ctx.stroke();
+
+  // === RIGHT ARM extended with gun ===
+  const armY = by - 22 + Math.sin(elapsed * 6) * 0.5;
+  // Upper arm
+  ctx.strokeStyle = '#C8956A';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(cx + 11, by - 24);
+  ctx.lineTo(cx + 22, armY);
+  ctx.stroke();
+  // Hand
+  ctx.fillStyle = '#C8956A';
+  ctx.beginPath();
+  ctx.arc(cx + 22, armY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Gun grip
+  ctx.fillStyle = '#4a3520';
+  roundRect(ctx, cx + 20, armY, 7, 10, 2); ctx.fill();
+  // Gun body
+  ctx.fillStyle = '#222222';
+  roundRect(ctx, cx + 22, armY - 6, 22, 7, 2); ctx.fill();
+  ctx.fillStyle = '#3a3a3a';
+  roundRect(ctx, cx + 23, armY - 5, 20, 3, 1); ctx.fill();
+  // Trigger guard
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx + 27, armY + 2, 4, 0, Math.PI, false);
+  ctx.stroke();
+
+  // === HEAD ===
+  // Dog head (rounded)
+  ctx.fillStyle = '#D4A574';
+  ctx.beginPath();
+  ctx.ellipse(cx, by - 42, 14, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Cheek patches
+  ctx.fillStyle = '#C4956A';
+  ctx.beginPath();
+  ctx.ellipse(cx - 7, by - 38, 5, 4, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 7, by - 38, 5, 4, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === FLOPPY EARS ===
+  ctx.fillStyle = '#B8855A';
+  // Left ear
+  ctx.beginPath();
+  ctx.ellipse(cx - 13, by - 44, 6, 10, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  // Right ear
+  ctx.beginPath();
+  ctx.ellipse(cx + 13, by - 44, 6, 10, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner ear
+  ctx.fillStyle = '#E8A0A0';
+  ctx.beginPath();
+  ctx.ellipse(cx - 13, by - 45, 3, 6, -0.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 13, by - 45, 3, 6, 0.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === COWBOY HAT ===
+  // Brim
+  ctx.fillStyle = '#2E1F0E';
+  ctx.beginPath();
+  ctx.ellipse(cx, by - 54, 20, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Crown
+  ctx.fillStyle = '#4A3020';
+  roundRect(ctx, cx - 12, by - 74, 24, 22, 4); ctx.fill();
+  // Crown crease (indent at top)
+  ctx.fillStyle = '#3A2215';
+  roundRect(ctx, cx - 8, by - 74, 16, 6, 2); ctx.fill();
+  // Hat band
+  ctx.fillStyle = '#B8960C';
+  ctx.fillRect(cx - 12, by - 55, 24, 3);
+  // Hat star badge
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 9px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('★', cx, by - 64);
+
+  // === EYES ===
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(cx - 5, by - 44, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 5, by - 44, 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1a0a00';
+  ctx.beginPath(); ctx.arc(cx - 5, by - 44, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 5, by - 44, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(cx - 4, by - 45, 0.8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + 6, by - 45, 0.8, 0, Math.PI * 2); ctx.fill();
+
+  // === SNOUT ===
+  ctx.fillStyle = '#c4956a';
+  ctx.beginPath();
+  ctx.ellipse(cx, by - 37, 6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Nose
+  ctx.fillStyle = '#1a0a00';
+  ctx.beginPath();
+  ctx.ellipse(cx, by - 39, 4, 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Mouth
+  ctx.strokeStyle = '#6B3A1F';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, by - 36);
+  ctx.lineTo(cx - 4, by - 33);
+  ctx.moveTo(cx, by - 36);
+  ctx.lineTo(cx + 4, by - 33);
+  ctx.stroke();
+
+  // === TAIL (curving behind left) ===
+  ctx.strokeStyle = '#C8956A';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 11, by - 10);
+  ctx.quadraticCurveTo(cx - 26, by - 20 + Math.sin(elapsed * 5) * 5, cx - 22, by - 32 + Math.sin(elapsed * 5) * 4);
+  ctx.stroke();
+  // Tail tip
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(cx - 22, by - 32 + Math.sin(elapsed * 5) * 4, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // Return muzzle position for bullet/flash drawing
+  const muzzleX = cx + 44;
+  const muzzleY = armY - 2;
+  return { muzzleX, muzzleY };
 }
 
 export default function CrashGame() {
@@ -42,9 +234,14 @@ export default function CrashGame() {
   const hasActiveBetRef = useRef(false);
   const cashedOutRef = useRef<number | null>(null);
 
+  // Cowboy dog animation state
+  const bulletsRef = useRef<Bullet[]>([]);
+  const lastFireRef = useRef(0);
+  const flashFrameRef = useRef(0);
+
   function generateCrashPoint() {
     const r = Math.random();
-    if (r < 0.28) return 1.00 + Math.random() * 0.05;  // instant crash
+    if (r < 0.28) return 1.00 + Math.random() * 0.05;
     if (r < 0.50) return 1.1 + Math.random() * 0.6;
     if (r < 0.70) return 1.8 + Math.random() * 1.5;
     if (r < 0.85) return 3.5 + Math.random() * 6;
@@ -63,6 +260,8 @@ export default function CrashGame() {
     setResultMsg(null);
     hasActiveBetRef.current = false;
     setHasActiveBet(false);
+    bulletsRef.current = [];
+    flashFrameRef.current = 0;
     setBets([
       { user: 'Player1', amount: 250 + Math.floor(Math.random() * 750), status: 'active', cashout: null },
       { user: 'CryptoKing', amount: 500 + Math.floor(Math.random() * 1500), status: 'active', cashout: null },
@@ -93,14 +292,12 @@ export default function CrashGame() {
     startTimeRef.current = Date.now();
 
     if (intervalRef.current) clearInterval(intervalRef.current);
-    // 100ms tick — smooth but not frantic
     intervalRef.current = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       const m = getMultiplier(elapsed);
       multiplierRef.current = m;
       setMultiplier(m);
 
-      // Random bot cashouts (slower probability to match slower pace)
       setBets(prev => prev.map(b => {
         if (b.status === 'active' && Math.random() < 0.003 && m > 1.2) {
           return { ...b, status: 'cashed', cashout: m };
@@ -108,7 +305,6 @@ export default function CrashGame() {
         return b;
       }));
 
-      // Auto cashout
       if (hasActiveBetRef.current && autoCashout > 1 && m >= autoCashout && !cashedOutRef.current) {
         doCashout(m);
         return;
@@ -131,7 +327,7 @@ export default function CrashGame() {
     setResultMsg({ text: `Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, win: true });
     if (state.user) {
       addHistory({ id: makeId(), game: 'crash', wager: betAmount, multiplier: atMult, payout, won: true, timestamp: Date.now() });
-      addNotification(`✈️ Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
+      addNotification(`🤠 Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
     }
   }
 
@@ -150,6 +346,7 @@ export default function CrashGame() {
       setHasActiveBet(false);
     }
 
+    bulletsRef.current = [];
     setBets(prev => prev.map(b => b.status === 'active' ? { ...b, status: 'crashed' } : b));
     setTimeout(() => startCountdown(), 4000);
   }
@@ -168,14 +365,13 @@ export default function CrashGame() {
     doCashout(multiplierRef.current);
   }
 
-  // Canvas animation loop (separate from game logic)
+  // Canvas animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
     const W = canvas.width, H = canvas.height;
 
-    // Point history for drawing the curve
     const points: { x: number; y: number }[] = [];
 
     function draw() {
@@ -196,10 +392,11 @@ export default function CrashGame() {
         ctx.beginPath(); ctx.moveTo(0, i * H / 5); ctx.lineTo(W, i * H / 5); ctx.stroke();
       }
 
-      // Multiplier labels on left
+      // Multiplier labels
       ctx.fillStyle = '#33334a';
       ctx.font = '11px Inter';
       ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
       for (let i = 1; i <= 5; i++) {
         const y = H - i * H / 5;
         ctx.fillText(`${i}x`, 6, y - 4);
@@ -214,31 +411,26 @@ export default function CrashGame() {
         return;
       }
 
+      const elapsed = startTimeRef.current > 0 ? (Date.now() - startTimeRef.current) / 1000 : 0;
       const m = multiplierRef.current;
       const iscrashed = phaseRef.current === 'crashed';
       const lineColor = iscrashed ? '#ff3b5c' : '#00d4ff';
 
-      // How far along the x-axis the plane is
-      // Cap at 90% of canvas width so we don't go off screen
       const maxMult = Math.max(crashPointRef.current, m, 3);
-      const progress = Math.min((m - 1) / (maxMult - 1), 0.92);
+      const progress = Math.min((m - 1) / (maxMult - 1), 0.90);
 
-      // Build current point
-      const curX = 30 + progress * (W - 60);
-      // Y: logarithmic curve
+      const curX = 30 + progress * (W - 100);
       const t = progress;
       const curY = (H - 30) - (H - 70) * Math.pow(t, 0.7);
 
-      // Track points
       if (!iscrashed && points.length === 0) { points.push({ x: 30, y: H - 30 }); }
       if (!iscrashed) { points.push({ x: curX, y: curY }); if (points.length > 300) points.shift(); }
 
-      // Draw filled area under curve
+      // Filled area under curve
       if (points.length > 1) {
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, `${lineColor}25`);
         grad.addColorStop(1, `${lineColor}03`);
-
         ctx.beginPath();
         ctx.moveTo(points[0].x, H - 30);
         points.forEach(p => ctx.lineTo(p.x, p.y));
@@ -248,7 +440,7 @@ export default function CrashGame() {
         ctx.fill();
       }
 
-      // Draw curve line
+      // Curve line
       if (points.length > 1) {
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
@@ -267,40 +459,118 @@ export default function CrashGame() {
       }
 
       if (!iscrashed) {
-        // Plane emoji at tip of curve
-        ctx.font = '28px serif';
-        ctx.textAlign = 'center';
-        // Angle the plane by computing slope
-        const last2 = points.length >= 2 ? points[points.length - 2] : null;
-        const angle = last2 ? Math.atan2(curY - last2.y, curX - last2.x) : -0.4;
-        ctx.save();
-        ctx.translate(curX, curY - 10);
-        ctx.rotate(angle);
-        ctx.fillText('✈️', 0, 0);
-        ctx.restore();
-      } else {
-        // Explosion at crash point
-        ctx.font = '36px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('💥', curX, curY - 10);
-      }
+        // ---- COWBOY DOG CHARACTER ----
 
-      // Multiplier text on canvas
-      if (!iscrashed) {
+        // Compute muzzle position (arm extends ~44px right, armY ≈ curY - 22)
+        const armY = curY - 22 + Math.sin(elapsed * 6) * 0.5;
+        const muzzleX = curX + 44;
+        const muzzleY = armY - 2;
+
+        // Fire bullets periodically
+        const now = Date.now();
+        const fireInterval = 250 + Math.random() * 200;
+        if (now - lastFireRef.current > fireInterval) {
+          lastFireRef.current = now;
+          flashFrameRef.current = 6;
+          bulletsRef.current.push({
+            x: muzzleX,
+            y: muzzleY,
+            speed: 14 + Math.random() * 6,
+            opacity: 1,
+          });
+        }
+
+        // Update bullets
+        bulletsRef.current = bulletsRef.current
+          .map(b => ({ ...b, x: b.x + b.speed, opacity: b.opacity - 0.025 }))
+          .filter(b => b.x < W + 50 && b.opacity > 0);
+
+        // Draw bullets
+        bulletsRef.current.forEach(b => {
+          // Trail
+          ctx.save();
+          const trailGrad = ctx.createLinearGradient(b.x - 24, 0, b.x, 0);
+          trailGrad.addColorStop(0, `rgba(255, 200, 0, 0)`);
+          trailGrad.addColorStop(0.6, `rgba(255, 200, 0, ${b.opacity * 0.5})`);
+          trailGrad.addColorStop(1, `rgba(255, 255, 100, ${b.opacity})`);
+          ctx.beginPath();
+          ctx.moveTo(b.x - 24, b.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.strokeStyle = trailGrad;
+          ctx.lineWidth = 2.5;
+          ctx.shadowColor = '#ffd700';
+          ctx.shadowBlur = 8;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          // Bullet head (elongated)
+          ctx.beginPath();
+          ctx.ellipse(b.x + 2, b.y, 5, 3, 0, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 230, 60, ${b.opacity})`;
+          ctx.fill();
+          ctx.restore();
+        });
+
+        // Muzzle flash
+        if (flashFrameRef.current > 0) {
+          flashFrameRef.current--;
+          ctx.save();
+          ctx.translate(muzzleX, muzzleY);
+          const fSize = 5 + flashFrameRef.current * 2;
+          // Burst rays
+          for (let a = 0; a < 8; a++) {
+            const angle = (a / 8) * Math.PI * 2 + (flashFrameRef.current * 0.3);
+            const len = fSize * (0.6 + Math.random() * 0.8);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(angle) * len, Math.sin(angle) * len);
+            ctx.strokeStyle = `rgba(255, 220, 60, ${flashFrameRef.current / 6})`;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#ffcc00';
+            ctx.shadowBlur = 6;
+            ctx.stroke();
+          }
+          ctx.shadowBlur = 0;
+          // Core glow
+          const fGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, fSize + 4);
+          fGrad.addColorStop(0, `rgba(255, 255, 220, ${flashFrameRef.current / 6})`);
+          fGrad.addColorStop(0.5, `rgba(255, 160, 30, ${(flashFrameRef.current / 6) * 0.7})`);
+          fGrad.addColorStop(1, `rgba(255, 100, 0, 0)`);
+          ctx.beginPath();
+          ctx.arc(0, 0, fSize + 4, 0, Math.PI * 2);
+          ctx.fillStyle = fGrad;
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw the cowboy dog
+        drawCowboyDog(ctx, curX, curY, elapsed);
+
+        // Multiplier text
         ctx.font = 'bold 44px Inter';
         ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
         ctx.fillStyle = m >= 3 ? '#00ff88' : m >= 2 ? '#ffd700' : '#00d4ff';
         ctx.shadowColor = ctx.fillStyle;
         ctx.shadowBlur = 20;
-        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 60);
+        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 16);
         ctx.shadowBlur = 0;
+
+      } else {
+        // Crashed — explosion
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '48px serif';
+        ctx.fillText('💥', curX, curY - 10);
       }
 
       animRef.current = requestAnimationFrame(draw);
     }
 
     animRef.current = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(animRef.current); points.length = 0; };
+    return () => {
+      cancelAnimationFrame(animRef.current);
+      points.length = 0;
+    };
   }, []);
 
   useEffect(() => {
@@ -321,7 +591,7 @@ export default function CrashGame() {
           borderRadius: '10px', padding: '8px 16px', color: 'var(--text2)',
           cursor: 'pointer', fontSize: '14px',
         }}>← Back</button>
-        <h1 style={{ fontWeight: 800, fontSize: '24px' }}>✈️ Crash</h1>
+        <h1 style={{ fontWeight: 800, fontSize: '24px' }}>🤠 Crash</h1>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {history.slice(0, 12).map((v, i) => (
             <div key={i} style={{
@@ -342,7 +612,7 @@ export default function CrashGame() {
           }}>
             <canvas ref={canvasRef} width={720} height={380} style={{ width: '100%', display: 'block' }} />
 
-            {/* Overlay: crashed big text */}
+            {/* Crashed overlay */}
             {phase === 'crashed' && (
               <div style={{
                 position: 'absolute', top: '50%', left: '50%',
@@ -365,7 +635,7 @@ export default function CrashGame() {
                 position: 'absolute', top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none',
               }}>
-                <div style={{ fontSize: '56px', marginBottom: '12px' }}>✈️</div>
+                <div style={{ fontSize: '56px', marginBottom: '12px' }}>🤠</div>
                 <div style={{ color: 'var(--text2)', fontWeight: 700, fontSize: '18px' }}>Next round in</div>
                 <div style={{ fontSize: '52px', fontWeight: 900, color: 'var(--neon-blue)', textShadow: '0 0 20px var(--neon-blue)', lineHeight: 1.1 }}>
                   {countdown}s
@@ -461,7 +731,7 @@ export default function CrashGame() {
                 border: 'none', borderRadius: 'var(--radius)', padding: '16px',
                 fontWeight: 800, fontSize: '16px', cursor: phase === 'waiting' ? 'pointer' : 'not-allowed',
               }}>
-                {phase === 'waiting' ? `✈️ Bet ₹${betAmount.toLocaleString()}` : 'Round in progress...'}
+                {phase === 'waiting' ? `🔫 Bet ₹${betAmount.toLocaleString()}` : 'Round in progress...'}
               </button>
             ) : (
               <button onClick={cashOut} disabled={phase !== 'flying' || !!cashedOutAt} style={{
@@ -475,11 +745,10 @@ export default function CrashGame() {
               }}>
                 {cashedOutAt
                   ? `✅ Cashed at ${cashedOutAt.toFixed(2)}x`
-                  : `💰 Cash Out  ${Math.floor(betAmount * multiplier).toLocaleString()}`}
+                  : `💰 Cash Out  ₹${Math.floor(betAmount * multiplier).toLocaleString()}`}
               </button>
             )}
 
-            {/* Live multiplier display */}
             {phase === 'flying' && (
               <div style={{
                 marginTop: '14px', padding: '14px', borderRadius: '12px', textAlign: 'center',
