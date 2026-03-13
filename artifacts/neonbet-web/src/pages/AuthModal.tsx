@@ -1,0 +1,158 @@
+import { useState } from 'react';
+import { useGame } from '../context/GameContext';
+
+export default function AuthModal({ onClose }: { onClose: () => void }) {
+  const { login } = useGame();
+  const [tab, setTab] = useState<'login' | 'register'>('register');
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!username.trim() || username.length < 3) { setError('Username must be at least 3 characters.'); return; }
+    if (!email.includes('@')) { setError('Enter a valid email address.'); return; }
+    if (password.length < 4) { setError('Password must be at least 4 characters.'); return; }
+    login(username.trim(), email.trim());
+    onClose();
+  }
+
+  function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!username.trim()) { setError('Enter your username.'); return; }
+    login(username.trim(), email.trim() || `${username}@neonbet.com`);
+    onClose();
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      animation: 'fadeIn 0.2s ease',
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: 'var(--bg2)', borderRadius: 'var(--radius-xl)',
+        border: '1px solid var(--border)', padding: '40px',
+        width: '440px', animation: 'scaleIn 0.2s ease',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '8px' }}>⚡</div>
+          <div style={{ fontWeight: 900, fontSize: '26px', letterSpacing: '-0.5px' }}>
+            <span style={{ color: 'var(--neon-blue)' }}>Neon</span>Bet
+          </div>
+          <div style={{ color: 'var(--text3)', fontSize: '13px', marginTop: '4px' }}>
+            Start with 10,000 pts free!
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr',
+          background: 'var(--bg3)', borderRadius: 'var(--radius)',
+          padding: '4px', marginBottom: '28px', border: '1px solid var(--border)',
+        }}>
+          {(['register', 'login'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{
+              padding: '10px', borderRadius: '9px',
+              background: tab === t ? 'var(--neon-blue)' : 'transparent',
+              color: tab === t ? '#000' : 'var(--text2)',
+              fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+              border: 'none', transition: 'all 0.2s',
+            }}>
+              {t === 'register' ? 'Register' : 'Sign In'}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={tab === 'register' ? handleSubmit : handleLogin}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>
+                USERNAME
+              </label>
+              <input value={username} onChange={e => setUsername(e.target.value)}
+                placeholder="Enter username"
+                style={{
+                  width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)', padding: '13px 16px',
+                  color: 'var(--text)', fontSize: '15px', transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+              />
+            </div>
+
+            {tab === 'register' && (
+              <div>
+                <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>
+                  EMAIL
+                </label>
+                <input value={email} onChange={e => setEmail(e.target.value)}
+                  type="email" placeholder="Enter email"
+                  style={{
+                    width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)', padding: '13px 16px',
+                    color: 'var(--text)', fontSize: '15px', transition: 'border-color 0.2s',
+                  }}
+                  onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                  onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+                />
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>
+                PASSWORD
+              </label>
+              <input value={password} onChange={e => setPassword(e.target.value)}
+                type="password" placeholder="Enter password"
+                style={{
+                  width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)', padding: '13px 16px',
+                  color: 'var(--text)', fontSize: '15px', transition: 'border-color 0.2s',
+                }}
+                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
+              />
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              marginTop: '14px', padding: '12px 16px',
+              background: 'var(--neon-red)15', border: '1px solid var(--neon-red)40',
+              borderRadius: 'var(--radius)', color: 'var(--neon-red)', fontSize: '14px', fontWeight: 600,
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <button type="submit" style={{
+            width: '100%', background: 'var(--neon-blue)', color: '#000',
+            border: 'none', borderRadius: 'var(--radius)', padding: '16px',
+            fontWeight: 800, fontSize: '16px', cursor: 'pointer',
+            marginTop: '20px', letterSpacing: '0.5px',
+          }}>
+            {tab === 'register' ? '🎮 Create Account & Play!' : '⚡ Sign In'}
+          </button>
+        </form>
+
+        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', marginTop: '20px' }}>
+          No real money involved. For entertainment only. Play responsibly.
+        </p>
+
+        <button onClick={onClose} style={{
+          position: 'absolute', top: '16px', right: '20px',
+          background: 'none', border: 'none', color: 'var(--text3)',
+          fontSize: '22px', cursor: 'pointer', lineHeight: 1,
+        }}>×</button>
+      </div>
+    </div>
+  );
+}
