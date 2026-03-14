@@ -1,19 +1,21 @@
+import http from "http";
+import { WebSocketServer } from "ws";
 import app from "./app";
+import { startGameEngine, handleConnection } from "./lib/gameEngine";
 
 const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+if (!rawPort) throw new Error("PORT environment variable is required");
 const port = Number(rawPort);
+if (Number.isNaN(port) || port <= 0) throw new Error(`Invalid PORT: "${rawPort}"`);
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
+const server = http.createServer(app);
 
-app.listen(port, () => {
+const wss = new WebSocketServer({ server, path: "/ws" });
+wss.on("connection", handleConnection);
+
+startGameEngine(wss);
+
+server.listen(port, () => {
   console.log(`Server listening on port ${port}`);
+  console.log(`WebSocket ready on ws://localhost:${port}/ws`);
 });

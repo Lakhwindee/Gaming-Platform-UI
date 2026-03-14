@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useReducer, useRef } from 'react';
+import { api, ApiUser } from '../lib/api';
+import { connectWS, disconnectWS, WSC } from '../lib/wsClient';
 
 export type User = {
   id: string;
@@ -11,7 +13,7 @@ export type User = {
   totalWagered: number;
   level: number;
   xp: number;
-  vipLevel: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
+  vipLevel: string;
 };
 
 export type GameHistory = {
@@ -39,6 +41,7 @@ type State = {
   notifications: Notification[];
   walletOpen: boolean;
   chatOpen: boolean;
+  authLoading: boolean;
 };
 
 type Action =
@@ -52,30 +55,30 @@ type Action =
   | { type: 'ADD_NOTIFICATION'; notif: Notification }
   | { type: 'CLEAR_NOTIFICATIONS' }
   | { type: 'TOGGLE_WALLET' }
-  | { type: 'TOGGLE_CHAT' };
+  | { type: 'TOGGLE_CHAT' }
+  | { type: 'SET_AUTH_LOADING'; loading: boolean };
 
 const init: State = {
-  user: null,
-  history: [],
-  page: 'home',
-  activeGame: null,
-  notifications: [],
-  walletOpen: false,
-  chatOpen: false,
+  user: null, history: [], page: 'home',
+  activeGame: null, notifications: [], walletOpen: false, chatOpen: false, authLoading: true,
 };
 
-function getVipLevel(totalWagered: number): User['vipLevel'] {
-  if (totalWagered >= 5000000) return 'Diamond';
-  if (totalWagered >= 1000000) return 'Platinum';
-  if (totalWagered >= 500000) return 'Gold';
-  if (totalWagered >= 100000) return 'Silver';
-  return 'Bronze';
+function apiUserToUser(u: ApiUser): User {
+  return {
+    id: String(u.id), username: u.username, email: u.email,
+    balance: u.balance, coins: Math.floor(u.totalWagered / 10),
+    totalWins: u.totalWins, totalLosses: u.totalLosses, totalWagered: u.totalWagered,
+    level: Math.floor(u.totalWagered / 5000) + 1,
+    xp: Math.floor(u.totalWagered / 5),
+    vipLevel: u.vipLevel,
+  };
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'LOGIN': return { ...state, user: action.user };
-    case 'LOGOUT': return { ...state, user: null, history: [] };
+    case 'LOGIN': return { ...state, user: action.user, authLoading: false };
+    case 'LOGOUT': return { ...state, user: null, history: [], authLoading: false };
+    case 'SET_AUTH_LOADING': return { ...state, authLoading: action.loading };
     case 'ADD_HISTORY': {
       const e = action.entry;
       const newHistory = [e, ...state.history].slice(0, 500);
@@ -85,8 +88,7 @@ function reducer(state: State, action: Action): State {
       const newXp = state.user.xp + Math.floor(e.wager / 5);
       const newCoins = state.user.coins + Math.floor(e.wager / 10);
       return {
-        ...state,
-        history: newHistory,
+        ...state, history: newHistory,
         user: {
           ...state.user,
           balance: state.user.balance + profit,
@@ -96,7 +98,7 @@ function reducer(state: State, action: Action): State {
           totalWagered: newWagered,
           xp: newXp,
           level: Math.floor(newXp / 500) + 1,
-          vipLevel: getVipLevel(newWagered),
+          vipLevel: e.won && newWagered >= 5000000 ? 'Diamond' : e.won && newWagered >= 1000000 ? 'Platinum' : e.won && newWagered >= 500000 ? 'Gold' : e.won && newWagered >= 100000 ? 'Silver' : state.user.vipLevel,
         },
       };
     }
@@ -124,7 +126,8 @@ function reducer(state: State, action: Action): State {
 
 type Ctx = {
   state: State;
-  login: (username: string, email: string) => void;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   addHistory: (e: GameHistory) => void;
   navigate: (page: string) => void;
@@ -137,43 +140,67 @@ type Ctx = {
 const GameCtx = createContext<Ctx | null>(null);
 
 export function GameProvider({ children }: { children: React.ReactNode }) {
-  const saved = (() => {
-    try {
-      const u = localStorage.getItem('nb_user');
-      const h = localStorage.getItem('nb_history');
-      return { user: u ? JSON.parse(u) : null, history: h ? JSON.parse(h) : [] };
-    } catch { return { user: null, history: [] }; }
-  })();
+  const [state, dispatch] = useReducer(reducer, init);
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
 
-  const [state, dispatch] = useReducer(reducer, { ...init, user: saved.user, history: saved.history });
-
+  // On mount: restore session from localStorage token
   useEffect(() => {
-    if (state.user) localStorage.setItem('nb_user', JSON.stringify(state.user));
-    else localStorage.removeItem('nb_user');
-  }, [state.user]);
+    const token = localStorage.getItem('nb_token');
+    const history = (() => { try { return JSON.parse(localStorage.getItem('nb_history') ?? '[]'); } catch { return []; } })();
+    if (token) {
+      api.me(token).then(u => {
+        dispatchRef.current({ type: 'LOGIN', user: apiUserToUser(u) });
+        connectWS(token);
+      }).catch(() => {
+        localStorage.removeItem('nb_token');
+        dispatchRef.current({ type: 'SET_AUTH_LOADING', loading: false });
+        connectWS(null);
+      });
+    } else {
+      dispatchRef.current({ type: 'SET_AUTH_LOADING', loading: false });
+      connectWS(null);
+    }
+    if (history.length) history.forEach((e: GameHistory) => dispatchRef.current({ type: 'ADD_HISTORY', entry: e }));
+  }, []);
 
+  // WebSocket balance updates (from crash game bet/cashout)
+  useEffect(() => {
+    const handler = (msg: Record<string, unknown>) => {
+      if (msg.type === 'cashout_ok' || msg.type === 'bet_ok') {
+        dispatchRef.current({ type: 'UPDATE_BALANCE', amount: msg.balance as number });
+      }
+    };
+    WSC.msgListeners.add(handler);
+    return () => { WSC.msgListeners.delete(handler); };
+  }, []);
+
+  // Persist history
   useEffect(() => {
     localStorage.setItem('nb_history', JSON.stringify(state.history));
   }, [state.history]);
 
-  const login = (username: string, email: string) => {
-    const user: User = {
-      id: Date.now().toString(),
-      username,
-      email,
-      balance: 10000,
-      coins: 500,
-      totalWins: 0,
-      totalLosses: 0,
-      totalWagered: 0,
-      level: 1,
-      xp: 0,
-      vipLevel: 'Bronze',
-    };
-    dispatch({ type: 'LOGIN', user });
+  const login = async (username: string, password: string) => {
+    const { token, user } = await api.login(username, password);
+    localStorage.setItem('nb_token', token);
+    dispatch({ type: 'LOGIN', user: apiUserToUser(user) });
+    connectWS(token);
   };
 
-  const logout = () => dispatch({ type: 'LOGOUT' });
+  const register = async (username: string, email: string, password: string) => {
+    const { token, user } = await api.register(username, email, password);
+    localStorage.setItem('nb_token', token);
+    dispatch({ type: 'LOGIN', user: apiUserToUser(user) });
+    connectWS(token);
+  };
+
+  const logout = () => {
+    localStorage.removeItem('nb_token');
+    dispatch({ type: 'LOGOUT' });
+    disconnectWS();
+    connectWS(null);
+  };
+
   const addHistory = (e: GameHistory) => dispatch({ type: 'ADD_HISTORY', entry: e });
   const navigate = (page: string) => dispatch({ type: 'SET_PAGE', page });
   const playGame = (game: string) => dispatch({ type: 'SET_GAME', game });
@@ -184,7 +211,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const toggleChat = () => dispatch({ type: 'TOGGLE_CHAT' });
 
   return (
-    <GameCtx.Provider value={{ state, login, logout, addHistory, navigate, playGame, addNotification, toggleWallet, toggleChat }}>
+    <GameCtx.Provider value={{ state, login, register, logout, addHistory, navigate, playGame, addNotification, toggleWallet, toggleChat }}>
       {children}
     </GameCtx.Provider>
   );
@@ -196,5 +223,3 @@ export function useGame() {
   return ctx;
 }
 
-let _id = 0;
-export function makeId() { return `${Date.now()}-${_id++}`; }

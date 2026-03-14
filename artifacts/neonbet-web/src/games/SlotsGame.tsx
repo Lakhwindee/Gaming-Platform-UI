@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { useGame, makeId } from '../context/GameContext';
+import { useGame } from '../context/GameContext';
+import { makeId } from '../lib/utils';
 
 const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣', '🎰', '🔔', '🍀'];
 const WEIGHTS = [20, 18, 16, 14, 10, 8, 6, 4, 2, 2]; // lower weight = rarer

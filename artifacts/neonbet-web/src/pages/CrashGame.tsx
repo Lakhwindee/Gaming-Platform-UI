@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useGame, makeId } from '../context/GameContext';
-
-type Phase = 'waiting' | 'flying' | 'crashed';
+import { useGame } from '../context/GameContext';
+import { makeId } from '../lib/utils';
+import { WSC, wsSend, Phase } from '../lib/wsClient';
 
 const HISTORY_ITEMS = [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01];
 
@@ -24,25 +24,21 @@ function getPos(elapsed: number, mult: number, W: number, H: number) {
   return { x, y };
 }
 
-// ─── SIMPLE AVIATOR-STYLE PLANE ─────────────────────────────────────────────
 function drawPlane(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle: number, t: number, fading: boolean) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
   if (fading) ctx.globalAlpha = Math.max(0, 1 - (t % 2));
 
-  // Exhaust glow
   ctx.shadowColor = '#FF7000'; ctx.shadowBlur = 22;
   ctx.fillStyle = `rgba(255,110,0,${0.55 + 0.45 * Math.sin(t * 10)})`;
   ctx.beginPath(); ctx.ellipse(-42, 0, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
 
-  // Wings
   ctx.fillStyle = '#BDC8D8';
   ctx.beginPath(); ctx.moveTo(6, -4); ctx.lineTo(-14, -5); ctx.lineTo(-32, -40); ctx.lineTo(-10, -40); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(6,  4); ctx.lineTo(-14,  5); ctx.lineTo(-32,  40); ctx.lineTo(-10,  40); ctx.closePath(); ctx.fill();
 
-  // Fuselage
   const fg = ctx.createLinearGradient(0, -10, 0, 10);
   fg.addColorStop(0, '#FFFFFF'); fg.addColorStop(0.35, '#EEF2FA');
   fg.addColorStop(0.75, '#C0CCD8'); fg.addColorStop(1, '#8898A8');
@@ -55,7 +51,6 @@ function drawPlane(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle:
   ctx.bezierCurveTo(28, 10, 46, 8, 48, 0);
   ctx.closePath(); ctx.fill();
 
-  // Top highlight
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.beginPath();
   ctx.moveTo(42, -2);
@@ -63,13 +58,11 @@ function drawPlane(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle:
   ctx.bezierCurveTo(-20, -7, 0, -6, 20, -5); ctx.bezierCurveTo(30, -4, 38, -3, 42, -2);
   ctx.fill();
 
-  // Cockpit
   ctx.fillStyle = 'rgba(70,145,220,0.78)';
   ctx.beginPath(); ctx.ellipse(18, -3, 12, 7, -0.1, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.42)';
   ctx.beginPath(); ctx.ellipse(15, -5, 5, 3, -0.1, 0, Math.PI * 2); ctx.fill();
 
-  // Tail fin
   ctx.fillStyle = '#AAB8C4';
   ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(-44, -6); ctx.lineTo(-40, -24); ctx.lineTo(-32, -12); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(-36, -3); ctx.lineTo(-46, -3); ctx.lineTo(-50, -16); ctx.lineTo(-38, -9); ctx.closePath(); ctx.fill();
@@ -79,105 +72,8 @@ function drawPlane(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle:
   ctx.restore();
 }
 
-// ─── MODULE-LEVEL GAME ENGINE (persists across navigations) ─────────────────
-interface BotBet { user: string; amount: number; status: string; cashout: number | null; }
-type Listener = () => void;
-
-function genCrash(): number {
-  const r = Math.random();
-  if (r < 0.28) return 1.0 + Math.random() * 0.05;
-  if (r < 0.50) return 1.1 + Math.random() * 0.6;
-  if (r < 0.70) return 1.8 + Math.random() * 1.5;
-  if (r < 0.85) return 3.5 + Math.random() * 6;
-  if (r < 0.94) return 10 + Math.random() * 20;
-  if (r < 0.99) return 30 + Math.random() * 70;
-  return 100 + Math.random() * 900;
-}
-
-const BOT_NAMES = ['CryptoKing', 'NeonBlade', 'StarDust', 'VortexX', 'NightOwl', 'BlazeRun', 'GhostRider', 'PixelHunter'];
-function genBots(): BotBet[] {
-  return Array.from({ length: 3 + Math.floor(Math.random() * 3) }, () => ({
-    user: BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)],
-    amount: 100 + Math.floor(Math.random() * 1900),
-    status: 'active', cashout: null,
-  }));
-}
-
-const ENG = {
-  phase: 'waiting' as Phase,
-  mult: 1.0,
-  countdown: 5,
-  crashPoint: 0,
-  startTime: 0,
-  crashTime: 0,
-  crashPos: { x: 0, y: 0 },
-  history: [...HISTORY_ITEMS],
-  bots: genBots(),
-  listeners: new Set<Listener>(),
-  timer: null as ReturnType<typeof setInterval> | null,
-  cdTimer: null as ReturnType<typeof setInterval> | null,
-  initialized: false,
-};
-
-function engNotify() { ENG.listeners.forEach(fn => fn()); }
-
-function engStartCountdown() {
-  ENG.phase = 'waiting';
-  ENG.mult = 1.0;
-  ENG.countdown = 5;
-  ENG.crashPoint = genCrash();
-  ENG.bots = genBots();
-  if (ENG.cdTimer) clearInterval(ENG.cdTimer);
-  engNotify();
-  ENG.cdTimer = setInterval(() => {
-    ENG.countdown = Math.max(0, ENG.countdown - 1);
-    engNotify();
-    if (ENG.countdown <= 0) {
-      clearInterval(ENG.cdTimer!); ENG.cdTimer = null;
-      engStartFlight();
-    }
-  }, 1000);
-}
-
-function engStartFlight() {
-  ENG.phase = 'flying';
-  ENG.startTime = Date.now();
-  ENG.mult = 1.0;
-  if (ENG.timer) clearInterval(ENG.timer);
-  engNotify();
-  ENG.timer = setInterval(() => {
-    const el = (Date.now() - ENG.startTime) / 1000;
-    ENG.mult = calcMult(el);
-    ENG.bots = ENG.bots.map(b => {
-      if (b.status === 'active' && Math.random() < 0.004 && ENG.mult > 1.3)
-        return { ...b, status: 'cashed', cashout: ENG.mult };
-      return b;
-    });
-    engNotify();
-    if (ENG.mult >= ENG.crashPoint) engCrash();
-  }, 100);
-}
-
-function engCrash() {
-  if (ENG.timer) { clearInterval(ENG.timer); ENG.timer = null; }
-  ENG.phase = 'crashed';
-  ENG.crashTime = Date.now();
-  ENG.bots = ENG.bots.map(b => b.status === 'active' ? { ...b, status: 'crashed' } : b);
-  ENG.history = [Math.floor(ENG.mult * 100) / 100, ...ENG.history].slice(0, 15);
-  engNotify();
-  setTimeout(engStartCountdown, 4500);
-}
-
-// Boot engine once — persists forever
-if (!ENG.initialized) {
-  ENG.initialized = true;
-  engStartCountdown();
-}
-
-// ─── PARTICLE TYPE ───────────────────────────────────────────────────────────
 type Particle = { x: number; y: number; vx: number; vy: number; life: number; r: number; color: string };
 
-// ─── COMPONENT ───────────────────────────────────────────────────────────────
 export default function CrashGame() {
   const { state, navigate, addHistory, addNotification } = useGame();
   const [, setTick] = useState(0);
@@ -187,14 +83,14 @@ export default function CrashGame() {
   const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
   const [resultMsg, setResultMsg] = useState<{ text: string; win: boolean } | null>(null);
 
-  const betRef        = useRef(100);
-  const hasActiveRef  = useRef(false);
-  const cashedRef     = useRef<number | null>(null);
-  const autoCashRef   = useRef(2.0);
-  const prevPhaseRef  = useRef<Phase>(ENG.phase);
-  const addHistRef    = useRef(addHistory);
-  const addNotifRef   = useRef(addNotification);
-  const stateRef      = useRef(state);
+  const betRef       = useRef(100);
+  const hasActiveRef = useRef(false);
+  const cashedRef    = useRef<number | null>(null);
+  const prevPhaseRef = useRef<Phase>(WSC.state.phase);
+  const addHistRef   = useRef(addHistory);
+  const addNotifRef  = useRef(addNotification);
+  const stateRef     = useRef(state);
+  const betAmtRef    = useRef(betAmount);
 
   useEffect(() => {
     addHistRef.current = addHistory;
@@ -202,64 +98,70 @@ export default function CrashGame() {
     stateRef.current = state;
   });
 
-  function doCashout(atMult: number) {
-    if (!hasActiveRef.current || cashedRef.current) return;
-    cashedRef.current = atMult; setCashedOutAt(atMult);
-    hasActiveRef.current = false; setHasActiveBet(false);
-    const payout = Math.floor(betRef.current * atMult);
-    const profit = payout - betRef.current;
-    setResultMsg({ text: `Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, win: true });
-    if (stateRef.current.user) {
-      addHistRef.current({ id: makeId(), game: 'crash', wager: betRef.current, multiplier: atMult, payout, won: true, timestamp: Date.now() });
-      addNotifRef.current(`✈️ Cashed out at ${atMult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
-    }
-  }
-
-  // Subscribe to engine — handles phase transitions + auto-cashout
+  // Subscribe to WebSocket state (re-renders + phase transitions + auto-cashout)
   useEffect(() => {
     const update = () => {
-      const newPhase = ENG.phase;
+      const newPhase = WSC.state.phase;
       const oldPhase = prevPhaseRef.current;
 
       if (oldPhase !== newPhase) {
-        // Flying → Crashed
-        if (oldPhase === 'flying' && newPhase === 'crashed') {
-          if (hasActiveRef.current && !cashedRef.current) {
-            setResultMsg({ text: `Flew away at ${ENG.mult.toFixed(2)}x! Lost ₹${betRef.current.toLocaleString()}`, win: false });
-            hasActiveRef.current = false; setHasActiveBet(false);
-            if (stateRef.current.user)
-              addHistRef.current({ id: makeId(), game: 'crash', wager: betRef.current, multiplier: ENG.mult, payout: 0, won: false, timestamp: Date.now() });
-          }
-        }
-        // Crashed → Waiting (new round starting)
         if (oldPhase === 'crashed' && newPhase === 'waiting') {
           cashedRef.current = null; setCashedOutAt(null);
           setTimeout(() => setResultMsg(null), 1500);
         }
         prevPhaseRef.current = newPhase;
       }
-
-      // Auto-cashout
-      if (newPhase === 'flying' && hasActiveRef.current && !cashedRef.current) {
-        if (autoCashRef.current > 1.05 && ENG.mult >= autoCashRef.current) {
-          doCashout(ENG.mult);
-        }
-      }
-
       setTick(n => n + 1);
     };
+    WSC.listeners.add(update);
+    return () => { WSC.listeners.delete(update); };
+  }, []);
 
-    ENG.listeners.add(update);
-    return () => { ENG.listeners.delete(update); };
-  }, []); // eslint-disable-line
+  // Handle server messages (bet results, cashout results, crash)
+  useEffect(() => {
+    const handler = (msg: Record<string, unknown>) => {
+      if (msg.type === 'bet_ok') {
+        // Bet placed OK — nothing extra needed (balance updated via GameContext listener)
+      }
+      if (msg.type === 'bet_fail') {
+        setResultMsg({ text: String(msg.error ?? 'Bet failed'), win: false });
+        hasActiveRef.current = false; setHasActiveBet(false);
+      }
+      if (msg.type === 'cashout_ok') {
+        const mult = msg.mult as number;
+        const payout = msg.payout as number;
+        cashedRef.current = mult; setCashedOutAt(mult);
+        hasActiveRef.current = false; setHasActiveBet(false);
+        const profit = payout - betAmtRef.current;
+        setResultMsg({ text: `Cashed out at ${mult.toFixed(2)}x! +₹${profit.toLocaleString()}`, win: true });
+        addNotifRef.current(`✈️ Cashed out at ${mult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
+        if (stateRef.current.user)
+          addHistRef.current({ id: makeId(), game: 'crash', wager: betAmtRef.current, multiplier: mult, payout, won: true, timestamp: Date.now() });
+      }
+      if (msg.type === 'cashout_fail') {
+        setResultMsg({ text: String(msg.error ?? 'Cashout failed'), win: false });
+      }
+      if (msg.type === 'bet_crash') {
+        const mult = msg.mult as number;
+        setResultMsg({ text: `Flew away at ${mult.toFixed(2)}x! Lost ₹${betAmtRef.current.toLocaleString()}`, win: false });
+        hasActiveRef.current = false; setHasActiveBet(false);
+        if (stateRef.current.user)
+          addHistRef.current({ id: makeId(), game: 'crash', wager: betAmtRef.current, multiplier: mult, payout: 0, won: false, timestamp: Date.now() });
+      }
+    };
+    WSC.msgListeners.add(handler);
+    return () => { WSC.msgListeners.delete(handler); };
+  }, []);
 
-  // Canvas loop — reads ENG directly (no stale closure)
-  const canvasRef     = useRef<HTMLCanvasElement>(null);
-  const animRef       = useRef(0);
-  const smoothAngRef  = useRef(-0.3);
-  const lastElRef     = useRef(0);
-  const particlesRef  = useRef<Particle[]>([]);
-  const cvPrevPhase   = useRef<Phase>(ENG.phase);
+  // Canvas animation loop — reads WSC.state directly (no stale closure)
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const animRef      = useRef(0);
+  const smoothAngRef = useRef(-0.3);
+  const lastElRef    = useRef(0);
+  const crashPosRef  = useRef({ x: 0, y: 0 });
+  const crashTimeRef = useRef(0);
+  const particlesRef = useRef<Particle[]>([]);
+  const cvPrevPhase  = useRef<Phase>(WSC.state.phase);
 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
@@ -272,20 +174,18 @@ export default function CrashGame() {
       ctx.clearRect(0, 0, W, H);
       const now = Date.now();
       const t = now / 1000;
-      const phase = ENG.phase;
-      const m = ENG.mult;
+      const { phase, mult: m, startTime, countdown } = WSC.state;
       const isFlying  = phase === 'flying';
       const isCrashed = phase === 'crashed';
       const isWaiting = phase === 'waiting';
 
-      // Track elapsed for smooth crash freeze
-      const elapsed = isFlying ? (now - ENG.startTime) / 1000 : lastElRef.current;
-      if (isFlying) { lastElRef.current = elapsed; ENG.crashPos = getPos(elapsed, m, W, H); }
+      const elapsed = isFlying ? (now - startTime) / 1000 : lastElRef.current;
+      if (isFlying) { lastElRef.current = elapsed; crashPosRef.current = getPos(elapsed, m, W, H); }
       if (isWaiting) { lastElRef.current = 0; smoothAngRef.current = -0.3; }
 
-      // Spawn explosion on crash
       if (cvPrevPhase.current === 'flying' && phase === 'crashed') {
-        const cp = ENG.crashPos;
+        crashTimeRef.current = now;
+        const cp = crashPosRef.current;
         for (let i = 0; i < 55; i++) {
           const ang = Math.random() * Math.PI * 2;
           const spd = 2 + Math.random() * 8;
@@ -295,13 +195,13 @@ export default function CrashGame() {
       if (isWaiting) particlesRef.current = [];
       cvPrevPhase.current = phase;
 
-      // ── SKY ──────────────────────────────────────────────────────────────────
+      // SKY
       const sky = ctx.createLinearGradient(0, 0, 0, H);
       sky.addColorStop(0, '#01060F'); sky.addColorStop(0.4, '#040E20');
       sky.addColorStop(0.75, '#071828'); sky.addColorStop(1, '#0C2238');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
-      // ── STARS ────────────────────────────────────────────────────────────────
+      // STARS
       STARS.forEach(s => {
         ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * s.speed + s.blink));
         ctx.fillStyle = '#FFFFFF';
@@ -309,7 +209,7 @@ export default function CrashGame() {
       });
       ctx.globalAlpha = 1;
 
-      // ── MOON ─────────────────────────────────────────────────────────────────
+      // MOON
       const mX = W * 0.88, mY = H * 0.09;
       ctx.shadowColor = 'rgba(200,220,255,0.35)'; ctx.shadowBlur = 28;
       ctx.fillStyle = '#F0F0D8';
@@ -322,7 +222,7 @@ export default function CrashGame() {
       ctx.fillStyle = 'rgba(2,8,20,0.38)';
       ctx.beginPath(); ctx.arc(mX + 7, mY, 22, 0, Math.PI * 2); ctx.fill();
 
-      // ── CLOUDS ───────────────────────────────────────────────────────────────
+      // CLOUDS
       [[0.12, 0.28, 80, 0.10], [0.46, 0.20, 65, 0.07], [0.78, 0.26, 75, 0.09]].forEach(([rx, ry, rs, ra]) => {
         ctx.globalAlpha = ra;
         ctx.fillStyle = '#8AAABB';
@@ -332,7 +232,7 @@ export default function CrashGame() {
         ctx.globalAlpha = 1;
       });
 
-      // ── CITY GLOW ────────────────────────────────────────────────────────────
+      // CITY GLOW
       const cg = ctx.createLinearGradient(0, H * 0.83, 0, H);
       cg.addColorStop(0, 'rgba(30,70,120,0)'); cg.addColorStop(1, 'rgba(40,80,140,0.28)');
       ctx.fillStyle = cg; ctx.fillRect(0, H * 0.83, W, H * 0.17);
@@ -343,7 +243,7 @@ export default function CrashGame() {
       }
       ctx.globalAlpha = 1;
 
-      // ── FLIGHT PATH (from fixed origin) ──────────────────────────────────────
+      // FLIGHT PATH
       if (isFlying || isCrashed) {
         const drawEl = elapsed;
         const N = 90;
@@ -365,15 +265,12 @@ export default function CrashGame() {
         ctx.strokeStyle = '#FFCC44'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
         for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.stroke(); ctx.shadowBlur = 0;
 
-        // Origin dot
         ctx.fillStyle = '#FFCC44'; ctx.shadowColor = '#FF8800'; ctx.shadowBlur = 10;
         ctx.beginPath(); ctx.arc(ORIG_X, ORIG_Y, 5, 0, Math.PI * 2); ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Multiplier guide lines
         const curPt = getPos(drawEl, m, W, H);
         ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = 1;
         ctx.setLineDash([4, 8]);
@@ -390,10 +287,8 @@ export default function CrashGame() {
         ctx.setLineDash([]);
       }
 
-      // ── PLANE ────────────────────────────────────────────────────────────────
+      // PLANE
       const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X + 20, y: ORIG_Y - 10 };
-
-      // Smooth angle via lerp
       if (!isWaiting) {
         const dT = 0.25;
         const pA = getPos(Math.max(elapsed - dT, 0), calcMult(Math.max(elapsed - dT, 0.001)), W, H);
@@ -402,19 +297,17 @@ export default function CrashGame() {
         smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.08;
       }
       let angle = smoothAngRef.current;
-      if (isCrashed) angle += ((now - ENG.crashTime) / 1000) * 3.5;
+      if (isCrashed) angle += ((now - crashTimeRef.current) / 1000) * 3.5;
 
-      // Contrail
       if (isFlying) {
         const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 26);
         cG.addColorStop(0, 'rgba(180,210,255,0.18)'); cG.addColorStop(1, 'rgba(180,210,255,0)');
         ctx.fillStyle = cG;
         ctx.beginPath(); ctx.arc(pos.x, pos.y, 26, 0, Math.PI * 2); ctx.fill();
       }
-
       drawPlane(ctx, pos.x, pos.y, isWaiting ? -0.22 : angle, t, isCrashed);
 
-      // ── EXPLOSION PARTICLES ──────────────────────────────────────────────────
+      // EXPLOSION PARTICLES
       particlesRef.current = particlesRef.current.filter(p => p.life > 0).map(p => {
         p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.vx *= 0.97; p.r *= 0.97; p.life -= 0.025;
         ctx.globalAlpha = p.life; ctx.shadowColor = p.color; ctx.shadowBlur = 10;
@@ -424,7 +317,7 @@ export default function CrashGame() {
         return p;
       });
 
-      // ── HUD ──────────────────────────────────────────────────────────────────
+      // HUD
       if (isFlying) {
         const mColor = m >= 10 ? '#00FF88' : m >= 5 ? '#FFD700' : m >= 2 ? '#FF9900' : '#22DDFF';
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -433,8 +326,7 @@ export default function CrashGame() {
         ctx.beginPath(); ctx.roundRect(W / 2 - 100, 14, 200, 68, 14); ctx.stroke();
         ctx.font = 'bold 54px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillStyle = mColor; ctx.shadowColor = mColor; ctx.shadowBlur = 28;
-        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 20);
-        ctx.shadowBlur = 0;
+        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 20); ctx.shadowBlur = 0;
 
       } else if (isWaiting) {
         ctx.fillStyle = 'rgba(0,0,0,0.65)';
@@ -443,21 +335,27 @@ export default function CrashGame() {
         ctx.fillStyle = '#7A8898'; ctx.fillText('NEXT FLIGHT DEPARTS IN', W / 2, 20);
         ctx.font = 'bold 36px Inter,sans-serif';
         ctx.fillStyle = '#22DDFF'; ctx.shadowColor = '#22DDFF'; ctx.shadowBlur = 18;
-        ctx.fillText(`${ENG.countdown}s`, W / 2, 36);  // reads ENG directly — never stale
-        ctx.shadowBlur = 0;
+        ctx.fillText(`${countdown}s`, W / 2, 36); ctx.shadowBlur = 0;
 
       } else if (isCrashed) {
-        const ct = Math.min((now - ENG.crashTime) / 1000 * 3, 1);
+        const ct = Math.min((now - crashTimeRef.current) / 1000 * 3, 1);
         ctx.globalAlpha = ct;
         ctx.fillStyle = 'rgba(0,0,0,0.68)';
         ctx.beginPath(); ctx.roundRect(W / 2 - 140, H / 2 - 48, 280, 96, 16); ctx.fill();
         ctx.font = 'bold 42px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FF3344'; ctx.shadowColor = '#FF3344'; ctx.shadowBlur = 28;
-        ctx.fillText('FLEW AWAY!', W / 2, H / 2 - 12);
-        ctx.shadowBlur = 0;
+        ctx.fillText('FLEW AWAY!', W / 2, H / 2 - 12); ctx.shadowBlur = 0;
         ctx.font = 'bold 20px Inter,sans-serif'; ctx.fillStyle = '#FF8888';
         ctx.fillText(`${m.toFixed(2)}x`, W / 2, H / 2 + 26);
         ctx.globalAlpha = 1;
+      }
+
+      // CONNECTION indicator
+      if (!WSC.state.connected) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.font = 'bold 20px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FF3344'; ctx.fillText('Reconnecting…', W / 2, H / 2);
       }
 
       animRef.current = requestAnimationFrame(draw);
@@ -469,20 +367,21 @@ export default function CrashGame() {
 
   function placeBet() {
     if (!state.user) { navigate('profile'); return; }
-    if (state.user.balance < betAmount) { alert('Insufficient balance!'); return; }
-    if (ENG.phase !== 'waiting') { alert('Bet only during countdown!'); return; }
-    betRef.current = betAmount;
+    if (WSC.state.phase !== 'waiting') { return; }
+    if (hasActiveRef.current) return;
+    betAmtRef.current = betAmount;
     hasActiveRef.current = true; setHasActiveBet(true);
+    wsSend({ type: 'place_bet', amount: betAmount, autoCashout });
   }
 
   function cashOut() {
-    if (!hasActiveRef.current || ENG.phase !== 'flying' || cashedRef.current) return;
-    doCashout(ENG.mult);
+    if (!hasActiveRef.current || WSC.state.phase !== 'flying' || cashedRef.current) return;
+    wsSend({ type: 'cashout' });
   }
 
-  const phase = ENG.phase;
-  const mult  = ENG.mult;
-  const multColor = phase === 'crashed' ? 'var(--neon-red)' : mult >= 5 ? 'var(--neon-green)' : mult >= 2 ? 'var(--neon-gold)' : 'var(--neon-blue)';
+  const { phase, mult: m, countdown, history, bots } = WSC.state;
+  const displayHistory = history.length > 0 ? history : HISTORY_ITEMS;
+  const multColor = phase === 'crashed' ? 'var(--neon-red)' : m >= 5 ? 'var(--neon-green)' : m >= 2 ? 'var(--neon-gold)' : 'var(--neon-blue)';
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', animation: 'slideIn 0.3s ease' }}>
@@ -490,8 +389,9 @@ export default function CrashGame() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <button onClick={() => navigate('fastgames')} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 16px', color: 'var(--text2)', cursor: 'pointer', fontSize: '14px' }}>← Back</button>
         <h1 style={{ fontWeight: 800, fontSize: '24px' }}>✈️ Aviator Crash</h1>
+        {WSC.state.connected && <span style={{ background: 'var(--neon-green)20', color: 'var(--neon-green)', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700 }}>● LIVE</span>}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {ENG.history.slice(0, 12).map((v, i) => (
+          {displayHistory.slice(0, 12).map((v, i) => (
             <div key={i} style={{ background: v <= 1.5 ? 'var(--neon-red)20' : v >= 10 ? 'var(--neon-gold)20' : 'var(--neon-green)20', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
           ))}
         </div>
@@ -514,7 +414,7 @@ export default function CrashGame() {
           <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
             <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontWeight: 700, fontSize: '14px' }}>👥 Live Bets</span>
-              <span style={{ color: 'var(--text3)', fontSize: '13px' }}>{ENG.bots.length + (hasActiveBet ? 1 : 0)} players</span>
+              <span style={{ color: 'var(--text3)', fontSize: '13px' }}>{bots.length + (hasActiveBet ? 1 : 0)} players</span>
             </div>
             <div style={{ maxHeight: '140px', overflowY: 'auto' }}>
               {hasActiveBet && (
@@ -530,8 +430,8 @@ export default function CrashGame() {
                   </div>
                 </div>
               )}
-              {ENG.bots.map((b, i) => (
-                <div key={i} style={{ padding: '10px 18px', borderBottom: i < ENG.bots.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {bots.map((b, i) => (
+                <div key={i} style={{ padding: '10px 18px', borderBottom: i < bots.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: b.status === 'crashed' ? 'var(--neon-red)' : b.status === 'cashed' ? 'var(--neon-green)' : 'var(--neon-blue)', animation: b.status === 'active' ? 'pulse 1.5s infinite' : 'none' }} />
                     <span style={{ fontWeight: 600, fontSize: '14px' }}>{b.user}</span>
@@ -554,15 +454,15 @@ export default function CrashGame() {
             <h3 style={{ fontWeight: 700, marginBottom: '20px', fontSize: '16px' }}>🎯 Place Bet</h3>
 
             <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>BET AMOUNT</label>
-            <input type="number" value={betAmount} onChange={e => { setBetAmount(Number(e.target.value)); betRef.current = Number(e.target.value); }} disabled={phase !== 'waiting'} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '16px', fontWeight: 700, marginBottom: '8px' }} />
+            <input type="number" value={betAmount} onChange={e => { setBetAmount(Number(e.target.value)); betRef.current = Number(e.target.value); betAmtRef.current = Number(e.target.value); }} disabled={phase !== 'waiting'} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '16px', fontWeight: 700, marginBottom: '8px' }} />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginBottom: '16px' }}>
               {[100, 250, 500, 1000].map(v => (
-                <button key={v} onClick={() => { setBetAmount(v); betRef.current = v; }} disabled={phase !== 'waiting'} style={{ background: betAmount === v ? 'var(--neon-blue)20' : 'var(--bg3)', border: `1px solid ${betAmount === v ? 'var(--neon-blue)' : 'var(--border)'}`, color: betAmount === v ? 'var(--neon-blue)' : 'var(--text2)', borderRadius: '8px', padding: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{v}</button>
+                <button key={v} onClick={() => { setBetAmount(v); betRef.current = v; betAmtRef.current = v; }} disabled={phase !== 'waiting'} style={{ background: betAmount === v ? 'var(--neon-blue)20' : 'var(--bg3)', border: `1px solid ${betAmount === v ? 'var(--neon-blue)' : 'var(--border)'}`, color: betAmount === v ? 'var(--neon-blue)' : 'var(--text2)', borderRadius: '8px', padding: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{v}</button>
               ))}
             </div>
 
             <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>AUTO CASHOUT</label>
-            <input type="number" value={autoCashout} step="0.1" min="1.1" onChange={e => { setAutoCashout(Number(e.target.value)); autoCashRef.current = Number(e.target.value); }} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '15px', fontWeight: 700, marginBottom: '20px' }} />
+            <input type="number" value={autoCashout} step="0.1" min="1.1" onChange={e => setAutoCashout(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '15px', fontWeight: 700, marginBottom: '20px' }} />
 
             {!hasActiveBet ? (
               <button onClick={placeBet} disabled={phase !== 'waiting'} style={{ width: '100%', background: phase === 'waiting' ? 'linear-gradient(135deg,#1060E0,#4490FF)' : 'var(--bg3)', color: phase === 'waiting' ? '#fff' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '16px', fontWeight: 800, fontSize: '16px', cursor: phase === 'waiting' ? 'pointer' : 'not-allowed' }}>
@@ -570,30 +470,34 @@ export default function CrashGame() {
               </button>
             ) : (
               <button onClick={cashOut} disabled={phase !== 'flying' || !!cashedOutAt} style={{ width: '100%', background: !cashedOutAt && phase === 'flying' ? 'var(--neon-green)' : 'var(--bg3)', color: !cashedOutAt && phase === 'flying' ? '#000' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '16px', fontWeight: 800, fontSize: '16px', cursor: !cashedOutAt && phase === 'flying' ? 'pointer' : 'not-allowed', animation: !cashedOutAt && phase === 'flying' ? 'neonPulse 1.5s infinite' : 'none' }}>
-                {cashedOutAt ? `✅ Exited at ${cashedOutAt.toFixed(2)}x` : `🪂 Eject! ₹${Math.floor(betAmount * mult).toLocaleString()}`}
+                {cashedOutAt ? `✅ Exited at ${cashedOutAt.toFixed(2)}x` : `🪂 Eject! ₹${Math.floor(betAmount * m).toLocaleString()}`}
               </button>
             )}
 
             {phase === 'flying' && (
               <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: `1px solid ${multColor}40` }}>
                 <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>ALTITUDE</div>
-                <div style={{ fontSize: '36px', fontWeight: 900, color: multColor, textShadow: `0 0 20px ${multColor}`, lineHeight: 1 }}>{mult.toFixed(2)}x</div>
-                {hasActiveBet && !cashedOutAt && <div style={{ color: 'var(--neon-green)', fontSize: '14px', fontWeight: 700, marginTop: '6px' }}>→ ₹{Math.floor(betAmount * mult).toLocaleString()}</div>}
+                <div style={{ fontSize: '36px', fontWeight: 900, color: multColor, textShadow: `0 0 20px ${multColor}`, lineHeight: 1 }}>{m.toFixed(2)}x</div>
+                {hasActiveBet && !cashedOutAt && <div style={{ color: 'var(--neon-green)', fontSize: '14px', fontWeight: 700, marginTop: '6px' }}>→ ₹{Math.floor(betAmount * m).toLocaleString()}</div>}
               </div>
             )}
 
             {phase === 'waiting' && (
               <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: '1px solid var(--neon-blue)30' }}>
                 <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>NEXT FLIGHT</div>
-                <div style={{ fontSize: '36px', fontWeight: 900, color: 'var(--neon-blue)', lineHeight: 1 }}>{ENG.countdown}s</div>
+                <div style={{ fontSize: '36px', fontWeight: 900, color: 'var(--neon-blue)', lineHeight: 1 }}>{countdown}s</div>
               </div>
             )}
 
-            {state.user && (
+            {state.user ? (
               <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
                 <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>₹{state.user.balance.toLocaleString()}</span>
               </div>
+            ) : (
+              <button onClick={() => navigate('profile')} style={{ marginTop: '12px', width: '100%', background: 'var(--neon-purple)20', border: '1px solid var(--neon-purple)40', borderRadius: '10px', padding: '12px', color: 'var(--neon-purple)', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>
+                🔐 Login to bet with real balance
+              </button>
             )}
           </div>
 
@@ -601,7 +505,7 @@ export default function CrashGame() {
           <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '20px' }}>
             <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '14px' }}>🏁 Flight History</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {ENG.history.map((v, i) => (
+              {displayHistory.map((v, i) => (
                 <div key={i} style={{ background: v <= 1.5 ? 'var(--neon-red)15' : v >= 10 ? 'var(--neon-gold)15' : 'var(--neon-green)15', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
               ))}
             </div>

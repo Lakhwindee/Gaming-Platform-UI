@@ -75,3 +75,33 @@ Drizzle ORM + PostgreSQL. Run `pnpm --filter @workspace/db run push` for migrati
 
 ### `lib/api-spec` (`@workspace/api-spec`)
 OpenAPI spec + Orval codegen. Run `pnpm --filter @workspace/api-spec run codegen`.
+
+## NeonBet Web (`artifacts/neonbet-web`)
+
+Premium 1win-style casino gaming site. React + Vite on port 19702 (base path `/neonbet-web/`).
+
+### Architecture
+- **Frontend**: React + Vite, dark neon theme (`#0a0a0f` bg, neon-blue/purple/green/gold/red)
+- **Auth**: JWT (bcryptjs on server) — register/login/me via `/api/auth/*`
+- **Real-time**: WebSocket singleton (`lib/wsClient.ts`) at `${BASE_URL}ws` — proxied through Vite to API server at port 8080
+- **Database**: PostgreSQL via Drizzle ORM — tables: `users` (balance default ₹10,000), `game_rounds`, `bets`
+- **State**: `GameContext.tsx` (React Context + reducer), `WSC` module-level WS singleton
+
+### Key Files
+- `src/context/GameContext.tsx` — app state, auth actions, WS balance sync
+- `src/lib/wsClient.ts` — WebSocket singleton (connects to `${BASE_URL}ws`, reconnects on disconnect)
+- `src/lib/api.ts` — REST API client (register, login, me)
+- `src/lib/utils.ts` — `makeId()` + `cn()` utilities
+- `src/pages/CrashGame.tsx` — Aviator/Crash game (canvas, WSC state, bet/cashout via WS)
+- `vite.config.ts` — proxy `/api` + `${basePath}ws` → `localhost:8080`
+
+### Games (8 total)
+Crash/Aviator, Mines, Plinko, Tower, Hi-Lo, Slots, Dice, Coin Flip
+
+### Multiplayer (Crash)
+Server-side game engine (`api-server/src/lib/gameEngine.ts`) broadcasts round state to all clients. Bets/cashouts sent via WS messages. Balance updates flow from server → `WSC.msgListeners` → `GameContext`.
+
+### Important Notes
+- `makeId()` MUST live in `lib/utils.ts` (not `GameContext.tsx`) — avoids Fast Refresh breakage
+- WS URL uses `import.meta.env.BASE_URL` prefix so Replit proxy routes correctly
+- JWT_SECRET: `process.env.JWT_SECRET || 'neonbet-secret-2024'`

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useGame, makeId } from '../context/GameContext';
+import { useGame } from '../context/GameContext';
+import { makeId } from '../lib/utils';
 
 const ROWS_PER_LEVEL = 4;
 const TOTAL_LEVELS = 10;

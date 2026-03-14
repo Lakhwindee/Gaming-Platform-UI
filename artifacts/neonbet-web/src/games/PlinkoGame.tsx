@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useGame, makeId } from '../context/GameContext';
+import { useGame } from '../context/GameContext';
+import { makeId } from '../lib/utils';
 
 const ROWS = 12;
 const MULTIPLIERS_12 = [1000, 130, 26, 9, 4, 2, 0.5, 0.5, 2, 4, 9, 26, 130, 1000];
