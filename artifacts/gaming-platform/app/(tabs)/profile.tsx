@@ -424,7 +424,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuRow} onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert("About", "Blaze v1.0.0\nPremium Crash Game\n\n© 2025 NeonBet");
+            Alert.alert("About", "Blaze v1.0.0\nPremium Crash Game by Star Games\n\n© 2025 Star Games");
           }} activeOpacity={0.7}>
             <View style={[styles.menuIcon, { backgroundColor: C.textDim + "20" }]}>
               <Ionicons name="information-circle-outline" size={18} color={C.textMuted} />
@@ -444,7 +444,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>Blaze v1.0.0  ·  Made with ❤️</Text>
+        <Text style={styles.versionText}>Blaze v1.0.0 by Star Games  ·  © 2025</Text>
       </ScrollView>
 
       <ChangePasswordModal

@@ -26,8 +26,8 @@ const PAY_METHODS: { id: PayMethod; label: string; color: string; bg: string }[]
 ];
 
 function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
-  const name = encodeURIComponent("UDAAN");
-  const note = encodeURIComponent("UDAAN Deposit " + txnRef);
+  const name = encodeURIComponent("Blaze");
+  const note = encodeURIComponent("Blaze Deposit " + txnRef);
   const base = "pa=" + merchantUpi + "&pn=" + name + "&am=" + amount + "&cu=INR&tn=" + note;
   if (method === "gpay")    return "tez://upi/pay?" + base;
   if (method === "phonepe") return "phonepe://pay?transactionId=" + txnRef + "&" + base;
@@ -200,9 +200,9 @@ export default function WalletScreen() {
 
       const specificUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
       const genericUrl  = "upi://pay?pa=" + txn.merchantUpi +
-        "&pn=" + encodeURIComponent("UDAAN") +
+        "&pn=" + encodeURIComponent("Blaze") +
         "&am=" + finalAmount +
-        "&cu=INR&tn=" + encodeURIComponent("UDAAN Deposit " + txn.txnRef);
+        "&cu=INR&tn=" + encodeURIComponent("Blaze Deposit " + txn.txnRef);
 
       let opened = false;
       try {

@@ -11,16 +11,18 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0A0F"
+      "backgroundColor": "#080005"
     },
     "ios": {
       "supportsTablet": false,
+      "bundleIdentifier": "com.stargames.blaze",
       "infoPlist": {
         "LSApplicationQueriesSchemes": ["tez", "phonepe", "paytmmp", "upi", "bhim"]
       }
     },
     "android": {
-      "backgroundColor": "#0A0A0F"
+      "backgroundColor": "#080005",
+      "package": "com.stargames.blaze"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -38,6 +40,10 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "company": "Star Games",
+      "appDescription": "Blaze — Premium Crash Game by Star Games"
     }
   }
 }

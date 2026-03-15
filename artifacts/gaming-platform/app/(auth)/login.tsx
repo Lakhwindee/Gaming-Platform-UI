@@ -55,8 +55,8 @@ export default function LoginScreen() {
             <LinearGradient colors={["#FF1A3A", "#8B0000"]} style={styles.logoCircle}>
               <Ionicons name="rocket" size={44} color="#FFFFFF" />
             </LinearGradient>
-            <Text style={styles.logoTitle}>UDAAN</Text>
-            <Text style={styles.logoSub}>Fly high, cash big 🚀</Text>
+            <Text style={styles.logoTitle}>BLAZE</Text>
+            <Text style={styles.logoSub}>by Star Games 🚀</Text>
           </View>
 
           {/* Card */}
