@@ -210,24 +210,6 @@ export default function GameScreen() {
     }, 5000);
   }, [popupAnim]);
 
-  const [cancelToast, setCancelToast] = useState<{ slot: number; slotIdx: 0 | 1; amount: number } | null>(null);
-  const cancelAnim = useRef(new Animated.Value(0)).current;
-  const cancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showCancelToast = useCallback((slotIdx: 0 | 1, amount: number) => {
-    if (cancelTimer.current) clearTimeout(cancelTimer.current);
-    setCancelToast({ slot: slotIdx + 1, slotIdx, amount });
-    cancelAnim.setValue(0);
-    Animated.spring(cancelAnim, { toValue: 1, useNativeDriver: true, tension: 90, friction: 10 }).start();
-    cancelTimer.current = setTimeout(() => {
-      Animated.timing(cancelAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setCancelToast(null));
-    }, 5000);
-  }, [cancelAnim]);
-
-  const dismissCancelToast = useCallback(() => {
-    if (cancelTimer.current) clearTimeout(cancelTimer.current);
-    Animated.timing(cancelAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setCancelToast(null));
-  }, [cancelAnim]);
 
   const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
     setSlots(prev => {
@@ -263,19 +245,16 @@ export default function GameScreen() {
       if (msg.type === "bet_ok") {
         const isQueued = msg.auto === true;
         updateSlot(slotIdx, { status: isQueued ? "active" : "placed", result: null });
-        if (!isQueued) showCancelToast(slotIdx, slotRefs.current[slotIdx].amount);
         if (Platform.OS !== "web") Haptics.selectionAsync();
       }
 
       if (msg.type === "bet_queued") {
         updateSlot(slotIdx, { status: "queued", result: null });
-        showCancelToast(slotIdx, slotRefs.current[slotIdx].amount);
         if (Platform.OS !== "web") Haptics.selectionAsync();
       }
 
       if (msg.type === "bet_cancelled") {
         updateSlot(slotIdx, { status: "idle" });
-        dismissCancelToast();
       }
 
       if (msg.type === "cashout_ok") {
@@ -406,21 +385,29 @@ export default function GameScreen() {
       );
     } else if (slot.status === "placed") {
       btnContent = (
-        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
-          <View style={styles.cancelBtn}>
-            <Text style={styles.cancelBtnText}>BET ₹{slot.amount.toLocaleString("en-IN")} ✓</Text>
-            <Text style={styles.cancelBtnSub}>TAP TO CANCEL</Text>
+        <View style={styles.placedBtn}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.placedBtnTop}>BET PLACED ✓</Text>
+            <Text style={styles.placedBtnAmt}>₹{slot.amount.toLocaleString("en-IN")}</Text>
           </View>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => cancelBet(slotIdx)} style={styles.inlineCancelBtn} activeOpacity={0.75}>
+            <Text style={styles.inlineCancelX}>✕</Text>
+            <Text style={styles.inlineCancelTxt}>CANCEL</Text>
+          </TouchableOpacity>
+        </View>
       );
     } else if (slot.status === "queued") {
       btnContent = (
-        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
-          <View style={[styles.cancelBtn, { borderColor: "#FF9800" }]}>
-            <Text style={[styles.cancelBtnText, { color: "#FF9800" }]}>NEXT ROUND  ₹{slot.amount.toLocaleString("en-IN")}</Text>
-            <Text style={styles.cancelBtnSub}>TAP TO CANCEL</Text>
+        <View style={[styles.placedBtn, { borderColor: "rgba(255,152,0,0.45)" }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.placedBtnTop, { color: "#FF9800" }]}>NEXT ROUND ⏳</Text>
+            <Text style={styles.placedBtnAmt}>₹{slot.amount.toLocaleString("en-IN")}</Text>
           </View>
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => cancelBet(slotIdx)} style={styles.inlineCancelBtn} activeOpacity={0.75}>
+            <Text style={styles.inlineCancelX}>✕</Text>
+            <Text style={styles.inlineCancelTxt}>CANCEL</Text>
+          </TouchableOpacity>
+        </View>
       );
     } else if (slot.status === "cashedout") {
       btnContent = (
@@ -678,7 +665,7 @@ export default function GameScreen() {
       </View>
     </ScrollView>
 
-    {/* ── Cashout toast (small, top) ── */}
+    {/* ── Cashout toast (compact, centered) ── */}
     {cashoutPopup && (
       <Animated.View
         style={[styles.toastWrap, {
@@ -689,35 +676,11 @@ export default function GameScreen() {
         }]}
       >
         <Text style={styles.toastEmoji}>🚀</Text>
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={styles.toastTitle}>CASHOUT  {cashoutPopup.mult.toFixed(2)}x</Text>
-          <Text style={styles.toastSub}>+₹{cashoutPopup.payout.toLocaleString("en-IN")} · BET {cashoutPopup.slot}</Text>
+        <View style={{ marginLeft: 8 }}>
+          <Text style={styles.toastTitle}>{cashoutPopup.mult.toFixed(2)}x  ·  WIN</Text>
+          <Text style={styles.toastAmt}>+₹{cashoutPopup.payout.toLocaleString("en-IN")}</Text>
         </View>
-        <View style={styles.toastBadge}><Text style={styles.toastBadgeTxt}>WIN</Text></View>
-      </Animated.View>
-    )}
-
-    {/* ── Cancel bet toast (small, top, interactive) ── */}
-    {cancelToast && (
-      <Animated.View
-        style={[styles.toastWrap, styles.cancelToastWrap, {
-          top: cashoutPopup ? insets.top + 66 : insets.top + 10,
-          opacity: cancelAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
-          transform: [{ translateY: cancelAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) }],
-        }]}
-      >
-        <Text style={styles.toastEmoji}>🎯</Text>
-        <View style={{ flex: 1, marginLeft: 8 }}>
-          <Text style={styles.toastTitle}>BET {cancelToast.slot} PLACED</Text>
-          <Text style={styles.toastSub}>₹{cancelToast.amount.toLocaleString("en-IN")} · Tap to cancel</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => { cancelBet(cancelToast.slotIdx); dismissCancelToast(); }}
-          style={styles.cancelToastBtn}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.cancelToastBtnTxt}>CANCEL</Text>
-        </TouchableOpacity>
+        <View style={styles.toastBadge}><Text style={styles.toastBadgeTxt}>✓</Text></View>
       </Animated.View>
     )}
     </View>
@@ -764,9 +727,12 @@ const styles = StyleSheet.create({
   mainBtnText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.8 },
   mainBtnSub: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 1 },
   cashoutGlow: { shadowColor: "#FF6B00", shadowRadius: 16, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
-  cancelBtn: { borderRadius: 12, paddingVertical: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: C.red, backgroundColor: "rgba(255,26,58,0.08)" },
-  cancelBtnText: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.red, letterSpacing: 0.5 },
-  cancelBtnSub: { fontSize: 9, fontFamily: "Inter_500Medium", color: C.textMuted, marginTop: 2 },
+  placedBtn: { flex: 1, flexDirection: "row", alignItems: "center", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "rgba(0,200,83,0.4)", backgroundColor: "rgba(0,200,83,0.07)" },
+  placedBtnTop: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5, marginBottom: 2 },
+  placedBtnAmt: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.text },
+  inlineCancelBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "rgba(255,60,60,0.5)", backgroundColor: "rgba(255,26,58,0.1)", alignItems: "center", marginLeft: 8 },
+  inlineCancelX: { fontSize: 12, color: "#FF4C6A", fontFamily: "Inter_700Bold", lineHeight: 14 },
+  inlineCancelTxt: { fontSize: 8, fontFamily: "Inter_700Bold", color: "#FF4C6A", letterSpacing: 0.8, marginTop: 1 },
   betsPanel: { backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 0 },
   tabBar: { flexDirection: "row", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: 16 },
@@ -804,29 +770,20 @@ const styles = StyleSheet.create({
   topMult: { fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 2 },
   emptyMsg: { textAlign: "center", fontSize: 13, fontFamily: "Inter_500Medium", color: C.textMuted, paddingVertical: 24 },
   toastWrap: {
-    position: "absolute", left: 16, right: 16, zIndex: 999,
-    flexDirection: "row", alignItems: "center",
-    backgroundColor: "rgba(5,15,5,0.88)",
-    borderRadius: 14, borderWidth: 1, borderColor: "rgba(0,200,83,0.45)",
-    paddingHorizontal: 12, paddingVertical: 10,
+    position: "absolute", alignSelf: "center", zIndex: 999,
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(4,14,4,0.92)",
+    borderRadius: 50, borderWidth: 1, borderColor: "rgba(0,200,83,0.5)",
+    paddingHorizontal: 14, paddingVertical: 9,
     shadowColor: "#00C853", shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 12, shadowOpacity: 0.4, elevation: 10,
+    shadowRadius: 14, shadowOpacity: 0.5, elevation: 12,
   },
-  cancelToastWrap: {
-    borderColor: "rgba(255,26,58,0.45)",
-    shadowColor: "#FF1A3A",
-  },
-  toastEmoji: { fontSize: 18 },
-  toastTitle: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.5 },
-  toastSub: { fontSize: 10, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.5)", marginTop: 1 },
+  toastEmoji: { fontSize: 16 },
+  toastTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "rgba(255,255,255,0.7)", letterSpacing: 0.3 },
+  toastAmt: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#FFFFFF", lineHeight: 18 },
   toastBadge: {
-    backgroundColor: "rgba(0,200,83,0.2)", borderRadius: 7, borderWidth: 1, borderColor: "rgba(0,200,83,0.4)",
-    paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: "rgba(0,200,83,0.25)", borderRadius: 50, borderWidth: 1, borderColor: "rgba(0,200,83,0.5)",
+    width: 24, height: 24, alignItems: "center", justifyContent: "center", marginLeft: 4,
   },
-  toastBadgeTxt: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1 },
-  cancelToastBtn: {
-    backgroundColor: "rgba(255,26,58,0.18)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,26,58,0.5)",
-    paddingHorizontal: 10, paddingVertical: 6,
-  },
-  cancelToastBtnTxt: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FF4C6A", letterSpacing: 1 },
+  toastBadgeTxt: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#00C853" },
 });
