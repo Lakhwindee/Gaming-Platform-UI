@@ -506,6 +506,7 @@ export function getEngineSnapshot() {
     roundId: ENG.roundId,
     crashPoint: ENG.crashPoint,
     activeBets: ENG.allBets.length,
+    allBets: ENG.allBets,
     clientCount: 0,
   };
 }

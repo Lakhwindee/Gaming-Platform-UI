@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { getEngineSnapshot, setForcedCrash } from "../lib/gameEngine";
 
 const router = Router();
@@ -93,6 +93,13 @@ router.get("/admin", (_req, res) => {
   .tx-bonus{background:rgba(255,215,0,0.15);color:var(--gold)}
   .tx-bet{background:rgba(255,26,58,0.15);color:var(--red)}
   .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+  .wd-pending{background:rgba(255,215,0,0.18);color:var(--gold);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
+  .wd-approved{background:rgba(0,200,83,0.18);color:var(--green);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
+  .wd-rejected{background:rgba(255,26,58,0.18);color:var(--red);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
+  .bet-active{background:rgba(255,215,0,0.15);color:var(--gold);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
+  .bet-cashed{background:rgba(0,200,83,0.15);color:var(--green);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
+  .bet-crashed{background:rgba(255,26,58,0.15);color:var(--red);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
+  .action-row{display:flex;gap:6px}
   .spinner{border:2px solid rgba(255,26,58,0.2);border-top-color:var(--red);border-radius:50%;width:20px;height:20px;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -125,6 +132,7 @@ router.get("/admin", (_req, res) => {
     <div class="tab active" onclick="switchTab('overview')">Overview</div>
     <div class="tab" onclick="switchTab('users')">Users</div>
     <div class="tab" onclick="switchTab('transactions')">Transactions</div>
+    <div class="tab" onclick="switchTab('withdrawals')">Withdrawals <span id="wdBadge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;display:none"></span></div>
     <div class="tab" onclick="switchTab('game')">Game Control</div>
   </div>
 
@@ -176,6 +184,28 @@ router.get("/admin", (_req, res) => {
         <table>
           <thead><tr><th>ID</th><th>User ID</th><th>Type</th><th>Amount</th><th>Note</th><th>Status</th><th>Time</th></tr></thead>
           <tbody id="txTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WITHDRAWALS -->
+    <div class="section" id="tab-withdrawals">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">💸 Withdrawal Requests</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="wdFilter" onchange="loadWithdrawals()" style="background:#111;border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:#f0e6f0;font-size:12px">
+              <option value="all">All</option>
+              <option value="pending" selected>Pending Only</option>
+              <option value="completed">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <button class="btn-sm blue" onclick="loadWithdrawals()" style="padding:6px 14px">Refresh</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>User</th><th>Amount</th><th>UPI ID</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
+          <tbody id="wdTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -247,6 +277,18 @@ router.get("/admin", (_req, res) => {
           </div>
         </div>
       </div>
+
+      <!-- LIVE BETS -->
+      <div class="card" style="margin-top:0">
+        <div class="card-header">
+          <span class="card-title">🎯 Live Bets This Round</span>
+          <span style="color:var(--muted);font-size:11px" id="liveBetsCount">0 bets</span>
+        </div>
+        <table>
+          <thead><tr><th>Player</th><th>Bet Amount</th><th>Status</th><th>Cashout At</th><th>Win Amount</th></tr></thead>
+          <tbody id="liveBetsTable"><tr><td colspan="5" class="empty">Waiting for bets...</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
   </div>
@@ -282,7 +324,7 @@ async function doLogin() {
     await api('/api/admin/ping');
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    loadOverview(); loadUsers(); loadTransactions();
+    loadOverview(); loadUsers(); loadTransactions(); loadWithdrawalsBadge();
     startLivePoll();
   } catch(e) {
     document.getElementById('loginErr').textContent = 'Wrong secret key';
@@ -298,9 +340,10 @@ function doLogout() {
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['overview','users','transactions','game'][i]===name));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['overview','users','transactions','withdrawals','game'][i]===name));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'withdrawals') loadWithdrawals();
 }
 
 function fmtAmt(n) {
@@ -393,6 +436,60 @@ async function loadTransactions() {
   } catch(e) { toast(e.message, true); }
 }
 
+async function loadWithdrawalsBadge() {
+  try {
+    const rows = await api('/api/admin/withdrawals?status=pending');
+    const badge = document.getElementById('wdBadge');
+    if (rows.length > 0) { badge.textContent = rows.length; badge.style.display = 'inline'; }
+    else { badge.style.display = 'none'; }
+  } catch(_){}
+}
+
+async function loadWithdrawals() {
+  const filter = document.getElementById('wdFilter')?.value || 'pending';
+  const url = filter === 'all' ? '/api/admin/withdrawals' : \`/api/admin/withdrawals?status=\${filter}\`;
+  try {
+    const rows = await api(url);
+    const tbody = document.getElementById('wdTable');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No withdrawal requests found</td></tr>'; return; }
+    tbody.innerHTML = rows.map(w => {
+      const upi = (w.note || '').replace('Withdrawal to ', '') || '—';
+      const actions = w.status === 'pending' ? \`<div class="action-row">
+        <button class="btn-sm green" onclick="approveWithdraw(\${w.id})">✓ Approve</button>
+        <button class="btn-sm" style="background:#555" onclick="rejectWithdraw(\${w.id})">✗ Reject</button>
+      </div>\` : '—';
+      const statusCls = w.status === 'pending' ? 'wd-pending' : w.status === 'completed' ? 'wd-approved' : 'wd-rejected';
+      const statusLabel = w.status === 'pending' ? '⏳ Pending' : w.status === 'completed' ? '✓ Approved' : '✗ Rejected';
+      return \`<tr>
+        <td style="color:#666">#\${w.id}</td>
+        <td style="font-weight:700">\${w.username || '#'+w.userId}</td>
+        <td style="color:var(--gold);font-weight:700">\${fmtAmt(w.amount)}</td>
+        <td style="color:#aaa;font-family:monospace;font-size:12px">\${upi}</td>
+        <td><span class="\${statusCls}">\${statusLabel}</span></td>
+        <td style="color:#666;font-size:11px">\${timeAgo(w.createdAt)}</td>
+        <td>\${actions}</td>
+      </tr>\`;
+    }).join('');
+    loadWithdrawalsBadge();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function approveWithdraw(id) {
+  if (!confirm('Approve this withdrawal? Money will be sent to the user UPI.')) return;
+  try {
+    await api(\`/api/admin/withdrawals/\${id}/approve\`, { method: 'POST' });
+    toast('✓ Withdrawal approved'); loadWithdrawals();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function rejectWithdraw(id) {
+  if (!confirm('Reject this withdrawal? Balance will be REFUNDED to user.')) return;
+  try {
+    await api(\`/api/admin/withdrawals/\${id}/reject\`, { method: 'POST' });
+    toast('Withdrawal rejected — balance refunded'); loadWithdrawals();
+  } catch(e) { toast(e.message, true); }
+}
+
 function setC(v) {
   document.getElementById('crashInput').value = v;
   forceCrash();
@@ -420,8 +517,32 @@ function startLivePoll() {
       document.getElementById('phaseBadge').textContent = snap.phase.toUpperCase();
       document.getElementById('phaseBadge').style.color = col;
       document.getElementById('liveMultText').textContent = snap.mult.toFixed(2)+'x';
+      renderLiveBets(snap.allBets || []);
     } catch(_){}
   }
+  function renderLiveBets(bets) {
+    const tbody = document.getElementById('liveBetsTable');
+    const count = document.getElementById('liveBetsCount');
+    if (!bets || !bets.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No bets this round</td></tr>';
+      count.textContent = '0 bets'; return;
+    }
+    count.textContent = bets.length + ' bet' + (bets.length !== 1 ? 's' : '');
+    tbody.innerHTML = bets.map(b => {
+      const stCls = b.status === 'active' ? 'bet-active' : b.status === 'cashed' ? 'bet-cashed' : 'bet-crashed';
+      const stLabel = b.status === 'active' ? '🟡 Flying' : b.status === 'cashed' ? '✅ Cashed' : '💥 Crashed';
+      const cashoutAt = b.cashout ? b.cashout.toFixed(2) + 'x' : '—';
+      const winAmt = b.winAmount > 0 ? '<span style="color:var(--green)">+' + fmtAmt(b.winAmount) + '</span>' : '—';
+      return \`<tr>
+        <td style="font-weight:700">\${b.user}</td>
+        <td style="color:var(--gold)">\${fmtAmt(b.amount)}</td>
+        <td><span class="\${stCls}">\${stLabel}</span></td>
+        <td style="color:#4DA6FF;font-weight:700">\${cashoutAt}</td>
+        <td>\${winAmt}</td>
+      </tr>\`;
+    }).join('');
+  }
+
   poll(); setInterval(poll, 1000);
 }
 </script>
@@ -518,6 +639,81 @@ router.get("/admin/transactions", async (req, res) => {
     res.json(rows);
   } catch (e) {
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.get("/admin/withdrawals", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const status = req.query.status as string | undefined;
+  try {
+    const rows = await db
+      .select({
+        id: transactionsTable.id,
+        userId: transactionsTable.userId,
+        amount: transactionsTable.amount,
+        note: transactionsTable.note,
+        status: transactionsTable.status,
+        createdAt: transactionsTable.createdAt,
+        username: usersTable.username,
+      })
+      .from(transactionsTable)
+      .leftJoin(usersTable, eq(transactionsTable.userId, usersTable.id))
+      .where(
+        status && status !== "all"
+          ? and(eq(transactionsTable.type, "withdraw"), eq(transactionsTable.status, status))
+          : eq(transactionsTable.type, "withdraw")
+      )
+      .orderBy(desc(transactionsTable.createdAt))
+      .limit(200);
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/admin/withdrawals/:id/approve", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const txId = parseInt(req.params.id);
+  try {
+    const rows = await db
+      .update(transactionsTable)
+      .set({ status: "completed" })
+      .where(and(eq(transactionsTable.id, txId), eq(transactionsTable.status, "pending")))
+      .returning({ id: transactionsTable.id });
+    if (!rows.length) return res.status(404).json({ error: "Withdrawal not found or already processed" });
+    res.json({ ok: true, message: "Withdrawal approved" });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/admin/withdrawals/:id/reject", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const txId = parseInt(req.params.id);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [txRow] = await tx
+        .select({ userId: transactionsTable.userId, amount: transactionsTable.amount, status: transactionsTable.status })
+        .from(transactionsTable)
+        .where(and(eq(transactionsTable.id, txId), eq(transactionsTable.type, "withdraw")));
+      if (!txRow) throw new Error("Withdrawal not found");
+      if (txRow.status !== "pending") throw new Error("Already processed");
+      await tx.update(transactionsTable).set({ status: "rejected" }).where(eq(transactionsTable.id, txId));
+      await tx.update(usersTable)
+        .set({ balance: sql`balance + ${txRow.amount}` })
+        .where(eq(usersTable.id, txRow.userId));
+      await tx.insert(transactionsTable).values({
+        userId: txRow.userId,
+        type: "deposit",
+        amount: txRow.amount,
+        note: `Refund: withdrawal #${txId} rejected`,
+        status: "completed",
+      });
+      return { ok: true };
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Server error" });
   }
 });
 
