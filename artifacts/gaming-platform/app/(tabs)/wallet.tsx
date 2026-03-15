@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, AppState, AppStateStatus,
+  ActivityIndicator, Alert, AppState, AppStateStatus, Image,
   Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View, Linking,
 } from "react-native";
@@ -35,13 +35,11 @@ function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txn
 
 function GPay({ size = 28 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" fill="#fff" />
-      <Path d="M35.76 24.2c0-.63-.057-1.24-.16-1.82H24v3.44h6.6a5.64 5.64 0 01-2.44 3.7v3.07h3.95c2.31-2.13 3.65-5.27 3.65-8.39z" fill="#4285F4" />
-      <Path d="M24 36c3.32 0 6.1-1.1 8.13-2.99l-3.95-3.07c-1.1.74-2.5 1.18-4.18 1.18-3.21 0-5.93-2.17-6.9-5.08H13.1v3.17A12 12 0 0024 36z" fill="#34A853" />
-      <Path d="M17.1 26.04A7.18 7.18 0 0116.73 24c0-.71.12-1.4.37-2.04v-3.17H13.1A12 12 0 0012 24c0 1.93.46 3.76 1.1 5.21l4-3.17z" fill="#FBBC05" />
-      <Path d="M24 16.88c1.81 0 3.44.62 4.72 1.84l3.54-3.54C30.09 13.14 27.31 12 24 12a12 12 0 00-10.9 6.79l4 3.17c.97-2.91 3.69-5.08 6.9-5.08z" fill="#EA4335" />
-    </Svg>
+    <Image
+      source={require("@/assets/images/gpay-logo.png")}
+      style={{ width: size, height: size, borderRadius: size * 0.2 }}
+      resizeMode="contain"
+    />
   );
 }
 
@@ -58,10 +56,11 @@ function PhonePeIcon({ size = 28 }: { size?: number }) {
 
 function PaytmIcon({ size = 28 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Rect width="24" height="24" rx="6" fill="#00BAF2" />
-      <Path d="M5 12h14M12 5v14" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-    </Svg>
+    <Image
+      source={require("@/assets/images/paytm-logo.png")}
+      style={{ width: size, height: size, borderRadius: size * 0.2 }}
+      resizeMode="contain"
+    />
   );
 }
 
