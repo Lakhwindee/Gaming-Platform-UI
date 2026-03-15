@@ -155,7 +155,7 @@ export default function ProfileScreen() {
           <MenuRow iconName="log-out-outline" label="Sign Out" color={C.red} onPress={handleLogout} />
         </View>
 
-        <Text style={styles.versionText}>Aviator v1.0.0  ·  NeonBet ©</Text>
+        <Text style={styles.versionText}>Udaan v1.0.0  ·  NeonBet ©</Text>
       </ScrollView>
     </LinearGradient>
   );

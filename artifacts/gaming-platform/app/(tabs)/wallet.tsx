@@ -150,7 +150,7 @@ export default function WalletScreen() {
           amount: order.amount,
           currency: order.currency,
           order_id: order.orderId,
-          name: "Aviator",
+          name: "Udaan",
           description: `Add ₹${selectedAmt} to wallet`,
           image: "",
           theme: { color: "#CC0022" },

@@ -20,11 +20,12 @@ const ORIG_Y = CV_H * 0.88;
 function calcMult(elapsed: number): number {
   return Math.floor(Math.pow(Math.E, 0.077 * elapsed) * 100) / 100;
 }
-function getPos(elapsed: number, mult: number): { x: number; y: number } {
-  const tX = Math.min(elapsed / 22, 1);
-  const x = ORIG_X + tX * CV_W * 0.82;
-  const tY = Math.min(Math.log(Math.max(mult, 1)) / Math.log(28), 1);
-  const y = ORIG_Y - tY * CV_H * 0.80;
+function getPos(elapsed: number): { x: number; y: number } {
+  const MAX_T = 34;
+  const t = Math.min(elapsed / MAX_T, 1);
+  const x = ORIG_X + t * (CV_W - ORIG_X - 20);
+  const yPow = Math.pow(t, 1.65);
+  const y = ORIG_Y - yPow * (CV_H * 0.87);
   return { x, y };
 }
 
@@ -35,33 +36,26 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
 }));
 
 function RocketShape({ phase }: { phase: string }) {
-  const S = 34;
+  const S = 26;
   const isFlying = phase === "flying";
   return (
     <>
       {isFlying && (
         <>
-          <Ellipse cx={0} cy={S * 0.95} rx={9} ry={S * 0.7} fill="url(#flameOuter)" />
-          <Ellipse cx={0} cy={S * 0.8} rx={5} ry={S * 0.45} fill="url(#flameMid)" />
-          <Ellipse cx={0} cy={S * 0.65} rx={2.5} ry={S * 0.25} fill="url(#flameCore)" />
-          <Ellipse cx={-3} cy={S * 1.1} rx={2} ry={3.5} fill="#FF6B00" opacity={0.4} />
-          <Ellipse cx={3} cy={S * 1.15} rx={1.5} ry={3} fill="#FFD700" opacity={0.35} />
+          <Ellipse cx={0} cy={S * 0.85} rx={8} ry={S * 0.62} fill="url(#flameOuter)" />
+          <Ellipse cx={0} cy={S * 0.70} rx={4.5} ry={S * 0.38} fill="url(#flameMid)" />
+          <Ellipse cx={0} cy={S * 0.56} rx={2} ry={S * 0.20} fill="url(#flameCore)" />
         </>
       )}
-      <Path d={`M -9 ${S * 0.25} L -19 ${S * 0.62} L -9 ${S * 0.47} Z`} fill="#8090A8" />
-      <Path d={`M 9 ${S * 0.25} L 19 ${S * 0.62} L 9 ${S * 0.47} Z`} fill="#8090A8" />
-      <Path d={`M -9 ${S * 0.28} L -13 ${S * 0.55} L -9 ${S * 0.45} Z`} fill="#A0B0C0" />
-      <Path d={`M 9 ${S * 0.28} L 13 ${S * 0.55} L 9 ${S * 0.45} Z`} fill="#A0B0C0" />
-      <Rect x={-9} y={-S * 0.5} width={18} height={S} rx={4} ry={4} fill="url(#rocketBody)" />
-      <Path d={`M 0 ${-S} L 9 ${-S * 0.5} L -9 ${-S * 0.5} Z`} fill="url(#rocketNose)" />
-      <Ellipse cx={0} cy={-S * 0.5} rx={9} ry={3} fill="#D0D8E8" />
-      <Rect x={-4} y={-S * 0.48} width={8} height={S * 0.32} rx={3} fill="#CC0022" opacity={0.85} />
-      <Circle cx={0} cy={-S * 0.12} r={6} fill="rgba(80,160,255,0.2)" />
-      <Circle cx={0} cy={-S * 0.12} r={6} stroke="#88CCFF" strokeWidth={1.5} fill="none" />
-      <Circle cx={-2} cy={-S * 0.12 - 2} r={2} fill="rgba(255,255,255,0.55)" />
-      <Rect x={-6} y={-S * 0.46} width={3} height={S * 0.92} rx={1.5} fill="rgba(255,255,255,0.2)" />
-      <Rect x={-8} y={S * 0.5} width={16} height={7} rx={2.5} fill="#505868" />
-      <Ellipse cx={0} cy={S * 0.5} rx={8} ry={3} fill="#3A4250" />
+      <Path d={`M -8 ${S * 0.2} L -17 ${S * 0.55} L -8 ${S * 0.42} Z`} fill="#D43050" />
+      <Path d={`M 8 ${S * 0.2} L 17 ${S * 0.55} L 8 ${S * 0.42} Z`} fill="#D43050" />
+      <Rect x={-8} y={-S * 0.46} width={16} height={S * 0.92} rx={4} ry={4} fill="url(#rocketBody)" />
+      <Path d={`M 0 ${-S} L 8 ${-S * 0.46} L -8 ${-S * 0.46} Z`} fill="url(#rocketNose)" />
+      <Rect x={-3.5} y={-S * 0.44} width={7} height={S * 0.26} rx={2} fill="#EE1133" opacity={0.9} />
+      <Circle cx={0} cy={-S * 0.10} r={5} fill="rgba(80,160,255,0.22)" stroke="#88CCFF" strokeWidth={1.2} />
+      <Circle cx={-1.5} cy={-S * 0.10 - 1.5} r={1.8} fill="rgba(255,255,255,0.55)" />
+      <Rect x={-5} y={-S * 0.43} width={2.5} height={S * 0.82} rx={1.2} fill="rgba(255,255,255,0.18)" />
+      <Rect x={-6.5} y={S * 0.44} width={13} height={5.5} rx={2} fill="#484E60" />
     </>
   );
 }
@@ -70,7 +64,7 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
   phase: string; mult: number; countdown: number; elapsed: number;
 }) {
   const pos = (phase === "flying" || phase === "crashed")
-    ? getPos(elapsed, mult)
+    ? getPos(elapsed)
     : { x: ORIG_X + 10, y: ORIG_Y - 20 };
 
   let pathD = `M ${ORIG_X} ${ORIG_Y}`;
@@ -78,7 +72,7 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
     const steps = 40;
     for (let i = 1; i <= steps; i++) {
       const t = elapsed * (i / steps);
-      const p = getPos(t, calcMult(t));
+      const p = getPos(t);
       pathD += ` L ${p.x} ${p.y}`;
     }
   }
@@ -86,10 +80,10 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
   const dT = 0.3;
   const e0 = Math.max(elapsed - dT, 0.001);
   const e1 = elapsed + dT;
-  const pA = getPos(e0, calcMult(e0));
-  const pB = getPos(e1, calcMult(e1));
+  const pA = getPos(e0);
+  const pB = getPos(e1);
   const angle = Math.atan2(pB.y - pA.y, pB.x - pA.x);
-  const angleDeg = (angle * 180) / Math.PI;
+  const angleDeg = (angle * 180) / Math.PI + 90;
 
   const mColor = phase === "crashed" ? "#FF1A3A" : mult >= 10 ? "#FFD700" : mult >= 3 ? "#FF6B00" : "#FFFFFF";
 
@@ -298,7 +292,7 @@ export default function GameScreen() {
             </Text>
           </View>
           <View style={styles.appLabel}>
-            <Text style={styles.appLabelText}>AVIATOR</Text>
+            <Text style={styles.appLabelText}>UDAAN</Text>
           </View>
           <View style={styles.connectionChip}>
             <View style={[styles.dot, { backgroundColor: connected ? C.green : C.red }]} />
