@@ -110,11 +110,13 @@ export default function WalletScreen() {
 
   const [withdrawAmt, setWithdrawAmt] = useState("");
   const [upiId,       setUpiId]       = useState("");
-  const [autoFailMsg, setAutoFailMsg] = useState("");
+  const [autoFailMsg,  setAutoFailMsg]  = useState("");
+  const [noAppFound,   setNoAppFound]   = useState(false);
 
-  const appStateRef   = useRef(AppState.currentState);
-  const tokenRef      = useRef(authState.token);
-  const pendingTxnRef = useRef(pendingTxn);
+  const appStateRef    = useRef(AppState.currentState);
+  const tokenRef       = useRef(authState.token);
+  const pendingTxnRef  = useRef(pendingTxn);
+  const upiAppOpenedRef = useRef(false);
 
   useEffect(() => { tokenRef.current      = authState.token; }, [authState.token]);
   useEffect(() => { pendingTxnRef.current = pendingTxn;      }, [pendingTxn]);
@@ -133,15 +135,20 @@ export default function WalletScreen() {
     if (payState !== "waiting") return;
     const sub = AppState.addEventListener("change", async (next: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && next === "active") {
+        if (!upiAppOpenedRef.current) {
+          appStateRef.current = next;
+          return;
+        }
         const token = tokenRef.current;
         const txn   = pendingTxnRef.current;
-        if (!token || !txn) return;
+        if (!token || !txn) { appStateRef.current = next; return; }
         setPayState("confirming");
         setConfirming(true);
         setAutoFailMsg("");
         try {
           const result = await api.upiConfirm(token, txn.txnRef);
           await refreshBalance();
+          upiAppOpenedRef.current = false;
           setPayState("success");
           setTimeout(() => {
             setPayState("idle");
@@ -150,13 +157,8 @@ export default function WalletScreen() {
             setSelectedAmt(500);
             setAutoFailMsg("");
           }, 3000);
-          Alert.alert(
-            "Payment Successful!",
-            "₹" + result.totalCredit.toLocaleString("en-IN") + " added to your wallet" +
-            (result.bonus > 0 ? "\n(includes ₹" + result.bonus + " bonus!)" : ""),
-          );
         } catch (e) {
-          setAutoFailMsg(e instanceof Error ? e.message : "Verification failed");
+          setAutoFailMsg(e instanceof Error ? e.message : "Verification failed. Tap below to retry.");
           setPayState("confirming");
         } finally {
           setConfirming(false);
@@ -191,34 +193,39 @@ export default function WalletScreen() {
 
     setLoading(true);
     setPayState("initiating");
+    setNoAppFound(false);
+    upiAppOpenedRef.current = false;
+
     try {
       const txn = await api.upiInitiate(authState.token, finalAmount, selectedMethod);
       setPendingTxn(txn);
       setUtrInput("");
+      setAutoFailMsg("");
+      setPayState("waiting");
 
-      const upiUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
-      const canOpen = await Linking.canOpenURL(upiUrl);
-      if (canOpen) {
-        await Linking.openURL(upiUrl);
-      } else {
-        const fallback = "upi://pay?pa=" + txn.merchantUpi +
-          "&pn=" + encodeURIComponent("UDAAN") +
-          "&am=" + finalAmount +
-          "&cu=INR&tn=" + encodeURIComponent("UDAAN Deposit " + txn.txnRef);
-        const canFallback = await Linking.canOpenURL(fallback);
-        if (canFallback) {
-          await Linking.openURL(fallback);
-        } else {
-          Alert.alert(
-            "UPI App Not Found",
-            "Please open your UPI app and pay to:\n\nUPI ID: " + txn.merchantUpi + "\nAmount: ₹" + finalAmount + "\nRef: " + txn.txnRef,
-          );
+      const specificUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
+      const genericUrl  = "upi://pay?pa=" + txn.merchantUpi +
+        "&pn=" + encodeURIComponent("UDAAN") +
+        "&am=" + finalAmount +
+        "&cu=INR&tn=" + encodeURIComponent("UDAAN Deposit " + txn.txnRef);
+
+      let opened = false;
+      try {
+        await Linking.openURL(specificUrl);
+        opened = true;
+      } catch {
+        try {
+          await Linking.openURL(genericUrl);
+          opened = true;
+        } catch {
+          setNoAppFound(true);
         }
       }
-      setPayState("waiting");
+      upiAppOpenedRef.current = opened;
     } catch (e) {
       Alert.alert("Failed", e instanceof Error ? e.message : "Please try again");
       setPayState("idle");
+      upiAppOpenedRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -255,6 +262,9 @@ export default function WalletScreen() {
     setPayState("idle");
     setPendingTxn(null);
     setUtrInput("");
+    setAutoFailMsg("");
+    setNoAppFound(false);
+    upiAppOpenedRef.current = false;
   }
 
   async function handleWithdraw() {
@@ -434,7 +444,34 @@ export default function WalletScreen() {
                       </>
                     )}
 
-                    {payState === "waiting" && !confirming && (
+                    {payState === "waiting" && !confirming && noAppFound && (
+                      <View style={styles.manualUpiBox}>
+                        <Text style={styles.manualUpiTitle}>No UPI app found — pay manually</Text>
+                        <View style={styles.manualUpiRow}>
+                          <Text style={styles.manualUpiLabel}>UPI ID</Text>
+                          <Text style={styles.manualUpiValue}>{pendingTxn.merchantUpi}</Text>
+                        </View>
+                        <View style={styles.manualUpiRow}>
+                          <Text style={styles.manualUpiLabel}>Amount</Text>
+                          <Text style={[styles.manualUpiValue, { color: C.gold }]}>
+                            ₹{pendingTxn.amount.toLocaleString("en-IN")}
+                          </Text>
+                        </View>
+                        <View style={styles.manualUpiRow}>
+                          <Text style={styles.manualUpiLabel}>Ref</Text>
+                          <Text style={styles.manualUpiValue}>{pendingTxn.txnRef}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.paidBtn, { backgroundColor: methodInfo.color, marginTop: 8 }]}
+                          onPress={() => setPayState("confirming")}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.paidBtnText}>I'VE PAID</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {payState === "waiting" && !confirming && !noAppFound && (
                       <TouchableOpacity onPress={handleDeposit} style={styles.reopenBtn} activeOpacity={0.7}>
                         <Ionicons name="refresh" size={14} color={C.textMuted} />
                         <Text style={styles.reopenText}>Reopen {methodInfo.label}</Text>
@@ -736,6 +773,11 @@ const styles = StyleSheet.create({
   cancelPayBtn: { paddingVertical: 6 },
   cancelPayText: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.red },
   successIcon: { marginBottom: 4 },
+  manualUpiBox: { width: "100%", backgroundColor: "rgba(255,255,255,0.04)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", padding: 14, gap: 8 },
+  manualUpiTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.textMuted, textAlign: "center", marginBottom: 4 },
+  manualUpiRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  manualUpiLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textDim },
+  manualUpiValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text },
   withdrawCard: { gap: 0 },
   fieldInput: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 10 },
   fieldPrefix: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 6 },

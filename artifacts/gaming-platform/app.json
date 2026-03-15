@@ -14,7 +14,10 @@
       "backgroundColor": "#0A0A0F"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["tez", "phonepe", "paytmmp", "upi", "bhim"]
+      }
     },
     "android": {
       "backgroundColor": "#0A0A0F"
