@@ -2,8 +2,8 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { usersTable, betsTable, gameRoundsTable } from "@workspace/db/schema";
+import { eq, desc, and } from "drizzle-orm";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "neonbet-secret-2024";
@@ -24,6 +24,16 @@ function sanitizeUser(u: typeof usersTable.$inferSelect) {
     vipLevel: u.vipLevel,
     createdAt: u.createdAt,
   };
+}
+
+function getUserId(authHeader: string | undefined): number | null {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  try {
+    const payload = jwt.verify(authHeader.slice(7), JWT_SECRET) as { userId: number };
+    return payload.userId;
+  } catch {
+    return null;
+  }
 }
 
 router.post("/auth/register", async (req, res) => {
@@ -73,18 +83,72 @@ router.post("/auth/login", async (req, res) => {
 });
 
 router.get("/auth/me", async (req, res) => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer "))
-    return res.status(401).json({ error: "No token" });
+  const userId = getUserId(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const payload = jwt.verify(auth.slice(7), JWT_SECRET) as { userId: number };
-    const rows = await db.select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
+    const rows = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     const user = rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
     return res.json(sanitizeUser(user));
   } catch {
     return res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+router.get("/auth/game-history", async (req, res) => {
+  const userId = getUserId(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const rows = await db
+      .select({
+        betId: betsTable.id,
+        roundId: betsTable.roundId,
+        amount: betsTable.amount,
+        payout: betsTable.payout,
+        cashedOutAt: betsTable.cashedOutAt,
+        status: betsTable.status,
+        placedAt: betsTable.placedAt,
+        crashPoint: gameRoundsTable.crashPoint,
+      })
+      .from(betsTable)
+      .leftJoin(gameRoundsTable, eq(betsTable.roundId, gameRoundsTable.id))
+      .where(and(eq(betsTable.userId, userId)))
+      .orderBy(desc(betsTable.placedAt))
+      .limit(30);
+
+    return res.json(rows);
+  } catch (e) {
+    console.error("Game history error:", e);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/auth/change-password", async (req, res) => {
+  const userId = getUserId(req.headers.authorization);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { currentPassword, newPassword } = req.body ?? {};
+  if (!currentPassword || !newPassword)
+    return res.status(400).json({ error: "Both fields required" });
+  if (newPassword.length < 6)
+    return res.status(400).json({ error: "New password must be at least 6 characters" });
+
+  try {
+    const rows = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const user = rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return res.status(401).json({ error: "Current password is incorrect" });
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.update(usersTable).set({ passwordHash: newHash }).where(eq(usersTable.id, userId));
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("Change password error:", e);
+    return res.status(500).json({ error: "Server error" });
   }
 });
 

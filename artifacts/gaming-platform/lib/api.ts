@@ -31,6 +31,17 @@ export interface ApiTransaction {
   createdAt: string;
 }
 
+export interface ApiGameHistory {
+  betId: number;
+  roundId: number | null;
+  amount: number;
+  payout: number | null;
+  cashedOutAt: string | null;
+  status: string;
+  placedAt: string;
+  crashPoint: string | null;
+}
+
 export interface UpiInitResult {
   txnRef: string;
   merchantUpi: string;
@@ -81,5 +92,14 @@ export const api = {
     request<UpiConfirmResult>("/payment/upi-confirm", {
       method: "POST",
       body: JSON.stringify({ txnRef, utr }),
+    }, token),
+
+  getGameHistory: (token: string) =>
+    request<ApiGameHistory[]>("/auth/game-history", undefined, token),
+
+  changePassword: (token: string, currentPassword: string, newPassword: string) =>
+    request<{ success: boolean }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
     }, token),
 };
