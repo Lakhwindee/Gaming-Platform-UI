@@ -115,8 +115,8 @@ function RocketShape({ phase }: { phase: string }) {
   );
 }
 
-function GameCanvas({ phase, mult, countdown, elapsed }: {
-  phase: string; mult: number; countdown: number; elapsed: number;
+function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
+  phase: string; mult: number; countdown: number; elapsed: number; synced: boolean;
 }) {
   const pos = (phase === "flying" || phase === "crashed")
     ? getPos(elapsed)
@@ -213,6 +213,13 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
           <Text style={styles.crashedLabel}>💥  BLAST!</Text>
         </View>
       )}
+      {!synced && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(4,0,12,0.88)", alignItems: "center", justifyContent: "center", borderRadius: 16 }]} pointerEvents="none">
+          <Text style={{ fontSize: 28, marginBottom: 8 }}>🚀</Text>
+          <Text style={{ color: "#FF3A3A", fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 2 }}>SYNCING...</Text>
+          <Text style={{ color: "#AA5566", fontSize: 10, marginTop: 4, letterSpacing: 1 }}>Connecting to live game</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -266,7 +273,12 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
-    const wsListener = () => setTick(n => n + 1);
+    const wsListener = () => {
+      if (WSC.state.phase === "flying" && WSC.state.startTime > 0) {
+        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
+      }
+      setTick(n => n + 1);
+    };
     WSC.listeners.add(wsListener);
     return () => { WSC.listeners.delete(wsListener); };
   }, []);
@@ -537,6 +549,7 @@ export default function GameScreen() {
   }
 
   const connected = WSC.state.connected;
+  const synced = WSC.state.synced;
 
   const popupTranslateY = popupAnim.interpolate({ inputRange: [0, 1], outputRange: [-130, 0] });
   const popupOpacity = popupAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] });
@@ -571,7 +584,7 @@ export default function GameScreen() {
           })}
         </ScrollView>
 
-        <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} />
+        <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
 
         <View style={styles.dualPanel}>
           {renderBetPanel(0)}

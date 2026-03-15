@@ -38,6 +38,7 @@ export interface WSState {
   topBets: TopWin[];
   topHistory: TopHistoryEntry[];
   connected: boolean;
+  synced: boolean;
 }
 
 type Listener = () => void;
@@ -47,7 +48,8 @@ const DEFAULT: WSState = {
   phase: "waiting", mult: 1.0, countdown: 5,
   roundId: 0, startTime: 0, history: [],
   allBets: [], betCount: 0, cashedCount: 0, totalWin: 0,
-  prevRound: null, topBets: [], topHistory: [], connected: false,
+  prevRound: null, topBets: [], topHistory: [],
+  connected: false, synced: false,
 };
 
 export const WSC = {
@@ -66,6 +68,8 @@ export function connectWS(token: string | null) {
   if (WSC.socket) { WSC.socket.onclose = null; WSC.socket.close(); WSC.socket = null; }
   if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }
 
+  WSC.state.synced = false;
+
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   const url = domain ? `wss://${domain}/api/ws` : "ws://localhost:8080/api/ws";
   const ws = new WebSocket(url);
@@ -81,7 +85,7 @@ export function connectWS(token: string | null) {
     let msg: Record<string, unknown>;
     try { msg = JSON.parse(e.data as string); } catch { return; }
     if (msg.type === "state") {
-      WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true };
+      WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true, synced: true };
       notify();
     }
     WSC.msgListeners.forEach(fn => fn(msg));
@@ -89,6 +93,7 @@ export function connectWS(token: string | null) {
 
   ws.onclose = () => {
     WSC.state.connected = false;
+    WSC.state.synced = false;
     notify();
     WSC.reconnectTimer = setTimeout(() => connectWS(WSC.token), 3000);
   };
@@ -104,5 +109,6 @@ export function disconnectWS() {
   if (WSC.socket) { WSC.socket.onclose = null; WSC.socket.close(); WSC.socket = null; }
   if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }
   WSC.state.connected = false;
+  WSC.state.synced = false;
   notify();
 }
