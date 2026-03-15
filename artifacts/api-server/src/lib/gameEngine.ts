@@ -8,15 +8,24 @@ const JWT_SECRET = process.env.JWT_SECRET || 'neonbet-secret-2024';
 
 type Phase = 'waiting' | 'flying' | 'crashed';
 
+interface BetSlot {
+  betId: number | null;
+  amount: number;
+  autoCashout: number;
+  active: boolean;
+  cashedOut: boolean;
+  queued: { amount: number; autoCashout: number } | null;
+}
+
+function emptySlot(): BetSlot {
+  return { betId: null, amount: 0, autoCashout: 0, active: false, cashedOut: false, queued: null };
+}
+
 interface ClientState {
   ws: WebSocket;
   userId: number | null;
   username: string | null;
-  betId: number | null;
-  betAmount: number;
-  autoCashout: number;
-  hasBet: boolean;
-  cashedOut: boolean;
+  slots: [BetSlot, BetSlot];
 }
 
 interface BotBet {
@@ -57,7 +66,6 @@ const ENG = {
   crashPoint: 0,
   roundId: 0,
   startTime: 0,
-  crashTime: 0,
   bots: genBots(),
   history: [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01],
   timer: null as ReturnType<typeof setInterval> | null,
@@ -86,16 +94,73 @@ function broadcast(data: object) {
   }
 }
 
+async function processCashout(ws: WebSocket, state: ClientState, slotIdx: 0 | 1, mult: number) {
+  const slot = state.slots[slotIdx];
+  if (!slot.active || slot.cashedOut || !state.userId) return;
+  slot.cashedOut = true;
+  const payout = Math.floor(slot.amount * mult);
+
+  try {
+    if (slot.betId) {
+      await db.update(betsTable)
+        .set({ status: 'cashed', cashedOutAt: String(mult), payout })
+        .where(eq(betsTable.id, slot.betId));
+    }
+    const rows = await db.update(usersTable)
+      .set({ balance: sql`balance + ${payout}`, totalWins: sql`total_wins + 1`, totalLosses: sql`total_losses - 1` })
+      .where(eq(usersTable.id, state.userId))
+      .returning({ balance: usersTable.balance });
+
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'cashout_ok', slot: slotIdx + 1, mult, payout, balance: rows[0]?.balance ?? 0 }));
+  } catch (e) {
+    console.error('DB cashout error:', e);
+    slot.cashedOut = false;
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'cashout_fail', slot: slotIdx + 1, error: 'Server error' }));
+  }
+}
+
+async function autoPlaceQueuedBets() {
+  for (const [ws, c] of clients) {
+    if (!c.userId) continue;
+    for (let i = 0; i < 2; i++) {
+      const slot = c.slots[i];
+      if (!slot.queued) continue;
+      const { amount, autoCashout } = slot.queued;
+      slot.queued = null;
+      try {
+        const rows = await db.update(usersTable)
+          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1` })
+          .where(sql`id = ${c.userId} AND balance >= ${amount}`)
+          .returning({ balance: usersTable.balance });
+        if (!rows.length) {
+          ws.send(JSON.stringify({ type: 'bet_fail', slot: i + 1, error: 'Insufficient balance for queued bet' }));
+          continue;
+        }
+        const betRows = await db.insert(betsTable).values({
+          roundId: ENG.roundId, userId: c.userId, amount,
+          autoCashout: autoCashout ? String(autoCashout) : null, status: 'active',
+        }).returning({ id: betsTable.id });
+        slot.betId = betRows[0]?.id ?? null;
+        slot.amount = amount;
+        slot.autoCashout = autoCashout;
+        slot.active = true;
+        slot.cashedOut = false;
+        ws.send(JSON.stringify({ type: 'bet_ok', slot: i + 1, balance: rows[0].balance, roundId: ENG.roundId, auto: true }));
+      } catch (e) {
+        console.error('auto queue bet error:', e);
+      }
+    }
+  }
+}
+
 async function startCountdown() {
   ENG.phase = 'waiting';
   ENG.mult = 1.0;
   ENG.countdown = 5;
   ENG.crashPoint = genCrash();
   ENG.bots = genBots();
-
-  for (const [, c] of clients) {
-    c.hasBet = false; c.cashedOut = false; c.betId = null; c.betAmount = 0;
-  }
 
   try {
     const rows = await db.insert(gameRoundsTable).values({
@@ -107,7 +172,17 @@ async function startCountdown() {
     ENG.roundId = Date.now();
   }
 
+  for (const [, c] of clients) {
+    for (const slot of c.slots) {
+      slot.active = false;
+      slot.cashedOut = false;
+      slot.betId = null;
+      slot.amount = 0;
+    }
+  }
+
   broadcast(statePayload());
+  await autoPlaceQueuedBets();
 
   if (ENG.cdTimer) clearInterval(ENG.cdTimer);
   ENG.cdTimer = setInterval(() => {
@@ -124,7 +199,6 @@ async function startFlight() {
   ENG.phase = 'flying';
   ENG.startTime = Date.now();
   ENG.mult = 1.0;
-
   try {
     await db.update(gameRoundsTable)
       .set({ status: 'flying', startedAt: new Date() })
@@ -145,8 +219,11 @@ async function startFlight() {
     });
 
     for (const [ws, c] of clients) {
-      if (c.hasBet && !c.cashedOut && c.autoCashout > 1.05 && ENG.mult >= c.autoCashout) {
-        await processCashout(ws, c, ENG.mult);
+      for (let i = 0; i < 2; i++) {
+        const slot = c.slots[i];
+        if (slot.active && !slot.cashedOut && slot.autoCashout > 1.05 && ENG.mult >= slot.autoCashout) {
+          await processCashout(ws, c, i as 0 | 1, ENG.mult);
+        }
       }
     }
 
@@ -158,18 +235,19 @@ async function startFlight() {
 async function doCrash() {
   if (ENG.timer) { clearInterval(ENG.timer); ENG.timer = null; }
   ENG.phase = 'crashed';
-  ENG.crashTime = Date.now();
   ENG.bots = ENG.bots.map(b => b.status === 'active' ? { ...b, status: 'crashed' } : b);
-  ENG.history = [ENG.mult, ...ENG.history].slice(0, 15);
+  ENG.history = [ENG.mult, ...ENG.history].slice(0, 20);
 
   for (const [ws, c] of clients) {
-    if (c.hasBet && !c.cashedOut && c.betId) {
-      try {
-        await db.update(betsTable).set({ status: 'crashed', payout: 0 }).where(eq(betsTable.id, c.betId));
-        if (ws.readyState === WebSocket.OPEN)
-          ws.send(JSON.stringify({ type: 'bet_crash', mult: ENG.mult }));
-      } catch (e) { console.error('DB bet crash:', e); }
-      c.hasBet = false;
+    for (let i = 0; i < 2; i++) {
+      const slot = c.slots[i];
+      if (slot.active && !slot.cashedOut && slot.betId) {
+        try {
+          await db.update(betsTable).set({ status: 'crashed', payout: 0 }).where(eq(betsTable.id, slot.betId));
+          if (ws.readyState === WebSocket.OPEN)
+            ws.send(JSON.stringify({ type: 'bet_crash', slot: i + 1, mult: ENG.mult, amount: slot.amount }));
+        } catch (e) { console.error('DB bet crash:', e); }
+      }
     }
   }
 
@@ -183,43 +261,16 @@ async function doCrash() {
   setTimeout(startCountdown, 4500);
 }
 
-async function processCashout(ws: WebSocket, c: ClientState, mult: number) {
-  if (!c.hasBet || c.cashedOut || !c.betId || !c.userId) return;
-  c.cashedOut = true; c.hasBet = false;
-  const payout = Math.floor(c.betAmount * mult);
-
-  try {
-    await db.update(betsTable)
-      .set({ status: 'cashed', cashedOutAt: String(mult), payout })
-      .where(eq(betsTable.id, c.betId));
-
-    const rows = await db.update(usersTable)
-      .set({ balance: sql`balance + ${payout}`, totalWins: sql`total_wins + 1`, totalLosses: sql`total_losses - 1` })
-      .where(eq(usersTable.id, c.userId))
-      .returning({ balance: usersTable.balance });
-
-    const balance = rows[0]?.balance ?? 0;
-    if (ws.readyState === WebSocket.OPEN)
-      ws.send(JSON.stringify({ type: 'cashout_ok', mult, payout, balance }));
-  } catch (e) {
-    console.error('DB cashout error:', e);
-    c.cashedOut = false; c.hasBet = true;
-    if (ws.readyState === WebSocket.OPEN)
-      ws.send(JSON.stringify({ type: 'cashout_fail', error: 'Server error' }));
-  }
-}
-
 export function handleConnection(ws: WebSocket) {
   const state: ClientState = {
-    ws, userId: null, username: null, betId: null,
-    betAmount: 0, autoCashout: 0, hasBet: false, cashedOut: false,
+    ws, userId: null, username: null,
+    slots: [emptySlot(), emptySlot()],
   };
   clients.set(ws, state);
-
   ws.send(JSON.stringify(statePayload()));
 
   ws.on('message', async (raw) => {
-    let msg: { type: string; token?: string; amount?: number; autoCashout?: number };
+    let msg: { type: string; token?: string; amount?: number; autoCashout?: number; slot?: number };
     try { msg = JSON.parse(String(raw)); } catch { return; }
 
     if (msg.type === 'auth' && msg.token) {
@@ -236,51 +287,96 @@ export function handleConnection(ws: WebSocket) {
 
     if (msg.type === 'place_bet') {
       if (!state.userId) { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Login required' })); return; }
-      if (ENG.phase !== 'waiting') { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Bet only during countdown' })); return; }
-      if (state.hasBet) { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Already have active bet' })); return; }
-
+      const slotIdx = (((msg.slot ?? 1) - 1) as 0 | 1);
+      if (slotIdx !== 0 && slotIdx !== 1) { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Invalid slot' })); return; }
+      const slot = state.slots[slotIdx];
       const amount = Math.floor(msg.amount ?? 0);
-      if (amount < 10 || amount > 100000) { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Invalid amount (₹10 - ₹1,00,000)' })); return; }
+      if (amount < 10 || amount > 100000) {
+        ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Invalid amount (₹10 - ₹1,00,000)' }));
+        return;
+      }
+
+      if (ENG.phase === 'flying') {
+        if (slot.active || slot.queued) {
+          ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Slot already has a bet' }));
+          return;
+        }
+        slot.queued = { amount, autoCashout: msg.autoCashout ?? 0 };
+        ws.send(JSON.stringify({ type: 'bet_queued', slot: slotIdx + 1, amount }));
+        return;
+      }
+
+      if (ENG.phase !== 'waiting') {
+        ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Wait for next round' }));
+        return;
+      }
+      if (slot.active) {
+        ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Slot already active' }));
+        return;
+      }
 
       try {
         const rows = await db.update(usersTable)
-          .set({
-            balance: sql`balance - ${amount}`,
-            totalWagered: sql`total_wagered + ${amount}`,
-            totalLosses: sql`total_losses + 1`,
-          })
+          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1` })
           .where(sql`id = ${state.userId} AND balance >= ${amount}`)
           .returning({ balance: usersTable.balance });
-
-        if (!rows.length) { ws.send(JSON.stringify({ type: 'bet_fail', error: 'Insufficient balance' })); return; }
+        if (!rows.length) { ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Insufficient balance' })); return; }
 
         const betRows = await db.insert(betsTable).values({
-          roundId: ENG.roundId,
-          userId: state.userId,
-          amount,
-          autoCashout: msg.autoCashout ? String(msg.autoCashout) : null,
-          status: 'active',
+          roundId: ENG.roundId, userId: state.userId, amount,
+          autoCashout: msg.autoCashout ? String(msg.autoCashout) : null, status: 'active',
         }).returning({ id: betsTable.id });
 
-        state.betId = betRows[0]?.id ?? null;
-        state.betAmount = amount;
-        state.autoCashout = msg.autoCashout ?? 0;
-        state.hasBet = true;
-        state.cashedOut = false;
-
-        ws.send(JSON.stringify({ type: 'bet_ok', balance: rows[0].balance, roundId: ENG.roundId }));
+        slot.betId = betRows[0]?.id ?? null;
+        slot.amount = amount;
+        slot.autoCashout = msg.autoCashout ?? 0;
+        slot.active = true;
+        slot.cashedOut = false;
+        ws.send(JSON.stringify({ type: 'bet_ok', slot: slotIdx + 1, balance: rows[0].balance, roundId: ENG.roundId }));
       } catch (e) {
         console.error('DB place_bet error:', e);
-        ws.send(JSON.stringify({ type: 'bet_fail', error: 'Server error' }));
+        ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Server error' }));
       }
       return;
     }
 
-    if (msg.type === 'cashout') {
-      if (!state.hasBet || state.cashedOut || ENG.phase !== 'flying') {
-        ws.send(JSON.stringify({ type: 'cashout_fail', error: 'Cannot cashout now' })); return;
+    if (msg.type === 'cancel_bet') {
+      if (!state.userId) return;
+      const slotIdx = (((msg.slot ?? 1) - 1) as 0 | 1);
+      const slot = state.slots[slotIdx];
+
+      if (slot.queued) {
+        slot.queued = null;
+        ws.send(JSON.stringify({ type: 'bet_cancelled', slot: slotIdx + 1, refunded: false }));
+        return;
       }
-      await processCashout(ws, state, ENG.mult);
+      if (slot.active && !slot.cashedOut && ENG.phase === 'waiting') {
+        const amount = slot.amount;
+        slot.active = false; slot.betId = null; slot.amount = 0;
+        try {
+          const rows = await db.update(usersTable)
+            .set({ balance: sql`balance + ${amount}`, totalWagered: sql`total_wagered - ${amount}`, totalLosses: sql`total_losses - 1` })
+            .where(eq(usersTable.id, state.userId))
+            .returning({ balance: usersTable.balance });
+          ws.send(JSON.stringify({ type: 'bet_cancelled', slot: slotIdx + 1, amount, refunded: true, balance: rows[0]?.balance }));
+        } catch {
+          ws.send(JSON.stringify({ type: 'bet_cancel_fail', slot: slotIdx + 1, error: 'Server error' }));
+        }
+        return;
+      }
+      ws.send(JSON.stringify({ type: 'bet_cancel_fail', slot: slotIdx + 1, error: 'Cannot cancel now' }));
+      return;
+    }
+
+    if (msg.type === 'cashout') {
+      if (!state.userId) return;
+      const slotIdx = (((msg.slot ?? 1) - 1) as 0 | 1);
+      const slot = state.slots[slotIdx];
+      if (!slot.active || slot.cashedOut || ENG.phase !== 'flying') {
+        ws.send(JSON.stringify({ type: 'cashout_fail', slot: slotIdx + 1, error: 'Cannot cashout now' }));
+        return;
+      }
+      await processCashout(ws, state, slotIdx, ENG.mult);
       return;
     }
   });

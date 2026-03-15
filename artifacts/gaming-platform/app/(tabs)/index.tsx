@@ -137,40 +137,63 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
 
       {phase === "flying" && (
         <View style={[StyleSheet.absoluteFill, styles.multOverlay]} pointerEvents="none">
-          <Text style={[styles.multText, { color: mColor, textShadowColor: mColor }]}>{mult.toFixed(2)}x</Text>
+          <Text style={[styles.multText, { color: mColor, textShadowColor: mColor }]}>
+            {mult.toFixed(2)}x
+          </Text>
         </View>
       )}
       {phase === "waiting" && (
         <View style={[StyleSheet.absoluteFill, styles.multOverlay]} pointerEvents="none">
           <Text style={styles.countLabel}>NEXT ROUND IN</Text>
-          <Text style={[styles.multText, { color: C.red }]}>{countdown}s</Text>
+          <Text style={[styles.multText, { color: C.textMuted, textShadowColor: "transparent", fontSize: 40 }]}>
+            {countdown}s
+          </Text>
         </View>
       )}
       {phase === "crashed" && (
         <View style={[StyleSheet.absoluteFill, styles.multOverlay]} pointerEvents="none">
-          <Text style={[styles.multText, { color: "#FF1A3A", textShadowColor: "#FF1A3A" }]}>{mult.toFixed(2)}x</Text>
-          <Text style={styles.crashedLabel}>FLEW AWAY</Text>
+          <Text style={[styles.multText, { color: "#FF1A3A", textShadowColor: "#FF1A3A" }]}>
+            {mult.toFixed(2)}x
+          </Text>
+          <Text style={styles.crashedLabel}>FLEW AWAY!</Text>
         </View>
       )}
     </View>
   );
 }
 
+type SlotStatus = "idle" | "placed" | "queued" | "active" | "cashedout" | "lost";
+
+interface SlotState {
+  amount: number;
+  input: string;
+  status: SlotStatus;
+  cashedOutAt: number | null;
+  result: { text: string; win: boolean } | null;
+}
+
+function initSlot(defaultAmt: number): SlotState {
+  return { amount: defaultAmt, input: String(defaultAmt), status: "idle", cashedOutAt: null, result: null };
+}
+
 export default function GameScreen() {
   const { state: authState } = useAuth();
   const insets = useSafeAreaInsets();
   const [, setTick] = useState(0);
-  const [betAmount, setBetAmount] = useState(100);
-  const [betInput, setBetInput] = useState("100");
-  const [hasActiveBet, setHasActiveBet] = useState(false);
-  const [cashedOutAt, setCashedOutAt] = useState<number | null>(null);
-  const [resultMsg, setResultMsg] = useState<{ text: string; win: boolean } | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
 
-  const hasActiveRef = useRef(false);
-  const cashedRef = useRef<number | null>(null);
-  const betAmtRef = useRef(100);
-  const resultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
+  const resultTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
+
+  const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
+    setSlots(prev => {
+      const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
+      next[idx] = { ...next[idx], ...patch };
+      slotRefs.current = next;
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const wsListener = () => setTick(n => n + 1);
@@ -181,8 +204,7 @@ export default function GameScreen() {
   useEffect(() => {
     const id = setInterval(() => {
       if (WSC.state.phase === "flying") {
-        const elapsed = (Date.now() - WSC.state.startTime) / 1000;
-        setElapsedSec(elapsed);
+        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
       } else if (WSC.state.phase === "waiting") {
         setElapsedSec(0);
       }
@@ -191,261 +213,295 @@ export default function GameScreen() {
   }, []);
 
   useEffect(() => {
-    const msgHandler = (msg: Record<string, unknown>) => {
+    const handler = (msg: Record<string, unknown>) => {
+      const slotNum = (msg.slot as number | undefined) ?? 1;
+      const slotIdx = (slotNum - 1) as 0 | 1;
+
+      if (msg.type === "bet_ok") {
+        const isQueued = msg.auto === true;
+        updateSlot(slotIdx, { status: isQueued ? "active" : "placed", result: null });
+        if (Platform.OS !== "web") Haptics.selectionAsync();
+      }
+
+      if (msg.type === "bet_queued") {
+        updateSlot(slotIdx, { status: "queued", result: null });
+        if (Platform.OS !== "web") Haptics.selectionAsync();
+      }
+
+      if (msg.type === "bet_cancelled") {
+        updateSlot(slotIdx, { status: "idle" });
+      }
+
       if (msg.type === "cashout_ok") {
         const m = msg.mult as number;
         const payout = msg.payout as number;
-        cashedRef.current = m;
-        setCashedOutAt(m);
-        hasActiveRef.current = false;
-        setHasActiveBet(false);
-        const profit = payout - betAmtRef.current;
-        if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-        setResultMsg({ text: `+₹${profit.toLocaleString("en-IN")} at ${m.toFixed(2)}x`, win: true });
-        resultTimerRef.current = setTimeout(() => setResultMsg(null), 5000);
+        const amt = slotRefs.current[slotIdx].amount;
+        const profit = payout - amt;
+        if (resultTimers.current[slotIdx]) clearTimeout(resultTimers.current[slotIdx]!);
+        updateSlot(slotIdx, {
+          status: "cashedout",
+          cashedOutAt: m,
+          result: { text: `+₹${profit.toLocaleString("en-IN")} @ ${m.toFixed(2)}x`, win: true },
+        });
+        resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
+
       if (msg.type === "bet_crash") {
         const m = msg.mult as number;
-        if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-        setResultMsg({ text: `-₹${betAmtRef.current.toLocaleString("en-IN")} at ${m.toFixed(2)}x`, win: false });
-        resultTimerRef.current = setTimeout(() => setResultMsg(null), 5000);
-        hasActiveRef.current = false;
-        setHasActiveBet(false);
+        const amt = slotRefs.current[slotIdx].amount;
+        if (resultTimers.current[slotIdx]) clearTimeout(resultTimers.current[slotIdx]!);
+        updateSlot(slotIdx, {
+          status: "lost",
+          result: { text: `-₹${amt.toLocaleString("en-IN")} @ ${m.toFixed(2)}x`, win: false },
+        });
+        resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
+
       if (msg.type === "bet_fail") {
+        const errSlot = ((msg.slot as number | undefined) ?? 1) - 1 as 0 | 1;
         Alert.alert("Bet Failed", String(msg.error ?? "Please try again"));
-        hasActiveRef.current = false;
-        setHasActiveBet(false);
+        updateSlot(errSlot, { status: "idle" });
       }
-      if (msg.type === "cashout_fail") {
-        Alert.alert("Cashout Failed", String(msg.error ?? "Please try again"));
-      }
+
       if (msg.type === "state") {
         const newPhase = (msg as { phase?: string }).phase;
         if (newPhase === "waiting") {
-          cashedRef.current = null;
-          setCashedOutAt(null);
+          setSlots(prev => {
+            const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
+            for (let i = 0; i < 2; i++) {
+              if (next[i].status === "lost" || next[i].status === "cashedout") {
+                next[i] = { ...next[i], status: "idle", cashedOutAt: null };
+              }
+              if (next[i].status === "placed") {
+                next[i] = { ...next[i], status: "active" };
+              }
+            }
+            slotRefs.current = next;
+            return next;
+          });
         }
-        if (newPhase === "crashed" && hasActiveRef.current) {
-          hasActiveRef.current = false;
-          setHasActiveBet(false);
-          if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
-          setResultMsg({ text: `Lost ₹${betAmtRef.current.toLocaleString("en-IN")}`, win: false });
-          resultTimerRef.current = setTimeout(() => setResultMsg(null), 4000);
+        if (newPhase === "flying") {
+          setSlots(prev => {
+            const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
+            for (let i = 0; i < 2; i++) {
+              if (next[i].status === "placed") next[i] = { ...next[i], status: "active" };
+            }
+            slotRefs.current = next;
+            return next;
+          });
         }
       }
     };
-    WSC.msgListeners.add(msgHandler);
-    return () => { WSC.msgListeners.delete(msgHandler); };
-  }, []);
+    WSC.msgListeners.add(handler);
+    return () => { WSC.msgListeners.delete(handler); };
+  }, [updateSlot]);
 
-  const setBet = useCallback((v: number) => {
-    const amt = Math.max(1, v);
-    setBetAmount(amt);
-    betAmtRef.current = amt;
-    setBetInput(String(amt));
-    if (Platform.OS !== "web") Haptics.selectionAsync();
-  }, []);
+  const phase = WSC.state.phase;
+  const mult = WSC.state.mult;
+  const countdown = WSC.state.countdown;
+  const bots = WSC.state.bots ?? [];
+  const history = WSC.state.history ?? [];
 
-  function placeBet() {
+  function placeBet(slotIdx: 0 | 1) {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
-    if (WSC.state.phase !== "waiting") { Alert.alert("Wait", "Wait for the next round to begin"); return; }
-    if (hasActiveRef.current) return;
-    if (betAmtRef.current < 1) { Alert.alert("Invalid Amount", "Minimum bet is ₹1"); return; }
-    hasActiveRef.current = true;
-    setHasActiveBet(true);
-    setResultMsg(null);
-    wsSend({ type: "place_bet", amount: betAmtRef.current, autoCashout: 0 });
+    const slot = slots[slotIdx];
+    if (slot.status !== "idle") return;
+    if (phase === "crashed") { Alert.alert("Wait", "Wait for next round"); return; }
+    wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
+    updateSlot(slotIdx, { status: phase === "flying" ? "queued" : "placed" });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  function cashOut() {
-    if (!hasActiveRef.current || WSC.state.phase !== "flying" || cashedRef.current) return;
-    wsSend({ type: "cashout" });
+  function cancelBet(slotIdx: 0 | 1) {
+    const slot = slots[slotIdx];
+    if (slot.status !== "placed" && slot.status !== "queued") return;
+    wsSend({ type: "cancel_bet", slot: slotIdx + 1 });
+    updateSlot(slotIdx, { status: "idle" });
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+  }
+
+  function cashOut(slotIdx: 0 | 1) {
+    const slot = slots[slotIdx];
+    if (slot.status !== "active" || phase !== "flying") return;
+    wsSend({ type: "cashout", slot: slotIdx + 1 });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }
 
-  const { phase, mult, countdown, history, bots, connected } = WSC.state;
-  const displayHistory = history.length ? history.slice(0, 12) : [];
-  const canBet = phase === "waiting" && !hasActiveBet && !!authState.user;
-  const canCashout = phase === "flying" && hasActiveBet && !cashedOutAt && !!authState.user;
-  const potentialWin = Math.floor(betAmtRef.current * mult);
+  function setSlotAmount(slotIdx: 0 | 1, val: number) {
+    const amt = Math.max(10, val);
+    updateSlot(slotIdx, { amount: amt, input: String(amt) });
+    if (Platform.OS !== "web") Haptics.selectionAsync();
+  }
+
+  function renderBetPanel(slotIdx: 0 | 1) {
+    const slot = slots[slotIdx];
+    const label = slotIdx === 0 ? "BET 1" : "BET 2";
+    const canEdit = slot.status === "idle";
+    const potentialWin = slot.status === "active" ? Math.floor(slot.amount * mult) : 0;
+
+    let btnContent: React.ReactNode;
+    if (slot.status === "active" && phase === "flying") {
+      btnContent = (
+        <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
+          <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
+            <Text style={styles.mainBtnText}>CASHOUT  ₹{potentialWin.toLocaleString("en-IN")}</Text>
+            <Text style={styles.mainBtnSub}>{mult.toFixed(2)}x</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      );
+    } else if (slot.status === "placed") {
+      btnContent = (
+        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
+          <View style={styles.cancelBtn}>
+            <Text style={styles.cancelBtnText}>BET ₹{slot.amount.toLocaleString("en-IN")} ✓</Text>
+            <Text style={styles.cancelBtnSub}>TAP TO CANCEL</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    } else if (slot.status === "queued") {
+      btnContent = (
+        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
+          <View style={[styles.cancelBtn, { borderColor: "#FF9800" }]}>
+            <Text style={[styles.cancelBtnText, { color: "#FF9800" }]}>NEXT ROUND  ₹{slot.amount.toLocaleString("en-IN")}</Text>
+            <Text style={styles.cancelBtnSub}>TAP TO CANCEL</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    } else if (slot.status === "cashedout") {
+      btnContent = (
+        <View style={[styles.mainBtn, { backgroundColor: "rgba(0,180,80,0.12)", borderWidth: 1, borderColor: "rgba(0,180,80,0.3)", alignItems: "center", justifyContent: "center", flex: 1 }]}>
+          <Text style={[styles.mainBtnText, { color: "#00C853" }]}>EXITED @ {slot.cashedOutAt?.toFixed(2)}x ✓</Text>
+        </View>
+      );
+    } else {
+      const canBet = !!authState.user && phase !== "crashed" && slot.status === "idle";
+      btnContent = (
+        <TouchableOpacity onPress={() => placeBet(slotIdx)} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
+          <LinearGradient
+            colors={canBet ? ["#00C853", "#009C41"] : ["rgba(0,60,20,0.35)", "rgba(0,40,10,0.35)"]}
+            style={styles.mainBtn}
+          >
+            <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
+              {!authState.user ? "SIGN IN" : phase === "flying" ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}` : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      );
+    }
+
+    return (
+      <View style={styles.betPanel} key={slotIdx}>
+        <View style={styles.panelHeader}>
+          <Text style={styles.panelLabel}>{label}</Text>
+          {slot.result && (
+            <View style={[styles.resultPill, { backgroundColor: slot.result.win ? "rgba(0,200,83,0.15)" : "rgba(255,26,58,0.15)" }]}>
+              <Text style={[styles.resultPillText, { color: slot.result.win ? "#00C853" : "#FF1A3A" }]}>
+                {slot.result.text}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.betAmtRow}>
+          <TouchableOpacity onPress={() => setSlotAmount(slotIdx, slot.amount - 50)} disabled={!canEdit} style={[styles.amtBtn, !canEdit && styles.disabled]}>
+            <Text style={styles.amtBtnText}>−</Text>
+          </TouchableOpacity>
+          <View style={styles.betInputWrap}>
+            <Text style={styles.betInputPrefix}>₹</Text>
+            <TextInput
+              style={styles.betInput}
+              value={slot.input}
+              keyboardType="numeric"
+              editable={canEdit}
+              onChangeText={t => updateSlot(slotIdx, { input: t })}
+              onBlur={() => {
+                const v = parseInt(slot.input, 10);
+                if (!isNaN(v) && v >= 10) updateSlot(slotIdx, { amount: v, input: String(v) });
+                else updateSlot(slotIdx, { input: String(slot.amount) });
+              }}
+            />
+          </View>
+          <TouchableOpacity onPress={() => setSlotAmount(slotIdx, slot.amount + 50)} disabled={!canEdit} style={[styles.amtBtn, !canEdit && styles.disabled]}>
+            <Text style={styles.amtBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.presetRow}>
+          {[100, 250, 500, 1000].map(v => (
+            <TouchableOpacity key={v} onPress={() => setSlotAmount(slotIdx, v)} disabled={!canEdit} style={[styles.presetBtn, slot.amount === v && styles.presetBtnActive, !canEdit && styles.disabled]}>
+              <Text style={[styles.presetText, slot.amount === v && styles.presetTextActive]}>₹{v >= 1000 ? "1K" : v}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {btnContent}
+      </View>
+    );
+  }
+
+  const connected = WSC.connected;
 
   return (
-    <LinearGradient colors={[C.bgGrad1, C.bgGrad2, "#0A0018"]} style={styles.root}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.scroll, {
-          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 8),
-          paddingBottom: insets.bottom + 90,
-        }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Top row */}
-        <View style={styles.topRow}>
-          <View style={styles.balanceChip}>
-            <Text style={styles.balanceLabel}>BALANCE</Text>
-            <Text style={styles.balanceValue}>
-              {authState.user ? `₹${authState.user.balance.toLocaleString("en-IN")}` : "—"}
-            </Text>
-          </View>
-          <View style={styles.appLabel}>
-            <Text style={styles.appLabelText}>UDAAN</Text>
-          </View>
-          <View style={styles.connectionChip}>
-            <View style={[styles.dot, { backgroundColor: connected ? C.green : C.red }]} />
-            <Text style={styles.connectionText}>{connected ? "LIVE" : "..."}</Text>
-          </View>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.balanceChip}>
+          <Text style={styles.balanceLabel}>BALANCE</Text>
+          <Text style={styles.balanceValue}>₹{(authState.user?.balance ?? 0).toLocaleString("en-IN")}</Text>
         </View>
+        <View style={styles.appLabel}>
+          <Text style={styles.appLabelText}>UDAAN</Text>
+        </View>
+        <View style={styles.connectionChip}>
+          <View style={[styles.dot, { backgroundColor: connected ? "#00E676" : "#FF1A3A" }]} />
+          <Text style={styles.connectionText}>{connected ? "LIVE" : "OFFLINE"}</Text>
+        </View>
+      </View>
 
-        {/* History */}
-        {displayHistory.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyRow} contentContainerStyle={{ paddingHorizontal: 4 }}>
-            {displayHistory.map((v, i) => (
-              <View key={i} style={[styles.histChip, {
-                backgroundColor: v <= 1.5 ? "rgba(255,26,58,0.2)" : v >= 10 ? "rgba(255,215,0,0.18)" : "rgba(0,200,83,0.15)",
-                borderColor: v <= 1.5 ? "rgba(255,26,58,0.3)" : v >= 10 ? "rgba(255,215,0,0.3)" : "transparent",
-              }]}>
-                <Text style={[styles.histText, { color: v <= 1.5 ? C.red : v >= 10 ? C.gold : C.green }]}>{v.toFixed(2)}x</Text>
+      <View style={{ paddingHorizontal: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyRow} contentContainerStyle={{ paddingHorizontal: 0 }}>
+          {history.map((h, i) => {
+            const isBig = h >= 10;
+            const isMed = h >= 2 && h < 10;
+            const bg = isBig ? "rgba(255,215,0,0.12)" : isMed ? "rgba(255,107,0,0.1)" : "rgba(255,26,58,0.1)";
+            const col = isBig ? C.gold : isMed ? "#FF6B00" : C.red;
+            return (
+              <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "44" }]}>
+                <Text style={[styles.histText, { color: col }]}>{h.toFixed(2)}x</Text>
               </View>
-            ))}
-          </ScrollView>
-        )}
+            );
+          })}
+        </ScrollView>
 
-        {/* Canvas */}
         <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} />
 
-        {/* Result message */}
-        {resultMsg && (
-          <LinearGradient
-            colors={resultMsg.win ? ["rgba(0,200,83,0.22)", "rgba(0,200,83,0.06)"] : ["rgba(255,26,58,0.22)", "rgba(255,26,58,0.06)"]}
-            style={styles.resultMsg}
-          >
-            <Text style={[styles.resultText, { color: resultMsg.win ? C.green : C.red }]}>{resultMsg.text}</Text>
-          </LinearGradient>
-        )}
-
-        {/* Bet Controls */}
-        <View style={styles.betPanel}>
-          <View style={styles.betAmtRow}>
-            <TouchableOpacity onPress={() => setBet(betAmount - 50)} disabled={!canBet} style={[styles.amtBtn, !canBet && styles.disabled]}>
-              <Text style={styles.amtBtnText}>−</Text>
-            </TouchableOpacity>
-            <View style={styles.betInputWrap}>
-              <Text style={styles.betInputPrefix}>₹</Text>
-              <TextInput
-                style={styles.betInput}
-                value={betInput}
-                onChangeText={v => {
-                  setBetInput(v);
-                  const n = parseInt(v, 10);
-                  if (!isNaN(n) && n > 0) { setBetAmount(n); betAmtRef.current = n; }
-                }}
-                keyboardType="numeric"
-                editable={canBet}
-                selectTextOnFocus
-              />
-            </View>
-            <TouchableOpacity onPress={() => setBet(betAmount + 50)} disabled={!canBet} style={[styles.amtBtn, !canBet && styles.disabled]}>
-              <Text style={styles.amtBtnText}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.presetRow}>
-            {[100, 250, 500, 1000].map(v => (
-              <TouchableOpacity key={v} onPress={() => setBet(v)} disabled={!canBet} style={[styles.presetBtn, betAmount === v && styles.presetBtnActive, !canBet && styles.disabled]}>
-                <Text style={[styles.presetText, betAmount === v && styles.presetTextActive]}>₹{v >= 1000 ? "1K" : v}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {!hasActiveBet ? (
-            <TouchableOpacity onPress={placeBet} disabled={!canBet} activeOpacity={0.85}>
-              <LinearGradient
-                colors={canBet ? ["#00C853", "#009C41"] : ["rgba(0,100,40,0.3)", "rgba(0,60,20,0.3)"]}
-                style={styles.mainBtn}
-              >
-                <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
-                  {!authState.user
-                    ? "SIGN IN TO PLAY"
-                    : phase === "waiting"
-                    ? `PLACE BET  ₹${betAmount.toLocaleString("en-IN")}`
-                    : phase === "flying"
-                    ? "ROUND IN PROGRESS..."
-                    : "WAIT FOR NEXT ROUND"}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={cashOut} disabled={!canCashout} activeOpacity={0.85}>
-              <LinearGradient
-                colors={canCashout ? ["#FF6B00", "#CC4400"] : ["rgba(80,30,0,0.3)", "rgba(40,15,0,0.3)"]}
-                style={[styles.mainBtn, canCashout && styles.cashoutGlow]}
-              >
-                <Text style={[styles.mainBtnText, !canCashout && { color: "#665" }]}>
-                  {cashedOutAt
-                    ? `EXITED AT ${cashedOutAt.toFixed(2)}x ✓`
-                    : canCashout
-                    ? `CASHOUT  ₹${potentialWin.toLocaleString("en-IN")}`
-                    : phase === "waiting"
-                    ? "BET PLACED ✓  —  Waiting for launch"
-                    : "IN FLIGHT..."}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {canCashout && (
-            <Text style={styles.multDisplay}>{mult.toFixed(2)}x</Text>
-          )}
+        <View style={styles.dualPanel}>
+          {renderBetPanel(0)}
+          {renderBetPanel(1)}
         </View>
 
-        {/* Live Bets */}
-        {(bots.length > 0 || hasActiveBet) && (
-          <View style={styles.liveBets}>
-            <Text style={styles.liveBetsTitle}>LIVE BETS</Text>
-            {hasActiveBet && authState.user && (
-              <View style={styles.betRow}>
-                <View style={[styles.dot, {
-                  backgroundColor: cashedOutAt ? C.green : phase === "waiting" ? "#00C853" : C.orange,
-                }]} />
-                <Text style={[styles.betUser, { color: C.gold }]}>{authState.user.username}</Text>
-                <Text style={styles.betAmt}>₹{betAmount.toLocaleString("en-IN")}</Text>
-                {cashedOutAt
-                  ? <Text style={[styles.betStatus, { color: C.green }]}>{cashedOutAt.toFixed(2)}x</Text>
-                  : phase === "waiting"
-                  ? <Text style={[styles.betStatus, { color: "#00C853" }]}>Ready ✓</Text>
-                  : <Text style={[styles.betStatus, { color: C.orange }]}>{mult.toFixed(2)}x</Text>
-                }
-              </View>
-            )}
-            {bots.slice(0, 7).map((b, i) => (
-              <View key={i} style={styles.betRow}>
-                <View style={[styles.dot, {
-                  backgroundColor: b.status === "cashed" ? C.green : b.status === "crashed" ? C.red : phase === "flying" ? C.orange : C.textMuted,
-                }]} />
-                <Text style={styles.betUser}>{b.user}</Text>
-                <Text style={styles.betAmt}>₹{b.amount.toLocaleString("en-IN")}</Text>
-                {b.status === "cashed" && <Text style={[styles.betStatus, { color: C.green }]}>{b.cashout?.toFixed(2)}x</Text>}
-                {b.status === "crashed" && <Text style={[styles.betStatus, { color: C.red }]}>Lost</Text>}
-                {b.status === "active" && phase === "flying" && <Text style={[styles.betStatus, { color: C.orange }]}>{mult.toFixed(2)}x</Text>}
-                {b.status === "active" && phase !== "flying" && <Text style={[styles.betStatus, { color: C.textMuted }]}>Ready</Text>}
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </LinearGradient>
+        <View style={styles.liveBets}>
+          <Text style={styles.liveBetsTitle}>LIVE BETS</Text>
+          {bots.map((b, i) => (
+            <View key={i} style={styles.betRow}>
+              <View style={[styles.dot, { backgroundColor: b.status === "cashed" ? "#00C853" : b.status === "crashed" ? C.red : "#FF9800", marginRight: 2 }]} />
+              <Text style={styles.betUser}>{b.user}</Text>
+              <Text style={styles.betAmt}>₹{b.amount.toLocaleString("en-IN")}</Text>
+              <Text style={[styles.betStatus, { color: b.status === "cashed" ? "#00C853" : b.status === "crashed" ? C.red : "#FF9800" }]}>
+                {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { paddingHorizontal: 16 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  balanceChip: { backgroundColor: C.bgCard, borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 7 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 10 },
+  balanceChip: { backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: C.border },
   balanceLabel: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 1.5 },
   balanceValue: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.gold },
   appLabel: {},
@@ -461,25 +517,31 @@ const styles = StyleSheet.create({
   multText: { fontSize: 54, fontFamily: "Inter_700Bold", textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 28 },
   countLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 2 },
   crashedLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#FF1A3A", letterSpacing: 4, marginTop: 2 },
-  resultMsg: { borderRadius: 12, paddingVertical: 11, paddingHorizontal: 16, marginBottom: 12, alignItems: "center" },
-  resultText: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  betPanel: { backgroundColor: C.bgCard, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 12 },
-  betAmtRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
-  amtBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: "rgba(255,26,58,0.12)", borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
-  amtBtnText: { fontSize: 22, color: C.text, fontFamily: "Inter_700Bold", lineHeight: 26 },
-  disabled: { opacity: 0.4 },
-  betInputWrap: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 9 },
-  betInputPrefix: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 3 },
-  betInput: { flex: 1, fontSize: 18, fontFamily: "Inter_700Bold", color: C.text },
-  presetRow: { flexDirection: "row", gap: 7, marginBottom: 12 },
-  presetBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, backgroundColor: "rgba(0,0,0,0.3)", borderWidth: 1, borderColor: C.border, alignItems: "center" },
+  dualPanel: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  betPanel: { flex: 1, backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 11 },
+  panelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  panelLabel: { fontSize: 11, fontFamily: "Inter_700Bold", color: C.textMuted, letterSpacing: 2 },
+  resultPill: { borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  resultPillText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+  betAmtRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  amtBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,26,58,0.12)", borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" },
+  amtBtnText: { fontSize: 20, color: C.text, fontFamily: "Inter_700Bold", lineHeight: 24 },
+  disabled: { opacity: 0.35 },
+  betInputWrap: { flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 9, paddingVertical: 7 },
+  betInputPrefix: { fontSize: 14, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 2 },
+  betInput: { flex: 1, fontSize: 15, fontFamily: "Inter_700Bold", color: C.text },
+  presetRow: { flexDirection: "row", gap: 5, marginBottom: 10 },
+  presetBtn: { flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.3)", borderWidth: 1, borderColor: C.border, alignItems: "center" },
   presetBtnActive: { backgroundColor: "rgba(255,26,58,0.18)", borderColor: C.primaryBright },
-  presetText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.textMuted },
+  presetText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted },
   presetTextActive: { color: C.red },
-  mainBtn: { borderRadius: 14, paddingVertical: 16, alignItems: "center" },
-  cashoutGlow: { shadowColor: "#FF6B00", shadowRadius: 18, shadowOpacity: 0.7, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
-  mainBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 1.5 },
-  multDisplay: { textAlign: "center", marginTop: 9, fontSize: 28, fontFamily: "Inter_700Bold", color: C.gold },
+  mainBtn: { borderRadius: 12, paddingVertical: 14, alignItems: "center", justifyContent: "center" },
+  mainBtnText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.8 },
+  mainBtnSub: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 1 },
+  cashoutGlow: { shadowColor: "#FF6B00", shadowRadius: 16, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  cancelBtn: { borderRadius: 12, paddingVertical: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: C.red, backgroundColor: "rgba(255,26,58,0.08)" },
+  cancelBtnText: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.red, letterSpacing: 0.5 },
+  cancelBtnSub: { fontSize: 9, fontFamily: "Inter_500Medium", color: C.textMuted, marginTop: 2 },
   liveBets: { backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
   liveBetsTitle: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 10 },
   betRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)" },
