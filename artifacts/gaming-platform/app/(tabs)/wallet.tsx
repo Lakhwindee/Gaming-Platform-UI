@@ -110,8 +110,14 @@ export default function WalletScreen() {
 
   const [withdrawAmt, setWithdrawAmt] = useState("");
   const [upiId,       setUpiId]       = useState("");
+  const [autoFailMsg, setAutoFailMsg] = useState("");
 
-  const appStateRef = useRef(AppState.currentState);
+  const appStateRef   = useRef(AppState.currentState);
+  const tokenRef      = useRef(authState.token);
+  const pendingTxnRef = useRef(pendingTxn);
+
+  useEffect(() => { tokenRef.current      = authState.token; }, [authState.token]);
+  useEffect(() => { pendingTxnRef.current = pendingTxn;      }, [pendingTxn]);
 
   const finalAmount = (() => {
     if (customAmt.trim()) {
@@ -125,14 +131,41 @@ export default function WalletScreen() {
 
   useEffect(() => {
     if (payState !== "waiting") return;
-    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+    const sub = AppState.addEventListener("change", async (next: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && next === "active") {
+        const token = tokenRef.current;
+        const txn   = pendingTxnRef.current;
+        if (!token || !txn) return;
         setPayState("confirming");
+        setConfirming(true);
+        setAutoFailMsg("");
+        try {
+          const result = await api.upiConfirm(token, txn.txnRef);
+          await refreshBalance();
+          setPayState("success");
+          setTimeout(() => {
+            setPayState("idle");
+            setPendingTxn(null);
+            setCustomAmt("");
+            setSelectedAmt(500);
+            setAutoFailMsg("");
+          }, 3000);
+          Alert.alert(
+            "Payment Successful!",
+            "₹" + result.totalCredit.toLocaleString("en-IN") + " added to your wallet" +
+            (result.bonus > 0 ? "\n(includes ₹" + result.bonus + " bonus!)" : ""),
+          );
+        } catch (e) {
+          setAutoFailMsg(e instanceof Error ? e.message : "Verification failed");
+          setPayState("confirming");
+        } finally {
+          setConfirming(false);
+        }
       }
       appStateRef.current = next;
     });
     return () => sub.remove();
-  }, [payState]);
+  }, [payState, refreshBalance]);
 
   const loadTx = useCallback(async () => {
     if (!authState.token) return;
@@ -333,7 +366,7 @@ export default function WalletScreen() {
                       <PayMethodIcon id={selectedMethod} size={40} />
                       <View style={styles.payPendingDots}>
                         {[0, 1, 2].map(i => (
-                          <View key={i} style={[styles.dot, { opacity: 0.3 + i * 0.3 }]} />
+                          <View key={i} style={[styles.dot, { opacity: 0.3 + i * 0.35 }]} />
                         ))}
                       </View>
                       <View style={styles.walletDot}>
@@ -341,56 +374,78 @@ export default function WalletScreen() {
                       </View>
                     </View>
 
-                    <Text style={styles.payPendingTitle}>
-                      {payState === "confirming" ? "Verifying Payment…" : "Complete Payment in " + methodInfo.label}
-                    </Text>
+                    {/* Auto-verifying spinner */}
+                    {confirming && (
+                      <View style={styles.verifyingRow}>
+                        <ActivityIndicator color={methodInfo.color} size="small" />
+                        <Text style={[styles.verifyingText, { color: methodInfo.color }]}>
+                          Verifying payment…
+                        </Text>
+                      </View>
+                    )}
+
+                    {!confirming && (
+                      <Text style={styles.payPendingTitle}>
+                        {payState === "confirming" && autoFailMsg
+                          ? "Payment Not Found"
+                          : payState === "confirming"
+                            ? "Verifying Payment…"
+                            : "Complete Payment in " + methodInfo.label}
+                      </Text>
+                    )}
+
                     <Text style={styles.payPendingSubtitle}>
                       Pay ₹{pendingTxn.amount.toLocaleString("en-IN")} to{"\n"}
                       <Text style={{ color: C.gold, fontFamily: "Inter_700Bold" }}>{pendingTxn.merchantUpi}</Text>
                     </Text>
                     <Text style={styles.txnRefText}>Ref: {pendingTxn.txnRef}</Text>
 
-                    {payState === "confirming" && (
-                      <View style={styles.utrBox}>
-                        <Text style={styles.utrLabel}>Enter UTR / Transaction ID (optional)</Text>
-                        <View style={styles.utrInput}>
-                          <TextInput
-                            style={styles.utrInputText}
-                            placeholder="12-digit UTR number"
-                            placeholderTextColor={C.textDim}
-                            value={utrInput}
-                            onChangeText={setUtrInput}
-                            keyboardType="numeric"
-                            maxLength={16}
-                          />
-                        </View>
+                    {/* Failed verification — show manual retry */}
+                    {payState === "confirming" && autoFailMsg && !confirming && (
+                      <View style={styles.failBox}>
+                        <Ionicons name="warning-outline" size={15} color={C.orange} />
+                        <Text style={styles.failText}>{autoFailMsg}</Text>
                       </View>
                     )}
 
-                    <TouchableOpacity
-                      style={[styles.paidBtn, { backgroundColor: methodInfo.color }]}
-                      onPress={payState === "waiting" ? () => setPayState("confirming") : handleConfirmPaid}
-                      disabled={confirming}
-                      activeOpacity={0.85}
-                    >
-                      {confirming
-                        ? <ActivityIndicator color="#fff" />
-                        : <Text style={styles.paidBtnText}>
-                            {payState === "waiting" ? "I'VE PAID ✓" : "CONFIRM PAYMENT"}
-                          </Text>
-                      }
-                    </TouchableOpacity>
+                    {payState === "confirming" && !confirming && (
+                      <>
+                        <View style={styles.utrBox}>
+                          <Text style={styles.utrLabel}>ENTER UTR / TRANSACTION ID (OPTIONAL)</Text>
+                          <View style={styles.utrInput}>
+                            <TextInput
+                              style={styles.utrInputText}
+                              placeholder="12-digit UTR number"
+                              placeholderTextColor={C.textDim}
+                              value={utrInput}
+                              onChangeText={setUtrInput}
+                              keyboardType="numeric"
+                              maxLength={16}
+                            />
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.paidBtn, { backgroundColor: methodInfo.color }]}
+                          onPress={handleConfirmPaid}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={styles.paidBtnText}>CONFIRM PAYMENT</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
 
-                    {payState === "waiting" && (
+                    {payState === "waiting" && !confirming && (
                       <TouchableOpacity onPress={handleDeposit} style={styles.reopenBtn} activeOpacity={0.7}>
                         <Ionicons name="refresh" size={14} color={C.textMuted} />
                         <Text style={styles.reopenText}>Reopen {methodInfo.label}</Text>
                       </TouchableOpacity>
                     )}
 
-                    <TouchableOpacity onPress={handleCancelPayment} style={styles.cancelPayBtn} activeOpacity={0.7}>
-                      <Text style={styles.cancelPayText}>Cancel</Text>
-                    </TouchableOpacity>
+                    {!confirming && (
+                      <TouchableOpacity onPress={handleCancelPayment} style={styles.cancelPayBtn} activeOpacity={0.7}>
+                        <Text style={styles.cancelPayText}>Cancel</Text>
+                      </TouchableOpacity>
+                    )}
                   </>
                 )}
               </View>
@@ -663,6 +718,10 @@ const styles = StyleSheet.create({
   payPendingDots: { flexDirection: "row", gap: 5, alignItems: "center" },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
   walletDot: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,215,0,0.15)", alignItems: "center", justifyContent: "center" },
+  verifyingRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  verifyingText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  failBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "rgba(255,107,0,0.1)", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "rgba(255,107,0,0.2)", width: "100%" },
+  failText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: C.orange, lineHeight: 17 },
   payPendingTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, textAlign: "center", marginTop: 4 },
   payPendingSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textMuted, textAlign: "center", lineHeight: 20 },
   txnRefText: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, letterSpacing: 0.5 },
