@@ -204,11 +204,30 @@ export default function GameScreen() {
     if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
     setCashoutPopup({ payout, mult, slot });
     popupAnim.setValue(0);
-    Animated.spring(popupAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 9 }).start();
+    Animated.spring(popupAnim, { toValue: 1, useNativeDriver: true, tension: 90, friction: 10 }).start();
     popupDismissTimer.current = setTimeout(() => {
-      Animated.timing(popupAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => setCashoutPopup(null));
-    }, 3000);
+      Animated.timing(popupAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setCashoutPopup(null));
+    }, 5000);
   }, [popupAnim]);
+
+  const [cancelToast, setCancelToast] = useState<{ slot: number; slotIdx: 0 | 1; amount: number } | null>(null);
+  const cancelAnim = useRef(new Animated.Value(0)).current;
+  const cancelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCancelToast = useCallback((slotIdx: 0 | 1, amount: number) => {
+    if (cancelTimer.current) clearTimeout(cancelTimer.current);
+    setCancelToast({ slot: slotIdx + 1, slotIdx, amount });
+    cancelAnim.setValue(0);
+    Animated.spring(cancelAnim, { toValue: 1, useNativeDriver: true, tension: 90, friction: 10 }).start();
+    cancelTimer.current = setTimeout(() => {
+      Animated.timing(cancelAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setCancelToast(null));
+    }, 5000);
+  }, [cancelAnim]);
+
+  const dismissCancelToast = useCallback(() => {
+    if (cancelTimer.current) clearTimeout(cancelTimer.current);
+    Animated.timing(cancelAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setCancelToast(null));
+  }, [cancelAnim]);
 
   const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
     setSlots(prev => {
@@ -244,16 +263,19 @@ export default function GameScreen() {
       if (msg.type === "bet_ok") {
         const isQueued = msg.auto === true;
         updateSlot(slotIdx, { status: isQueued ? "active" : "placed", result: null });
+        if (!isQueued) showCancelToast(slotIdx, slotRefs.current[slotIdx].amount);
         if (Platform.OS !== "web") Haptics.selectionAsync();
       }
 
       if (msg.type === "bet_queued") {
         updateSlot(slotIdx, { status: "queued", result: null });
+        showCancelToast(slotIdx, slotRefs.current[slotIdx].amount);
         if (Platform.OS !== "web") Haptics.selectionAsync();
       }
 
       if (msg.type === "bet_cancelled") {
         updateSlot(slotIdx, { status: "idle" });
+        dismissCancelToast();
       }
 
       if (msg.type === "cashout_ok") {
@@ -656,29 +678,46 @@ export default function GameScreen() {
       </View>
     </ScrollView>
 
-    {/* ── Cashout popup overlay ── */}
+    {/* ── Cashout toast (small, top) ── */}
     {cashoutPopup && (
       <Animated.View
-        style={[styles.cashoutPopupWrap, {
-          top: insets.top + 12,
+        style={[styles.toastWrap, {
+          top: insets.top + 10,
           opacity: popupOpacity,
           transform: [{ translateY: popupTranslateY }],
           pointerEvents: "none",
         }]}
       >
-        <View style={styles.cashoutPopupInner}>
-          <View style={styles.cashoutPopupLeft}>
-            <Text style={styles.cashoutPopupEmoji}>🚀</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cashoutPopupTitle}>CASHOUT!</Text>
-            <Text style={styles.cashoutPopupAmt}>₹{cashoutPopup.payout.toLocaleString("en-IN")}</Text>
-            <Text style={styles.cashoutPopupMult}>@ {cashoutPopup.mult.toFixed(2)}x · BET {cashoutPopup.slot}</Text>
-          </View>
-          <View style={styles.cashoutPopupBadge}>
-            <Text style={styles.cashoutPopupBadgeText}>WIN</Text>
-          </View>
+        <Text style={styles.toastEmoji}>🚀</Text>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={styles.toastTitle}>CASHOUT  {cashoutPopup.mult.toFixed(2)}x</Text>
+          <Text style={styles.toastSub}>+₹{cashoutPopup.payout.toLocaleString("en-IN")} · BET {cashoutPopup.slot}</Text>
         </View>
+        <View style={styles.toastBadge}><Text style={styles.toastBadgeTxt}>WIN</Text></View>
+      </Animated.View>
+    )}
+
+    {/* ── Cancel bet toast (small, top, interactive) ── */}
+    {cancelToast && (
+      <Animated.View
+        style={[styles.toastWrap, styles.cancelToastWrap, {
+          top: cashoutPopup ? insets.top + 66 : insets.top + 10,
+          opacity: cancelAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
+          transform: [{ translateY: cancelAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) }],
+        }]}
+      >
+        <Text style={styles.toastEmoji}>🎯</Text>
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={styles.toastTitle}>BET {cancelToast.slot} PLACED</Text>
+          <Text style={styles.toastSub}>₹{cancelToast.amount.toLocaleString("en-IN")} · Tap to cancel</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => { cancelBet(cancelToast.slotIdx); dismissCancelToast(); }}
+          style={styles.cancelToastBtn}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.cancelToastBtnTxt}>CANCEL</Text>
+        </TouchableOpacity>
       </Animated.View>
     )}
     </View>
@@ -764,30 +803,30 @@ const styles = StyleSheet.create({
   topStatValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 2 },
   topMult: { fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 2 },
   emptyMsg: { textAlign: "center", fontSize: 13, fontFamily: "Inter_500Medium", color: C.textMuted, paddingVertical: 24 },
-  cashoutPopupWrap: {
+  toastWrap: {
     position: "absolute", left: 16, right: 16, zIndex: 999,
-  },
-  cashoutPopupInner: {
-    flexDirection: "row", alignItems: "center", gap: 14,
-    backgroundColor: "rgba(5, 18, 5, 0.82)",
-    borderRadius: 20,
-    borderWidth: 1.5, borderColor: "rgba(0, 200, 83, 0.55)",
-    paddingHorizontal: 18, paddingVertical: 16,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "rgba(5,15,5,0.88)",
+    borderRadius: 14, borderWidth: 1, borderColor: "rgba(0,200,83,0.45)",
+    paddingHorizontal: 12, paddingVertical: 10,
     shadowColor: "#00C853", shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 24, shadowOpacity: 0.55, elevation: 14,
+    shadowRadius: 12, shadowOpacity: 0.4, elevation: 10,
   },
-  cashoutPopupLeft: {
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: "rgba(0,200,83,0.15)", borderWidth: 1.5, borderColor: "rgba(0,200,83,0.35)",
-    alignItems: "center", justifyContent: "center",
+  cancelToastWrap: {
+    borderColor: "rgba(255,26,58,0.45)",
+    shadowColor: "#FF1A3A",
   },
-  cashoutPopupEmoji: { fontSize: 24 },
-  cashoutPopupTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 2.5, marginBottom: 2 },
-  cashoutPopupAmt: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#FFFFFF", lineHeight: 32 },
-  cashoutPopupMult: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.5)", marginTop: 2 },
-  cashoutPopupBadge: {
-    backgroundColor: "rgba(0,200,83,0.18)", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,200,83,0.4)",
+  toastEmoji: { fontSize: 18 },
+  toastTitle: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.5 },
+  toastSub: { fontSize: 10, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.5)", marginTop: 1 },
+  toastBadge: {
+    backgroundColor: "rgba(0,200,83,0.2)", borderRadius: 7, borderWidth: 1, borderColor: "rgba(0,200,83,0.4)",
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  toastBadgeTxt: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1 },
+  cancelToastBtn: {
+    backgroundColor: "rgba(255,26,58,0.18)", borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,26,58,0.5)",
     paddingHorizontal: 10, paddingVertical: 6,
   },
-  cashoutPopupBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5 },
+  cancelToastBtnTxt: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FF4C6A", letterSpacing: 1 },
 });
