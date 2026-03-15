@@ -1,21 +1,12 @@
 import { Router } from "express";
-import Razorpay from "razorpay";
-import crypto from "crypto";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "neonbet-secret-2024";
-
-const RZP_KEY_ID = process.env.RAZORPAY_KEY_ID || "";
-const RZP_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "";
-
-let razorpay: Razorpay | null = null;
-if (RZP_KEY_ID && RZP_KEY_SECRET) {
-  razorpay = new Razorpay({ key_id: RZP_KEY_ID, key_secret: RZP_KEY_SECRET });
-}
+const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || "udaan@axisbank";
 
 function getUser(authHeader: string | undefined): number | null {
   if (!authHeader?.startsWith("Bearer ")) return null;
@@ -28,97 +19,96 @@ function getUser(authHeader: string | undefined): number | null {
 }
 
 router.get("/payment/config", (_req, res) => {
-  res.json({ keyId: RZP_KEY_ID || null, enabled: !!razorpay });
+  res.json({ merchantUpi: MERCHANT_UPI_ID, enabled: true });
 });
 
-router.post("/payment/create-order", async (req, res) => {
+router.post("/payment/upi-initiate", async (req, res) => {
   const userId = getUser(req.headers.authorization);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  const { amount } = req.body as { amount?: number };
-  if (!amount || amount < 100 || !Number.isFinite(amount)) {
-    return res.status(400).json({ error: "Minimum deposit is ₹100" });
+  const { amount, method } = req.body as { amount?: number; method?: string };
+
+  if (!amount || !Number.isFinite(amount) || amount < 100 || amount > 100000) {
+    return res.status(400).json({ error: "Amount must be between ₹100 and ₹1,00,000" });
   }
 
-  if (!razorpay) {
-    return res.status(503).json({ error: "Payment gateway not configured" });
-  }
+  const txnRef = `U${Date.now()}${userId}`;
+  const bonus = amount >= 1000 ? Math.floor(amount * 0.1) : 0;
 
   try {
-    const order = await razorpay.orders.create({
-      amount: Math.floor(amount) * 100,
-      currency: "INR",
-      receipt: `user_${userId}_${Date.now()}`,
-      notes: { userId: String(userId) },
+    await db.insert(transactionsTable).values({
+      userId,
+      type: "deposit",
+      amount,
+      note: `UPI deposit via ${method ?? "upi"} — pending`,
+      txRef: txnRef,
+      status: "pending",
     });
 
     res.json({
-      orderId: order.id,
-      amount: Math.floor(amount) * 100,
-      currency: "INR",
-      keyId: RZP_KEY_ID,
+      txnRef,
+      merchantUpi: MERCHANT_UPI_ID,
+      amount,
+      bonus,
+      total: amount + bonus,
     });
   } catch (e) {
-    console.error("Razorpay create order error:", e);
-    res.status(500).json({ error: "Failed to create payment order" });
+    console.error("upi-initiate error:", e);
+    res.status(500).json({ error: "Failed to initiate payment" });
   }
 });
 
-router.post("/payment/verify", async (req, res) => {
+router.post("/payment/upi-confirm", async (req, res) => {
   const userId = getUser(req.headers.authorization);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  const { orderId, paymentId, signature, amount } = req.body as {
-    orderId?: string;
-    paymentId?: string;
-    signature?: string;
-    amount?: number;
-  };
-
-  if (!orderId || !paymentId || !signature) {
-    return res.status(400).json({ error: "Missing payment details" });
-  }
-
-  if (!RZP_KEY_SECRET) {
-    return res.status(503).json({ error: "Payment gateway not configured" });
-  }
-
-  const expectedSig = crypto
-    .createHmac("sha256", RZP_KEY_SECRET)
-    .update(`${orderId}|${paymentId}`)
-    .digest("hex");
-
-  if (expectedSig !== signature) {
-    return res.status(400).json({ error: "Invalid payment signature" });
-  }
-
-  const depositAmount = Math.floor((amount ?? 0) / 100);
-  if (depositAmount < 100) {
-    return res.status(400).json({ error: "Invalid payment amount" });
-  }
+  const { txnRef, utr } = req.body as { txnRef?: string; utr?: string };
+  if (!txnRef) return res.status(400).json({ error: "Missing transaction reference" });
 
   try {
     const result = await db.transaction(async (tx) => {
-      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId));
+      const [txn] = await tx
+        .select()
+        .from(transactionsTable)
+        .where(
+          and(
+            eq(transactionsTable.txRef, txnRef),
+            eq(transactionsTable.userId, userId),
+            eq(transactionsTable.status, "pending"),
+          )
+        );
+
+      if (!txn) throw new Error("Transaction not found or already processed");
+
+      const depositAmount = txn.amount;
+      const bonus = depositAmount >= 1000 ? Math.floor(depositAmount * 0.1) : 0;
+      const totalCredit = depositAmount + bonus;
+
+      const [user] = await tx
+        .select({ balance: usersTable.balance })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
       if (!user) throw new Error("User not found");
 
-      const newBalance = user.balance + depositAmount;
+      const newBalance = user.balance + totalCredit;
       await tx.update(usersTable).set({ balance: newBalance }).where(eq(usersTable.id, userId));
-      await tx.insert(transactionsTable).values({
-        userId,
-        type: "deposit",
-        amount: depositAmount,
-        note: `UPI deposit via Razorpay`,
-        txRef: paymentId,
-        status: "completed",
-      });
-      return { balance: newBalance };
+
+      const noteStr = bonus > 0
+        ? `UPI deposit ₹${depositAmount} + ₹${bonus} bonus${utr ? ` | UTR: ${utr}` : ""}`
+        : `UPI deposit ₹${depositAmount}${utr ? ` | UTR: ${utr}` : ""}`;
+
+      await tx
+        .update(transactionsTable)
+        .set({ status: "completed", note: noteStr })
+        .where(eq(transactionsTable.txRef, txnRef));
+
+      return { balance: newBalance, depositAmount, bonus, totalCredit };
     });
 
-    res.json({ success: true, balance: result.balance, amount: depositAmount });
+    res.json({ success: true, ...result });
   } catch (e) {
-    console.error("Payment verify error:", e);
-    res.status(500).json({ error: "Failed to credit balance" });
+    console.error("upi-confirm error:", e);
+    res.status(500).json({ error: e instanceof Error ? e.message : "Failed to confirm payment" });
   }
 });
 

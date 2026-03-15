@@ -1,35 +1,47 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, AppState, AppStateStatus,
+  Platform, ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View, Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Circle, Ellipse, Path, Rect, Defs, LinearGradient as SvgGrad, Stop, G } from "react-native-svg";
-import * as WebBrowser from "expo-web-browser";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-import { api, ApiTransaction } from "@/lib/api";
+import { api, ApiTransaction, UpiInitResult } from "@/lib/api";
 
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 type PayMethod = "gpay" | "phonepe" | "paytm" | "upi";
+type PayState = "idle" | "initiating" | "waiting" | "confirming" | "success";
 
 const PAY_METHODS: { id: PayMethod; label: string; color: string; bg: string }[] = [
-  { id: "gpay", label: "Google Pay", color: "#34A853", bg: "rgba(52,168,83,0.15)" },
-  { id: "phonepe", label: "PhonePe", color: "#6739B7", bg: "rgba(103,57,183,0.15)" },
-  { id: "paytm", label: "Paytm", color: "#00BAF2", bg: "rgba(0,186,242,0.15)" },
-  { id: "upi", label: "Other UPI", color: "#FF6B00", bg: "rgba(255,107,0,0.15)" },
+  { id: "gpay",    label: "Google Pay", color: "#34A853", bg: "rgba(52,168,83,0.15)" },
+  { id: "phonepe", label: "PhonePe",   color: "#6739B7", bg: "rgba(103,57,183,0.15)" },
+  { id: "paytm",   label: "Paytm",     color: "#00BAF2", bg: "rgba(0,186,242,0.15)" },
+  { id: "upi",     label: "Other UPI", color: "#FF6B00", bg: "rgba(255,107,0,0.15)" },
 ];
+
+function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+  const name = encodeURIComponent("UDAAN");
+  const note = encodeURIComponent("UDAAN Deposit " + txnRef);
+  const base = "pa=" + merchantUpi + "&pn=" + name + "&am=" + amount + "&cu=INR&tn=" + note;
+  if (method === "gpay")    return "tez://upi/pay?" + base;
+  if (method === "phonepe") return "phonepe://pay?transactionId=" + txnRef + "&" + base;
+  if (method === "paytm")   return "paytmmp://upi/pay?" + base;
+  return "upi://pay?" + base;
+}
 
 function GPay({ size = 28 }: { size?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0z" fill="#34A853" />
-      <Path d="M7.5 12.5v-1h2v1h-2zm7-1h-2v1h2v-1z" fill="white" />
-      <Path d="M5 11.5h14v1H5v-1z" fill="white" opacity="0.8" />
-      <Path d="M12 8l3 3.5L12 15l-3-3.5z" fill="white" />
+    <Svg width={size} height={size} viewBox="0 0 48 48">
+      <Path d="M24 4C12.954 4 4 12.954 4 24s8.954 20 20 20 20-8.954 20-20S35.046 4 24 4z" fill="#fff" />
+      <Path d="M35.76 24.2c0-.63-.057-1.24-.16-1.82H24v3.44h6.6a5.64 5.64 0 01-2.44 3.7v3.07h3.95c2.31-2.13 3.65-5.27 3.65-8.39z" fill="#4285F4" />
+      <Path d="M24 36c3.32 0 6.1-1.1 8.13-2.99l-3.95-3.07c-1.1.74-2.5 1.18-4.18 1.18-3.21 0-5.93-2.17-6.9-5.08H13.1v3.17A12 12 0 0024 36z" fill="#34A853" />
+      <Path d="M17.1 26.04A7.18 7.18 0 0116.73 24c0-.71.12-1.4.37-2.04v-3.17H13.1A12 12 0 0012 24c0 1.93.46 3.76 1.1 5.21l4-3.17z" fill="#FBBC05" />
+      <Path d="M24 16.88c1.81 0 3.44.62 4.72 1.84l3.54-3.54C30.09 13.14 27.31 12 24 12a12 12 0 00-10.9 6.79l4 3.17c.97-2.91 3.69-5.08 6.9-5.08z" fill="#EA4335" />
     </Svg>
   );
 }
@@ -65,52 +77,62 @@ function UpiIcon({ size = 28 }: { size?: number }) {
 }
 
 function PayMethodIcon({ id, size = 28 }: { id: PayMethod; size?: number }) {
-  if (id === "gpay") return <GPay size={size} />;
+  if (id === "gpay")    return <GPay size={size} />;
   if (id === "phonepe") return <PhonePeIcon size={size} />;
-  if (id === "paytm") return <PaytmIcon size={size} />;
+  if (id === "paytm")   return <PaytmIcon size={size} />;
   return <UpiIcon size={size} />;
 }
 
 function txIcon(type: string) {
-  if (type === "deposit") return { name: "arrow-down-circle" as const, color: C.green };
-  if (type === "withdraw") return { name: "arrow-up-circle" as const, color: C.red };
-  if (type === "win") return { name: "trophy" as const, color: C.gold };
+  if (type === "deposit")  return { name: "arrow-down-circle" as const, color: C.green };
+  if (type === "withdraw") return { name: "arrow-up-circle"   as const, color: C.red };
+  if (type === "win")      return { name: "trophy"            as const, color: C.gold };
   return { name: "remove-circle" as const, color: C.textMuted };
-}
-
-declare const window: Window & {
-  Razorpay?: new (opts: Record<string, unknown>) => { open(): void };
-};
-
-async function loadRazorpayScript(): Promise<boolean> {
-  if (Platform.OS !== "web") return false;
-  return new Promise<boolean>((resolve) => {
-    if (typeof window === "undefined") { resolve(false); return; }
-    if (window.Razorpay) { resolve(true); return; }
-    const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
 }
 
 export default function WalletScreen() {
   const { state: authState, refreshBalance } = useAuth();
   const insets = useSafeAreaInsets();
+
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
-  const [txLoading, setTxLoading] = useState(false);
-  const [withdrawAmt, setWithdrawAmt] = useState("");
-  const [upiId, setUpiId] = useState("");
-  const [tab, setTab] = useState<"deposit" | "withdraw" | "history">("deposit");
-  const [loading, setLoading] = useState(false);
-  const [selectedAmt, setSelectedAmt] = useState<number>(500);
+  const [txLoading,    setTxLoading]    = useState(false);
+  const [tab,          setTab]          = useState<"deposit" | "withdraw" | "history">("deposit");
+  const [loading,      setLoading]      = useState(false);
+
+  const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
+  const [customAmt,      setCustomAmt]      = useState("");
   const [selectedMethod, setSelectedMethod] = useState<PayMethod>("gpay");
-  const [rzpConfig, setRzpConfig] = useState<{ keyId: string | null; enabled: boolean } | null>(null);
+
+  const [payState,    setPayState]    = useState<PayState>("idle");
+  const [pendingTxn,  setPendingTxn]  = useState<UpiInitResult | null>(null);
+  const [utrInput,    setUtrInput]    = useState("");
+  const [confirming,  setConfirming]  = useState(false);
+
+  const [withdrawAmt, setWithdrawAmt] = useState("");
+  const [upiId,       setUpiId]       = useState("");
+
+  const appStateRef = useRef(AppState.currentState);
+
+  const finalAmount = (() => {
+    if (customAmt.trim()) {
+      const v = parseInt(customAmt.replace(/[^0-9]/g, ""), 10);
+      return isNaN(v) ? 0 : v;
+    }
+    return selectedAmt ?? 0;
+  })();
+
+  const bonus = finalAmount >= 1000 ? Math.floor(finalAmount * 0.1) : 0;
 
   useEffect(() => {
-    api.getPaymentConfig(authState.token ?? undefined).then(setRzpConfig).catch(() => { });
-  }, [authState.token]);
+    if (payState !== "waiting") return;
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && next === "active") {
+        setPayState("confirming");
+      }
+      appStateRef.current = next;
+    });
+    return () => sub.remove();
+  }, [payState]);
 
   const loadTx = useCallback(async () => {
     if (!authState.token) return;
@@ -131,74 +153,75 @@ export default function WalletScreen() {
 
   async function handleDeposit() {
     if (!authState.token || !authState.user) { Alert.alert("Sign In Required"); return; }
-    if (!rzpConfig?.enabled || !rzpConfig.keyId) {
-      Alert.alert("Payment Unavailable", "Payment gateway is not configured yet. Please contact support.");
-      return;
-    }
+    if (finalAmount < 100) { Alert.alert("Minimum ₹100", "Please enter at least ₹100"); return; }
+    if (finalAmount > 100000) { Alert.alert("Too High", "Maximum deposit is ₹1,00,000"); return; }
+
     setLoading(true);
+    setPayState("initiating");
     try {
-      const order = await api.createPaymentOrder(authState.token, selectedAmt);
-      if (Platform.OS === "web") {
-        const loaded = await loadRazorpayScript();
-        if (!loaded || !window.Razorpay) {
-          Alert.alert("Error", "Could not load payment gateway. Please try again.");
-          setLoading(false);
-          return;
-        }
-        const rzp = new window.Razorpay({
-          key: order.keyId,
-          amount: order.amount,
-          currency: order.currency,
-          order_id: order.orderId,
-          name: "Udaan",
-          description: `Add ₹${selectedAmt} to wallet`,
-          image: "",
-          theme: { color: "#CC0022" },
-          modal: { backdropclose: false },
-          config: {
-            display: {
-              blocks: {
-                upi_block: {
-                  name: "Pay via UPI",
-                  instruments: [
-                    { method: "upi", flows: ["collect", "intent"], apps: ["google_pay", "phonepe", "paytm", "bhim"] },
-                  ],
-                },
-              },
-              sequence: ["block.upi_block"],
-              preferences: { show_default_blocks: true },
-            },
-          },
-          prefill: { name: authState.user.username },
-          handler: async (resp: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-            try {
-              const result = await api.verifyPayment(authState.token!, {
-                paymentId: resp.razorpay_payment_id,
-                orderId: resp.razorpay_order_id,
-                signature: resp.razorpay_signature,
-                amount: order.amount,
-              });
-              await refreshBalance();
-              Alert.alert("Payment Successful! 🎉", `₹${result.amount} added to your wallet.\nNew Balance: ₹${result.balance.toLocaleString("en-IN")}`);
-            } catch (e) {
-              Alert.alert("Verification Failed", e instanceof Error ? e.message : "Contact support with payment ID: " + resp.razorpay_payment_id);
-            }
-            setLoading(false);
-          },
-        });
-        rzp.open();
-        setLoading(false);
+      const txn = await api.upiInitiate(authState.token, finalAmount, selectedMethod);
+      setPendingTxn(txn);
+      setUtrInput("");
+
+      const upiUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
+      const canOpen = await Linking.canOpenURL(upiUrl);
+      if (canOpen) {
+        await Linking.openURL(upiUrl);
       } else {
-        const payUrl = `https://checkout.razorpay.com/v1/payment-button?key=${order.keyId}&order_id=${order.orderId}`;
-        await WebBrowser.openBrowserAsync(payUrl);
-        setLoading(false);
-        Alert.alert("Check your balance", "If payment was successful, your balance will update shortly.");
-        await refreshBalance();
+        const fallback = "upi://pay?pa=" + txn.merchantUpi +
+          "&pn=" + encodeURIComponent("UDAAN") +
+          "&am=" + finalAmount +
+          "&cu=INR&tn=" + encodeURIComponent("UDAAN Deposit " + txn.txnRef);
+        const canFallback = await Linking.canOpenURL(fallback);
+        if (canFallback) {
+          await Linking.openURL(fallback);
+        } else {
+          Alert.alert(
+            "UPI App Not Found",
+            "Please open your UPI app and pay to:\n\nUPI ID: " + txn.merchantUpi + "\nAmount: ₹" + finalAmount + "\nRef: " + txn.txnRef,
+          );
+        }
       }
+      setPayState("waiting");
     } catch (e) {
       Alert.alert("Failed", e instanceof Error ? e.message : "Please try again");
+      setPayState("idle");
+    } finally {
       setLoading(false);
     }
+  }
+
+  async function handleConfirmPaid() {
+    if (!authState.token || !pendingTxn) return;
+    setConfirming(true);
+    try {
+      const result = await api.upiConfirm(authState.token, pendingTxn.txnRef, utrInput.trim() || undefined);
+      await refreshBalance();
+      setPayState("success");
+      setTimeout(() => {
+        setPayState("idle");
+        setPendingTxn(null);
+        setUtrInput("");
+        setCustomAmt("");
+        setSelectedAmt(500);
+      }, 3000);
+      const got = result.totalCredit;
+      Alert.alert(
+        "Payment Confirmed!",
+        "₹" + got.toLocaleString("en-IN") + " added to your wallet" +
+        (result.bonus > 0 ? "\n(includes ₹" + result.bonus + " bonus!)" : ""),
+      );
+    } catch (e) {
+      Alert.alert("Confirmation Failed", e instanceof Error ? e.message : "If you paid, contact support.");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  function handleCancelPayment() {
+    setPayState("idle");
+    setPendingTxn(null);
+    setUtrInput("");
   }
 
   async function handleWithdraw() {
@@ -208,7 +231,7 @@ export default function WalletScreen() {
     if (!authState.token) { Alert.alert("Sign In Required"); return; }
     Alert.alert(
       "Confirm Withdrawal",
-      `Withdraw ₹${amt.toLocaleString("en-IN")} to:\n${upiId}\n\nProcessed within 24 hours.`,
+      "Withdraw ₹" + amt.toLocaleString("en-IN") + " to:\n" + upiId + "\n\nProcessed within 24 hours.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -218,7 +241,7 @@ export default function WalletScreen() {
             try {
               await api.withdraw(authState.token!, amt, upiId);
               await refreshBalance();
-              Alert.alert("Requested!", `₹${amt.toLocaleString("en-IN")} withdrawal submitted.\nYou'll receive it within 24 hours.`);
+              Alert.alert("Requested!", "₹" + amt.toLocaleString("en-IN") + " withdrawal submitted.\nYou'll receive it within 24 hours.");
               setWithdrawAmt(""); setUpiId("");
             } catch (e) {
               Alert.alert("Failed", e instanceof Error ? e.message : "Try again");
@@ -233,6 +256,8 @@ export default function WalletScreen() {
 
   const balance = authState.user?.balance ?? 0;
 
+  const methodInfo = PAY_METHODS.find(m => m.id === selectedMethod)!;
+
   return (
     <LinearGradient colors={[C.bgGrad1, C.bgGrad2, "#0A0018"]} style={styles.root}>
       <ScrollView
@@ -241,6 +266,7 @@ export default function WalletScreen() {
           paddingBottom: insets.bottom + 90,
         }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.screenTitle}>Wallet</Text>
 
@@ -288,83 +314,207 @@ export default function WalletScreen() {
         {/* DEPOSIT */}
         {tab === "deposit" && (
           <View>
-            <Text style={styles.sectionTitle}>SELECT AMOUNT</Text>
-            <View style={styles.amtGrid}>
-              {AMOUNTS.map(a => (
-                <TouchableOpacity
-                  key={a}
-                  style={[styles.amtChip, selectedAmt === a && styles.amtChipActive]}
-                  onPress={() => setSelectedAmt(a)}
-                >
-                  <Text style={[styles.amtChipText, selectedAmt === a && styles.amtChipTextActive]}>
-                    ₹{a >= 1000 ? `${a / 1000}K` : a}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Payment Waiting / Confirming overlay */}
+            {(payState === "waiting" || payState === "confirming" || payState === "success") && pendingTxn && (
+              <View style={styles.payPendingBox}>
+                {payState === "success" ? (
+                  <>
+                    <View style={styles.successIcon}>
+                      <Ionicons name="checkmark-circle" size={52} color={C.green} />
+                    </View>
+                    <Text style={styles.payPendingTitle}>Payment Confirmed!</Text>
+                    <Text style={styles.payPendingSubtitle}>
+                      ₹{pendingTxn.total.toLocaleString("en-IN")} added to your wallet
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.payPendingIconRow}>
+                      <PayMethodIcon id={selectedMethod} size={40} />
+                      <View style={styles.payPendingDots}>
+                        {[0, 1, 2].map(i => (
+                          <View key={i} style={[styles.dot, { opacity: 0.3 + i * 0.3 }]} />
+                        ))}
+                      </View>
+                      <View style={styles.walletDot}>
+                        <Ionicons name="wallet" size={22} color={C.gold} />
+                      </View>
+                    </View>
 
-            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>PAYMENT METHOD</Text>
-            <View style={styles.methodGrid}>
-              {PAY_METHODS.map(m => (
-                <TouchableOpacity
-                  key={m.id}
-                  style={[styles.methodCard, { backgroundColor: m.bg, borderColor: selectedMethod === m.id ? m.color : "rgba(255,255,255,0.08)" }]}
-                  onPress={() => setSelectedMethod(m.id)}
-                >
-                  <PayMethodIcon id={m.id} size={32} />
-                  <Text style={[styles.methodLabel, { color: selectedMethod === m.id ? m.color : C.textMuted }]}>{m.label}</Text>
-                  {selectedMethod === m.id && (
-                    <View style={[styles.methodCheck, { backgroundColor: m.color }]}>
-                      <Ionicons name="checkmark" size={10} color="#fff" />
+                    <Text style={styles.payPendingTitle}>
+                      {payState === "confirming" ? "Verifying Payment…" : "Complete Payment in " + methodInfo.label}
+                    </Text>
+                    <Text style={styles.payPendingSubtitle}>
+                      Pay ₹{pendingTxn.amount.toLocaleString("en-IN")} to{"\n"}
+                      <Text style={{ color: C.gold, fontFamily: "Inter_700Bold" }}>{pendingTxn.merchantUpi}</Text>
+                    </Text>
+                    <Text style={styles.txnRefText}>Ref: {pendingTxn.txnRef}</Text>
+
+                    {payState === "confirming" && (
+                      <View style={styles.utrBox}>
+                        <Text style={styles.utrLabel}>Enter UTR / Transaction ID (optional)</Text>
+                        <View style={styles.utrInput}>
+                          <TextInput
+                            style={styles.utrInputText}
+                            placeholder="12-digit UTR number"
+                            placeholderTextColor={C.textDim}
+                            value={utrInput}
+                            onChangeText={setUtrInput}
+                            keyboardType="numeric"
+                            maxLength={16}
+                          />
+                        </View>
+                      </View>
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.paidBtn, { backgroundColor: methodInfo.color }]}
+                      onPress={payState === "waiting" ? () => setPayState("confirming") : handleConfirmPaid}
+                      disabled={confirming}
+                      activeOpacity={0.85}
+                    >
+                      {confirming
+                        ? <ActivityIndicator color="#fff" />
+                        : <Text style={styles.paidBtnText}>
+                            {payState === "waiting" ? "I'VE PAID ✓" : "CONFIRM PAYMENT"}
+                          </Text>
+                      }
+                    </TouchableOpacity>
+
+                    {payState === "waiting" && (
+                      <TouchableOpacity onPress={handleDeposit} style={styles.reopenBtn} activeOpacity={0.7}>
+                        <Ionicons name="refresh" size={14} color={C.textMuted} />
+                        <Text style={styles.reopenText}>Reopen {methodInfo.label}</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    <TouchableOpacity onPress={handleCancelPayment} style={styles.cancelPayBtn} activeOpacity={0.7}>
+                      <Text style={styles.cancelPayText}>Cancel</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+            )}
+
+            {payState === "idle" && (
+              <>
+                <Text style={styles.sectionTitle}>SELECT AMOUNT</Text>
+                <View style={styles.amtGrid}>
+                  {AMOUNTS.map(a => (
+                    <TouchableOpacity
+                      key={a}
+                      style={[styles.amtChip, selectedAmt === a && !customAmt && styles.amtChipActive]}
+                      onPress={() => { setSelectedAmt(a); setCustomAmt(""); }}
+                    >
+                      <Text style={[styles.amtChipText, selectedAmt === a && !customAmt && styles.amtChipTextActive]}>
+                        ₹{a >= 1000 ? a / 1000 + "K" : a}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Custom amount input */}
+                <View style={styles.customAmtRow}>
+                  <Text style={styles.customAmtPrefix}>₹</Text>
+                  <TextInput
+                    style={styles.customAmtInput}
+                    placeholder="Enter custom amount"
+                    placeholderTextColor={C.textDim}
+                    value={customAmt}
+                    onChangeText={v => {
+                      const clean = v.replace(/[^0-9]/g, "");
+                      setCustomAmt(clean);
+                      if (clean) setSelectedAmt(null);
+                    }}
+                    keyboardType="numeric"
+                    maxLength={7}
+                  />
+                  {customAmt.length > 0 && (
+                    <TouchableOpacity onPress={() => { setCustomAmt(""); setSelectedAmt(500); }}>
+                      <Ionicons name="close-circle" size={18} color={C.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <Text style={[styles.sectionTitle, { marginTop: 20 }]}>PAYMENT METHOD</Text>
+                <View style={styles.methodGrid}>
+                  {PAY_METHODS.map(m => (
+                    <TouchableOpacity
+                      key={m.id}
+                      style={[styles.methodCard, {
+                        backgroundColor: m.bg,
+                        borderColor: selectedMethod === m.id ? m.color : "rgba(255,255,255,0.08)",
+                      }]}
+                      onPress={() => setSelectedMethod(m.id)}
+                    >
+                      <PayMethodIcon id={m.id} size={34} />
+                      <Text style={[styles.methodLabel, { color: selectedMethod === m.id ? m.color : C.textMuted }]}>
+                        {m.label}
+                      </Text>
+                      {selectedMethod === m.id && (
+                        <View style={[styles.methodCheck, { backgroundColor: m.color }]}>
+                          <Ionicons name="checkmark" size={10} color="#fff" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Pay Summary */}
+                <LinearGradient colors={["rgba(0,200,83,0.1)", "rgba(0,100,40,0.05)"]} style={styles.paySummary}>
+                  <View style={styles.paySummaryRow}>
+                    <Text style={styles.paySummaryLabel}>Amount</Text>
+                    <Text style={styles.paySummaryValue}>
+                      {finalAmount > 0 ? "₹" + finalAmount.toLocaleString("en-IN") : "—"}
+                    </Text>
+                  </View>
+                  {bonus > 0 && (
+                    <View style={styles.paySummaryRow}>
+                      <Text style={[styles.paySummaryLabel, { color: C.green }]}>Bonus (10%)</Text>
+                      <Text style={[styles.paySummaryValue, { color: C.green }]}>+₹{bonus.toLocaleString("en-IN")}</Text>
                     </View>
                   )}
+                  <View style={[styles.paySummaryRow, { marginTop: 4 }]}>
+                    <Text style={[styles.paySummaryLabel, { color: C.text }]}>You get</Text>
+                    <Text style={[styles.paySummaryValue, { color: C.gold, fontSize: 16 }]}>
+                      {finalAmount > 0 ? "₹" + (finalAmount + bonus).toLocaleString("en-IN") : "—"}
+                    </Text>
+                  </View>
+                </LinearGradient>
+
+                <TouchableOpacity
+                  onPress={handleDeposit}
+                  disabled={loading || !authState.user || finalAmount < 100}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={authState.user && finalAmount >= 100 ? ["#00C853", "#009C41"] : ["rgba(0,60,30,0.3)", "rgba(0,40,20,0.2)"]}
+                    style={styles.payBtn}
+                  >
+                    {loading
+                      ? <ActivityIndicator color="#fff" />
+                      : (
+                        <View style={styles.payBtnInner}>
+                          <Ionicons name="lock-closed" size={16} color="#fff" style={{ marginRight: 8 }} />
+                          <Text style={styles.payBtnText}>
+                            {!authState.user
+                              ? "SIGN IN TO DEPOSIT"
+                              : finalAmount >= 100
+                                ? "PAY ₹" + finalAmount.toLocaleString("en-IN") + " SECURELY"
+                                : "ENTER AMOUNT (MIN ₹100)"}
+                          </Text>
+                        </View>
+                      )
+                    }
+                  </LinearGradient>
                 </TouchableOpacity>
-              ))}
-            </View>
 
-            {/* Pay Summary */}
-            <LinearGradient colors={["rgba(0,200,83,0.1)", "rgba(0,100,40,0.05)"]} style={styles.paySummary}>
-              <View style={styles.paySummaryRow}>
-                <Text style={styles.paySummaryLabel}>Amount</Text>
-                <Text style={styles.paySummaryValue}>₹{selectedAmt.toLocaleString("en-IN")}</Text>
-              </View>
-              {selectedAmt >= 1000 && (
-                <View style={styles.paySummaryRow}>
-                  <Text style={[styles.paySummaryLabel, { color: C.green }]}>Bonus</Text>
-                  <Text style={[styles.paySummaryValue, { color: C.green }]}>+₹{Math.floor(selectedAmt * 0.1).toLocaleString("en-IN")}</Text>
+                <View style={styles.secureRow}>
+                  <Ionicons name="shield-checkmark" size={13} color={C.green} />
+                  <Text style={styles.secureText}>256-bit SSL encrypted · UPI Payments</Text>
                 </View>
-              )}
-              <View style={[styles.paySummaryRow, { marginTop: 4 }]}>
-                <Text style={[styles.paySummaryLabel, { color: C.text }]}>You get</Text>
-                <Text style={[styles.paySummaryValue, { color: C.gold, fontSize: 16 }]}>
-                  ₹{(selectedAmt >= 1000 ? Math.floor(selectedAmt * 1.1) : selectedAmt).toLocaleString("en-IN")}
-                </Text>
-              </View>
-            </LinearGradient>
-
-            <TouchableOpacity onPress={handleDeposit} disabled={loading || !authState.user} activeOpacity={0.85}>
-              <LinearGradient
-                colors={authState.user ? ["#00C853", "#009C41"] : ["rgba(0,60,30,0.3)", "rgba(0,40,20,0.2)"]}
-                style={styles.payBtn}
-              >
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : (
-                    <View style={styles.payBtnInner}>
-                      <Ionicons name="lock-closed" size={16} color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.payBtnText}>
-                        {authState.user ? `PAY ₹${selectedAmt.toLocaleString("en-IN")} SECURELY` : "SIGN IN TO DEPOSIT"}
-                      </Text>
-                    </View>
-                  )
-                }
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <View style={styles.secureRow}>
-              <Ionicons name="shield-checkmark" size={13} color={C.green} />
-              <Text style={styles.secureText}>256-bit SSL encrypted · Powered by Razorpay</Text>
-            </View>
+              </>
+            )}
           </View>
         )}
 
@@ -388,7 +538,7 @@ export default function WalletScreen() {
               <View style={styles.wdQuickRow}>
                 {[200, 500, 1000, 2000].map(a => (
                   <TouchableOpacity key={a} style={styles.wdQuickChip} onPress={() => setWithdrawAmt(String(a))}>
-                    <Text style={styles.wdQuickText}>₹{a >= 1000 ? `${a / 1000}K` : a}</Text>
+                    <Text style={styles.wdQuickText}>₹{a >= 1000 ? a / 1000 + "K" : a}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -492,6 +642,9 @@ const styles = StyleSheet.create({
   amtChipActive: { backgroundColor: "rgba(200,0,34,0.25)", borderColor: C.primaryBright },
   amtChipText: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.textMuted },
   amtChipTextActive: { color: "#FFFFFF" },
+  customAmtRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.12)", paddingHorizontal: 14, paddingVertical: 12, marginTop: 12 },
+  customAmtPrefix: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 6 },
+  customAmtInput: { flex: 1, fontSize: 16, fontFamily: "Inter_400Regular", color: C.text },
   methodGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   methodCard: { width: "47%", borderRadius: 14, borderWidth: 1.5, padding: 14, alignItems: "center", gap: 8, position: "relative" },
   methodLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", textAlign: "center" },
@@ -505,6 +658,25 @@ const styles = StyleSheet.create({
   payBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
   secureRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, marginTop: 10 },
   secureText: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim },
+  payPendingBox: { backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.1)", padding: 24, alignItems: "center", gap: 12, marginBottom: 16 },
+  payPendingIconRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  payPendingDots: { flexDirection: "row", gap: 5, alignItems: "center" },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
+  walletDot: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,215,0,0.15)", alignItems: "center", justifyContent: "center" },
+  payPendingTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, textAlign: "center", marginTop: 4 },
+  payPendingSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textMuted, textAlign: "center", lineHeight: 20 },
+  txnRefText: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, letterSpacing: 0.5 },
+  utrBox: { width: "100%", gap: 6 },
+  utrLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 1 },
+  utrInput: { flexDirection: "row", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10 },
+  utrInputText: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: C.text },
+  paidBtn: { width: "100%", borderRadius: 14, paddingVertical: 14, alignItems: "center" },
+  paidBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
+  reopenBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 6 },
+  reopenText: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted },
+  cancelPayBtn: { paddingVertical: 6 },
+  cancelPayText: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.red },
+  successIcon: { marginBottom: 4 },
   withdrawCard: { gap: 0 },
   fieldInput: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 10 },
   fieldPrefix: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 6 },

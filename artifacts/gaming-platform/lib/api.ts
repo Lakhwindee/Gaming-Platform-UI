@@ -31,17 +31,20 @@ export interface ApiTransaction {
   createdAt: string;
 }
 
-export interface PaymentOrder {
-  orderId: string;
+export interface UpiInitResult {
+  txnRef: string;
+  merchantUpi: string;
   amount: number;
-  currency: string;
-  keyId: string;
+  bonus: number;
+  total: number;
 }
 
-export interface PaymentVerifyResult {
+export interface UpiConfirmResult {
   success: boolean;
   balance: number;
-  amount: number;
+  depositAmount: number;
+  bonus: number;
+  totalCredit: number;
 }
 
 export const api = {
@@ -62,30 +65,21 @@ export const api = {
   getTransactions: (token: string) =>
     request<ApiTransaction[]>("/wallet/transactions", undefined, token),
 
-  deposit: (token: string, amount: number, txRef: string) =>
-    request<{ balance: number }>("/wallet/deposit", {
-      method: "POST",
-      body: JSON.stringify({ amount, txRef }),
-    }, token),
-
   withdraw: (token: string, amount: number, upiId: string) =>
     request<{ message: string; balance: number }>("/wallet/withdraw", {
       method: "POST",
       body: JSON.stringify({ amount, upiId }),
     }, token),
 
-  getPaymentConfig: (token?: string) =>
-    request<{ keyId: string | null; enabled: boolean }>("/payment/config", undefined, token),
-
-  createPaymentOrder: (token: string, amount: number) =>
-    request<PaymentOrder>("/payment/create-order", {
+  upiInitiate: (token: string, amount: number, method: string) =>
+    request<UpiInitResult>("/payment/upi-initiate", {
       method: "POST",
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amount, method }),
     }, token),
 
-  verifyPayment: (token: string, data: { paymentId: string; orderId: string; signature: string; amount: number }) =>
-    request<PaymentVerifyResult>("/payment/verify", {
+  upiConfirm: (token: string, txnRef: string, utr?: string) =>
+    request<UpiConfirmResult>("/payment/upi-confirm", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ txnRef, utr }),
     }, token),
 };
