@@ -89,9 +89,10 @@ function BlastShape() {
   );
 }
 
-function RocketShape({ phase }: { phase: string }) {
+function RocketShape({ phase, flicker = 0, flicker2 = 0 }: { phase: string; flicker?: number; flicker2?: number }) {
   const S = 26;
   const isFlying = phase === "flying";
+  const isWaiting = phase === "waiting";
   if (phase === "crashed") return <BlastShape />;
   return (
     <>
@@ -100,6 +101,24 @@ function RocketShape({ phase }: { phase: string }) {
           <Ellipse cx={0} cy={S * 0.85} rx={8} ry={S * 0.62} fill="url(#flameOuter)" />
           <Ellipse cx={0} cy={S * 0.70} rx={4.5} ry={S * 0.38} fill="url(#flameMid)" />
           <Ellipse cx={0} cy={S * 0.56} rx={2} ry={S * 0.20} fill="url(#flameCore)" />
+        </>
+      )}
+      {isWaiting && (
+        <>
+          {/* Ground steam / smoke rings */}
+          <Ellipse cx={-9} cy={S * 1.05 + flicker * S * 0.35} rx={4 + flicker2 * 2} ry={2.5 + flicker * 1.5} fill="#FF6B00" opacity={0.18 + flicker2 * 0.14} />
+          <Ellipse cx={9} cy={S * 1.05 + flicker2 * S * 0.3} rx={4 + flicker * 2} ry={2 + flicker2 * 1.5} fill="#FFD700" opacity={0.15 + flicker * 0.12} />
+          {/* Main pre-launch flame — flickers in height */}
+          <Ellipse cx={0} cy={S * 0.78 + flicker * S * 0.18} rx={6.5 + flicker2 * 2.5} ry={S * 0.32 + flicker * S * 0.18} fill="url(#flameOuter)" opacity={0.55 + flicker * 0.35} />
+          <Ellipse cx={0} cy={S * 0.64 + flicker2 * S * 0.10} rx={3.5 + flicker * 1.5} ry={S * 0.18 + flicker2 * S * 0.10} fill="url(#flameMid)" opacity={0.65 + flicker2 * 0.25} />
+          <Ellipse cx={0} cy={S * 0.52} rx={2 + flicker * 1} ry={S * 0.09 + flicker * S * 0.05} fill="url(#flameCore)" opacity={0.8 + flicker2 * 0.2} />
+          {/* Floating sparks */}
+          <Circle cx={-7 + flicker2 * 5} cy={S * 1.0 + flicker * S * 0.25} r={1.4} fill="#FFD700" opacity={flicker2 * 0.85} />
+          <Circle cx={8 - flicker * 4} cy={S * 1.15 + flicker2 * S * 0.2} r={1.1} fill="#FF6B00" opacity={flicker * 0.7} />
+          <Circle cx={-3} cy={S * 0.88 + flicker2 * S * 0.3} r={1.0} fill="#FFFFFF" opacity={flicker2 * 0.6} />
+          <Circle cx={4} cy={S * 0.92 + flicker * S * 0.22} r={1.2} fill="#FFD700" opacity={flicker * 0.65} />
+          <Circle cx={-10 + flicker * 3} cy={S * 1.25 + flicker2 * S * 0.15} r={0.9} fill="#FF4500" opacity={flicker2 * 0.5} />
+          <Circle cx={10 - flicker2 * 3} cy={S * 1.3 + flicker * S * 0.1} r={0.8} fill="#FFD700" opacity={flicker * 0.55} />
         </>
       )}
       <Path d={`M -8 ${S * 0.2} L -17 ${S * 0.55} L -8 ${S * 0.42} Z`} fill="#D43050" />
@@ -186,7 +205,11 @@ function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
           </>
         )}
         <G x={pos.x} y={pos.y} rotation={angleDeg} originX={0} originY={0}>
-          <RocketShape phase={phase} />
+          <RocketShape
+            phase={phase}
+            flicker={(Math.sin(Date.now() / 80) + 1) / 2}
+            flicker2={(Math.sin(Date.now() / 55 + 2.1) + 1) / 2}
+          />
         </G>
       </Svg>
 
