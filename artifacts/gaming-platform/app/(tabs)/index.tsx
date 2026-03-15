@@ -340,9 +340,8 @@ export default function GameScreen() {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
     const slot = slots[slotIdx];
     if (slot.status !== "idle") return;
-    if (phase === "crashed") { Alert.alert("Wait", "Wait for next round"); return; }
     wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
-    updateSlot(slotIdx, { status: phase === "flying" ? "queued" : "placed" });
+    updateSlot(slotIdx, { status: (phase === "flying" || phase === "crashed") ? "queued" : "placed" });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
@@ -385,29 +384,23 @@ export default function GameScreen() {
       );
     } else if (slot.status === "placed") {
       btnContent = (
-        <View style={styles.placedBtn}>
-          <View style={{ flex: 1 }}>
+        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.8} style={{ flex: 1 }}>
+          <View style={styles.placedBtn}>
             <Text style={styles.placedBtnTop}>BET PLACED ✓</Text>
             <Text style={styles.placedBtnAmt}>₹{slot.amount.toLocaleString("en-IN")}</Text>
+            <Text style={styles.placedBtnHint}>TAP TO CANCEL</Text>
           </View>
-          <TouchableOpacity onPress={() => cancelBet(slotIdx)} style={styles.inlineCancelBtn} activeOpacity={0.75}>
-            <Text style={styles.inlineCancelX}>✕</Text>
-            <Text style={styles.inlineCancelTxt}>CANCEL</Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       );
     } else if (slot.status === "queued") {
       btnContent = (
-        <View style={[styles.placedBtn, { borderColor: "rgba(255,152,0,0.45)" }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.placedBtnTop, { color: "#FF9800" }]}>NEXT ROUND ⏳</Text>
+        <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.8} style={{ flex: 1 }}>
+          <View style={[styles.placedBtn, { borderColor: "rgba(255,152,0,0.45)", backgroundColor: "rgba(255,152,0,0.07)" }]}>
+            <Text style={[styles.placedBtnTop, { color: "#FF9800" }]}>NEXT ROUND ✓</Text>
             <Text style={styles.placedBtnAmt}>₹{slot.amount.toLocaleString("en-IN")}</Text>
+            <Text style={styles.placedBtnHint}>TAP TO CANCEL</Text>
           </View>
-          <TouchableOpacity onPress={() => cancelBet(slotIdx)} style={styles.inlineCancelBtn} activeOpacity={0.75}>
-            <Text style={styles.inlineCancelX}>✕</Text>
-            <Text style={styles.inlineCancelTxt}>CANCEL</Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       );
     } else if (slot.status === "cashedout") {
       btnContent = (
@@ -416,16 +409,18 @@ export default function GameScreen() {
         </View>
       );
     } else {
-      const canBet = !!authState.user && phase !== "crashed" && slot.status === "idle";
+      const canBet = !!authState.user && slot.status === "idle";
+      const isNextRound = phase === "flying" || phase === "crashed";
       btnContent = (
         <TouchableOpacity onPress={() => placeBet(slotIdx)} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient
-            colors={canBet ? ["#00C853", "#009C41"] : ["rgba(0,60,20,0.35)", "rgba(0,40,10,0.35)"]}
+            colors={canBet ? (isNextRound ? ["#1565C0", "#0D47A1"] : ["#00C853", "#009C41"]) : ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]}
             style={styles.mainBtn}
           >
             <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
-              {!authState.user ? "SIGN IN" : phase === "flying" ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}` : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
+              {!authState.user ? "SIGN IN" : isNextRound ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}` : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
             </Text>
+            {isNextRound && canBet && <Text style={styles.mainBtnSub2}>next round</Text>}
           </LinearGradient>
         </TouchableOpacity>
       );
@@ -727,12 +722,11 @@ const styles = StyleSheet.create({
   mainBtnText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.8 },
   mainBtnSub: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 1 },
   cashoutGlow: { shadowColor: "#FF6B00", shadowRadius: 16, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
-  placedBtn: { flex: 1, flexDirection: "row", alignItems: "center", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, borderWidth: 1.5, borderColor: "rgba(0,200,83,0.4)", backgroundColor: "rgba(0,200,83,0.07)" },
-  placedBtnTop: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5, marginBottom: 2 },
-  placedBtnAmt: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.text },
-  inlineCancelBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "rgba(255,60,60,0.5)", backgroundColor: "rgba(255,26,58,0.1)", alignItems: "center", marginLeft: 8 },
-  inlineCancelX: { fontSize: 12, color: "#FF4C6A", fontFamily: "Inter_700Bold", lineHeight: 14 },
-  inlineCancelTxt: { fontSize: 8, fontFamily: "Inter_700Bold", color: "#FF4C6A", letterSpacing: 0.8, marginTop: 1 },
+  placedBtn: { flex: 1, alignItems: "center", justifyContent: "center", borderRadius: 12, paddingVertical: 10, borderWidth: 1.5, borderColor: "rgba(0,200,83,0.4)", backgroundColor: "rgba(0,200,83,0.07)" },
+  placedBtnTop: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5, marginBottom: 3 },
+  placedBtnAmt: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 3 },
+  placedBtnHint: { fontSize: 8, fontFamily: "Inter_500Medium", color: "rgba(255,26,58,0.7)", letterSpacing: 1.2 },
+  mainBtnSub2: { fontSize: 9, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.55)", marginTop: 2, letterSpacing: 1 },
   betsPanel: { backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 0 },
   tabBar: { flexDirection: "row", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 3, marginBottom: 14 },
   tab: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: 16 },

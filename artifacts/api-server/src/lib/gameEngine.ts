@@ -354,18 +354,13 @@ export function handleConnection(ws: WebSocket) {
         return;
       }
 
-      if (ENG.phase === 'flying') {
+      if (ENG.phase === 'flying' || ENG.phase === 'crashed') {
         if (slot.active || slot.queued) {
           ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Slot already has a bet' }));
           return;
         }
         slot.queued = { amount, autoCashout: msg.autoCashout ?? 0 };
         ws.send(JSON.stringify({ type: 'bet_queued', slot: slotIdx + 1, amount }));
-        return;
-      }
-
-      if (ENG.phase !== 'waiting') {
-        ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Wait for next round' }));
         return;
       }
       if (slot.active) {
