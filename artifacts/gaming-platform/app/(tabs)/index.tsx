@@ -300,9 +300,6 @@ export default function GameScreen() {
               if (next[i].status === "lost" || next[i].status === "cashedout") {
                 next[i] = { ...next[i], status: "idle", cashedOutAt: null };
               }
-              if (next[i].status === "placed") {
-                next[i] = { ...next[i], status: "active" };
-              }
             }
             slotRefs.current = next;
             return next;
