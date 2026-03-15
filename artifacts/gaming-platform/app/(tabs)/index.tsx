@@ -191,10 +191,19 @@ export default function GameScreen() {
       if (msg.type === "cashout_fail") {
         Alert.alert("Cashout Failed", String(msg.error ?? "Please try again"));
       }
-      if (msg.type === "state" && (msg as { phase?: string }).phase === "waiting") {
-        cashedRef.current = null;
-        setCashedOutAt(null);
-        if (!hasActiveRef.current) setHasActiveBet(false);
+      if (msg.type === "state") {
+        const newPhase = (msg as { phase?: string }).phase;
+        if (newPhase === "waiting") {
+          cashedRef.current = null;
+          setCashedOutAt(null);
+        }
+        if (newPhase === "crashed" && hasActiveRef.current) {
+          hasActiveRef.current = false;
+          setHasActiveBet(false);
+          if (resultTimerRef.current) clearTimeout(resultTimerRef.current);
+          setResultMsg({ text: `Lost ₹${betAmtRef.current.toLocaleString("en-IN")}`, win: false });
+          resultTimerRef.current = setTimeout(() => setResultMsg(null), 4000);
+        }
       }
     };
     WSC.msgListeners.add(msgHandler);
@@ -333,7 +342,7 @@ export default function GameScreen() {
                     : phase === "waiting"
                     ? `PLACE BET  ₹${betAmount.toLocaleString("en-IN")}`
                     : phase === "flying"
-                    ? "ROUND IN PROGRESS"
+                    ? "ROUND IN PROGRESS..."
                     : "WAIT FOR NEXT ROUND"}
                 </Text>
               </LinearGradient>
@@ -349,7 +358,9 @@ export default function GameScreen() {
                     ? `EXITED AT ${cashedOutAt.toFixed(2)}x ✓`
                     : canCashout
                     ? `CASHOUT  ₹${potentialWin.toLocaleString("en-IN")}`
-                    : "WAITING FOR LAUNCH..."}
+                    : phase === "waiting"
+                    ? "BET PLACED ✓  —  Waiting for launch"
+                    : "IN FLIGHT..."}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -366,23 +377,30 @@ export default function GameScreen() {
             <Text style={styles.liveBetsTitle}>LIVE BETS</Text>
             {hasActiveBet && authState.user && (
               <View style={styles.betRow}>
-                <View style={[styles.dot, { backgroundColor: cashedOutAt ? C.green : C.orange }]} />
+                <View style={[styles.dot, {
+                  backgroundColor: cashedOutAt ? C.green : phase === "waiting" ? "#00C853" : C.orange,
+                }]} />
                 <Text style={[styles.betUser, { color: C.gold }]}>{authState.user.username}</Text>
                 <Text style={styles.betAmt}>₹{betAmount.toLocaleString("en-IN")}</Text>
                 {cashedOutAt
                   ? <Text style={[styles.betStatus, { color: C.green }]}>{cashedOutAt.toFixed(2)}x</Text>
-                  : <Text style={[styles.betStatus, { color: C.orange }]}>Flying</Text>
+                  : phase === "waiting"
+                  ? <Text style={[styles.betStatus, { color: "#00C853" }]}>Ready ✓</Text>
+                  : <Text style={[styles.betStatus, { color: C.orange }]}>{mult.toFixed(2)}x</Text>
                 }
               </View>
             )}
             {bots.slice(0, 7).map((b, i) => (
               <View key={i} style={styles.betRow}>
-                <View style={[styles.dot, { backgroundColor: b.status === "cashed" ? C.green : b.status === "crashed" ? C.red : C.orange }]} />
+                <View style={[styles.dot, {
+                  backgroundColor: b.status === "cashed" ? C.green : b.status === "crashed" ? C.red : phase === "flying" ? C.orange : C.textMuted,
+                }]} />
                 <Text style={styles.betUser}>{b.user}</Text>
                 <Text style={styles.betAmt}>₹{b.amount.toLocaleString("en-IN")}</Text>
                 {b.status === "cashed" && <Text style={[styles.betStatus, { color: C.green }]}>{b.cashout?.toFixed(2)}x</Text>}
                 {b.status === "crashed" && <Text style={[styles.betStatus, { color: C.red }]}>Lost</Text>}
-                {b.status === "active" && <Text style={[styles.betStatus, { color: C.orange }]}>{mult.toFixed(2)}x</Text>}
+                {b.status === "active" && phase === "flying" && <Text style={[styles.betStatus, { color: C.orange }]}>{mult.toFixed(2)}x</Text>}
+                {b.status === "active" && phase !== "flying" && <Text style={[styles.betStatus, { color: C.textMuted }]}>Ready</Text>}
               </View>
             ))}
           </View>
