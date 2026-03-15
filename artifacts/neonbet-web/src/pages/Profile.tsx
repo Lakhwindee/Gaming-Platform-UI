@@ -13,12 +13,12 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
           border: '1px solid var(--border)', padding: '60px 40px',
         }}>
           <div style={{ fontSize: '72px', marginBottom: '20px' }}>👤</div>
-          <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px' }}>Join NeonBet</h2>
+          <h2 style={{ fontSize: '28px', fontWeight: 900, marginBottom: '12px', color: 'var(--primary)' }}>Join BLAZE</h2>
           <p style={{ color: 'var(--text2)', fontSize: '16px', marginBottom: '32px', lineHeight: 1.6 }}>
             Sign up to track your winnings, climb the leaderboard, and save your progress.
           </p>
           <button onClick={onAuthOpen} style={{
-            background: 'var(--neon-blue)', color: '#000', border: 'none',
+            background: 'var(--primary)', color: '#fff', border: 'none',
             borderRadius: 'var(--radius)', padding: '16px 40px',
             fontWeight: 800, fontSize: '18px', cursor: 'pointer', width: '100%',
             marginBottom: '12px',

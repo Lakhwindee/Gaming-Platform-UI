@@ -65,11 +65,12 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
         position: 'relative',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '8px' }}>⚡</div>
-          <div style={{ fontWeight: 900, fontSize: '26px', letterSpacing: '-0.5px' }}>
-            <span style={{ color: 'var(--neon-blue)' }}>Neon</span>Bet
+          <div style={{ fontSize: '40px', marginBottom: '8px' }}>🚀</div>
+          <div style={{ fontWeight: 900, fontSize: '26px', letterSpacing: '-0.5px', color: 'var(--primary)' }}>
+            BLAZE
           </div>
-          <div style={{ color: 'var(--text3)', fontSize: '13px', marginTop: '4px' }}>
+          <div style={{ color: 'var(--text3)', fontSize: '12px', marginTop: '2px', letterSpacing: '1px' }}>by Star Games</div>
+          <div style={{ color: 'var(--text2)', fontSize: '13px', marginTop: '6px' }}>
             {tab === 'register' ? 'Create account · Get ₹10,000 free!' : 'Welcome back!'}
           </div>
         </div>
@@ -82,8 +83,8 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           {(['register', 'login'] as const).map(t => (
             <button key={t} onClick={() => { setTab(t); setError(''); }} style={{
               padding: '10px', borderRadius: '9px',
-              background: tab === t ? 'var(--neon-blue)' : 'transparent',
-              color: tab === t ? '#000' : 'var(--text2)',
+              background: tab === t ? 'var(--primary)' : 'transparent',
+              color: tab === t ? '#fff' : 'var(--text2)',
               fontWeight: 700, fontSize: '14px', cursor: 'pointer',
               border: 'none', transition: 'all 0.2s',
             }}>
@@ -98,7 +99,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
               <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>USERNAME</label>
               <input value={username} onChange={e => setUsername(e.target.value)}
                 placeholder="Enter username" disabled={loading} style={inputStyle}
-                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                 onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
               />
             </div>
@@ -108,7 +109,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
                 <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>EMAIL</label>
                 <input value={email} onChange={e => setEmail(e.target.value)}
                   type="email" placeholder="Enter email" disabled={loading} style={inputStyle}
-                  onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                  onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                   onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
                 />
               </div>
@@ -119,7 +120,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
               <input value={password} onChange={e => setPassword(e.target.value)}
                 type="password" placeholder={tab === 'register' ? 'Min 6 characters' : 'Enter password'}
                 disabled={loading} style={inputStyle}
-                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--neon-blue)'}
+                onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                 onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
               />
             </div>
@@ -134,12 +135,12 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           )}
 
           <button type="submit" disabled={loading} style={{
-            width: '100%', background: loading ? 'var(--bg3)' : 'var(--neon-blue)', color: loading ? 'var(--text3)' : '#000',
+            width: '100%', background: loading ? 'var(--bg3)' : 'var(--primary)', color: loading ? 'var(--text3)' : '#fff',
             border: 'none', borderRadius: 'var(--radius)', padding: '16px',
             fontWeight: 800, fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer',
             marginTop: '20px', letterSpacing: '0.5px',
           }}>
-            {loading ? '⏳ Please wait…' : tab === 'register' ? '🎮 Create Account & Play!' : '⚡ Sign In'}
+            {loading ? '⏳ Please wait…' : tab === 'register' ? '🚀 Create Account & Play!' : '🔥 Sign In'}
           </button>
         </form>
 

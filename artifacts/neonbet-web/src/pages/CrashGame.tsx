@@ -24,49 +24,56 @@ function getPos(elapsed: number, mult: number, W: number, H: number) {
   return { x, y };
 }
 
-function drawPlane(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle: number, t: number, fading: boolean) {
+function drawRocket(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle: number, t: number, fading: boolean, waiting: boolean) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
   if (fading) ctx.globalAlpha = Math.max(0, 1 - (t % 2));
 
-  ctx.shadowColor = '#FF7000'; ctx.shadowBlur = 22;
-  ctx.fillStyle = `rgba(255,110,0,${0.55 + 0.45 * Math.sin(t * 10)})`;
-  ctx.beginPath(); ctx.ellipse(-42, 0, 18, 7, 0, 0, Math.PI * 2); ctx.fill();
+  const S = 30;
+  const showFlame = !fading;
+
+  if (showFlame) {
+    const osc  = 0.6 + 0.4 * Math.sin(t * 14);
+    const osc2 = 0.5 + 0.5 * Math.sin(t * 9 + 1.5);
+    const fScale = waiting ? 0.45 : 1.0;
+    const fReach = waiting ? 0.95 : 1.6;
+    ctx.shadowColor = '#FF6B00'; ctx.shadowBlur = waiting ? 10 : 20;
+    ctx.fillStyle = `rgba(255,80,0,${(0.65 + 0.35 * osc) * (waiting ? 0.65 : 1)})`;
+    ctx.beginPath(); ctx.ellipse(-S * fReach * osc, 0, S * 0.55 * osc * fScale, S * 0.26 * fScale, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(255,200,0,${0.75 * (waiting ? 0.55 : 1)})`;
+    ctx.beginPath(); ctx.ellipse(-S * (waiting ? 0.78 : 1.3) * osc2, 0, S * 0.32 * osc2 * fScale, S * 0.16 * fScale, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,200,0.9)';
+    ctx.beginPath(); ctx.ellipse(-S * (waiting ? 0.62 : 1.05), 0, S * 0.15 * fScale, S * 0.08 * fScale, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = '#D43050';
+  ctx.beginPath(); ctx.moveTo(-S * 0.25, -S * 0.3); ctx.lineTo(-S * 0.78, -S * 0.65); ctx.lineTo(-S * 0.55, -S * 0.3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-S * 0.25,  S * 0.3); ctx.lineTo(-S * 0.78,  S * 0.65); ctx.lineTo(-S * 0.55,  S * 0.3); ctx.closePath(); ctx.fill();
+
+  const bg = ctx.createLinearGradient(0, -S * 0.32, 0, S * 0.32);
+  bg.addColorStop(0, '#C8CED8'); bg.addColorStop(0.45, '#F0F2F8'); bg.addColorStop(1, '#9098A8');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.roundRect(-S * 0.8, -S * 0.3, S * 1.1, S * 0.6, S * 0.14); ctx.fill();
+
+  ctx.fillStyle = '#EE1133';
+  ctx.beginPath(); ctx.rect(-S * 0.18, -S * 0.3, S * 0.22, S * 0.6); ctx.fill();
+
+  ctx.fillStyle = '#CC1133';
+  ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.3, S * 0.3); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,100,130,0.4)';
+  ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.62, -S * 0.1); ctx.closePath(); ctx.fill();
+
+  ctx.shadowColor = '#88CCFF'; ctx.shadowBlur = 8;
+  ctx.fillStyle = 'rgba(80,160,255,0.35)';
+  ctx.beginPath(); ctx.arc(S * 0.18, 0, S * 0.17, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.arc(S * 0.12, -S * 0.06, S * 0.07, 0, Math.PI * 2); ctx.fill();
   ctx.shadowBlur = 0;
 
-  ctx.fillStyle = '#BDC8D8';
-  ctx.beginPath(); ctx.moveTo(6, -4); ctx.lineTo(-14, -5); ctx.lineTo(-32, -40); ctx.lineTo(-10, -40); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(6,  4); ctx.lineTo(-14,  5); ctx.lineTo(-32,  40); ctx.lineTo(-10,  40); ctx.closePath(); ctx.fill();
-
-  const fg = ctx.createLinearGradient(0, -10, 0, 10);
-  fg.addColorStop(0, '#FFFFFF'); fg.addColorStop(0.35, '#EEF2FA');
-  fg.addColorStop(0.75, '#C0CCD8'); fg.addColorStop(1, '#8898A8');
-  ctx.fillStyle = fg;
-  ctx.beginPath();
-  ctx.moveTo(48, 0);
-  ctx.bezierCurveTo(46, -8, 28, -10, 0, -10);
-  ctx.lineTo(-38, -8); ctx.lineTo(-46, 0); ctx.lineTo(-38, 8);
-  ctx.lineTo(0, 10);
-  ctx.bezierCurveTo(28, 10, 46, 8, 48, 0);
-  ctx.closePath(); ctx.fill();
-
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.beginPath();
-  ctx.moveTo(42, -2);
-  ctx.bezierCurveTo(36, -7, 20, -9, 0, -9); ctx.lineTo(-30, -7);
-  ctx.bezierCurveTo(-20, -7, 0, -6, 20, -5); ctx.bezierCurveTo(30, -4, 38, -3, 42, -2);
-  ctx.fill();
-
-  ctx.fillStyle = 'rgba(70,145,220,0.78)';
-  ctx.beginPath(); ctx.ellipse(18, -3, 12, 7, -0.1, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.42)';
-  ctx.beginPath(); ctx.ellipse(15, -5, 5, 3, -0.1, 0, Math.PI * 2); ctx.fill();
-
-  ctx.fillStyle = '#AAB8C4';
-  ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(-44, -6); ctx.lineTo(-40, -24); ctx.lineTo(-32, -12); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-36, -3); ctx.lineTo(-46, -3); ctx.lineTo(-50, -16); ctx.lineTo(-38, -9); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-36,  3); ctx.lineTo(-46,  3); ctx.lineTo(-50,  16); ctx.lineTo(-38,  9); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#484E60';
+  ctx.beginPath(); ctx.roundRect(-S * 0.82, -S * 0.18, S * 0.18, S * 0.36, 3); ctx.fill();
 
   ctx.globalAlpha = 1;
   ctx.restore();
@@ -197,8 +204,8 @@ export default function CrashGame() {
 
       // SKY
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#01060F'); sky.addColorStop(0.4, '#040E20');
-      sky.addColorStop(0.75, '#071828'); sky.addColorStop(1, '#0C2238');
+      sky.addColorStop(0, '#04000C'); sky.addColorStop(0.4, '#08000F');
+      sky.addColorStop(0.75, '#0C0015'); sky.addColorStop(1, '#100018');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
       // STARS
@@ -305,7 +312,7 @@ export default function CrashGame() {
         ctx.fillStyle = cG;
         ctx.beginPath(); ctx.arc(pos.x, pos.y, 26, 0, Math.PI * 2); ctx.fill();
       }
-      drawPlane(ctx, pos.x, pos.y, isWaiting ? -0.22 : angle, t, isCrashed);
+      drawRocket(ctx, pos.x, pos.y, isWaiting ? -0.22 : angle, t, isCrashed, isWaiting);
 
       // EXPLOSION PARTICLES
       particlesRef.current = particlesRef.current.filter(p => p.life > 0).map(p => {
@@ -319,23 +326,23 @@ export default function CrashGame() {
 
       // HUD
       if (isFlying) {
-        const mColor = m >= 10 ? '#00FF88' : m >= 5 ? '#FFD700' : m >= 2 ? '#FF9900' : '#22DDFF';
+        const mColor = m >= 10 ? '#FF4DFF' : m >= 2 ? '#4DA6FF' : '#FF3A3A';
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.beginPath(); ctx.roundRect(W / 2 - 100, 14, 200, 68, 14); ctx.fill();
         ctx.strokeStyle = mColor + 'AA'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.roundRect(W / 2 - 100, 14, 200, 68, 14); ctx.stroke();
         ctx.font = 'bold 54px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillStyle = mColor; ctx.shadowColor = mColor; ctx.shadowBlur = 28;
-        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 20); ctx.shadowBlur = 0;
+        ctx.fillStyle = mColor;
+        ctx.fillText(`${m.toFixed(2)}x`, W / 2, 20);
 
       } else if (isWaiting) {
         ctx.fillStyle = 'rgba(0,0,0,0.65)';
         ctx.beginPath(); ctx.roundRect(W / 2 - 130, 14, 260, 66, 14); ctx.fill();
         ctx.font = 'bold 12px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillStyle = '#7A8898'; ctx.fillText('NEXT FLIGHT DEPARTS IN', W / 2, 20);
+        ctx.fillStyle = '#664466'; ctx.fillText('NEXT ROUND IN', W / 2, 20);
         ctx.font = 'bold 36px Inter,sans-serif';
-        ctx.fillStyle = '#22DDFF'; ctx.shadowColor = '#22DDFF'; ctx.shadowBlur = 18;
-        ctx.fillText(`${countdown}s`, W / 2, 36); ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FF3A3A';
+        ctx.fillText(`${countdown}s`, W / 2, 36);
 
       } else if (isCrashed) {
         const ct = Math.min((now - crashTimeRef.current) / 1000 * 3, 1);
@@ -343,8 +350,8 @@ export default function CrashGame() {
         ctx.fillStyle = 'rgba(0,0,0,0.68)';
         ctx.beginPath(); ctx.roundRect(W / 2 - 140, H / 2 - 48, 280, 96, 16); ctx.fill();
         ctx.font = 'bold 42px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#FF3344'; ctx.shadowColor = '#FF3344'; ctx.shadowBlur = 28;
-        ctx.fillText('FLEW AWAY!', W / 2, H / 2 - 12); ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FF3A3A';
+        ctx.fillText('💥 BLAST!', W / 2, H / 2 - 12);
         ctx.font = 'bold 20px Inter,sans-serif'; ctx.fillStyle = '#FF8888';
         ctx.fillText(`${m.toFixed(2)}x`, W / 2, H / 2 + 26);
         ctx.globalAlpha = 1;
@@ -387,9 +394,8 @@ export default function CrashGame() {
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', animation: 'slideIn 0.3s ease' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <button onClick={() => navigate('fastgames')} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '10px', padding: '8px 16px', color: 'var(--text2)', cursor: 'pointer', fontSize: '14px' }}>← Back</button>
-        <h1 style={{ fontWeight: 800, fontSize: '24px' }}>✈️ Aviator Crash</h1>
-        {WSC.state.connected && <span style={{ background: 'var(--neon-green)20', color: 'var(--neon-green)', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700 }}>● LIVE</span>}
+        <h1 style={{ fontWeight: 900, fontSize: '22px', color: 'var(--primary)' }}>🚀 BLAZE CRASH</h1>
+        {WSC.state.connected && <span style={{ background: 'rgba(0,204,102,0.12)', color: 'var(--neon-green)', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, border: '1px solid rgba(0,204,102,0.25)' }}>● LIVE</span>}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {displayHistory.slice(0, 12).map((v, i) => (
             <div key={i} style={{ background: v <= 1.5 ? 'var(--neon-red)20' : v >= 10 ? 'var(--neon-gold)20' : 'var(--neon-green)20', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
@@ -400,7 +406,7 @@ export default function CrashGame() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
         {/* Canvas */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: '#01060F', borderRadius: 'var(--radius-lg)', border: '1px solid #1A3050', overflow: 'hidden' }}>
+          <div style={{ background: '#04000C', borderRadius: 'var(--radius-lg)', border: '1px solid #2A0A20', overflow: 'hidden' }}>
             <canvas ref={canvasRef} width={720} height={380} style={{ width: '100%', display: 'block' }} />
           </div>
 
