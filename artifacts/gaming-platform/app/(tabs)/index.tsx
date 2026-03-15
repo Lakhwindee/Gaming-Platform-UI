@@ -20,11 +20,9 @@ const ORIG_Y = CV_H * 0.88;
 const AVATAR_COLORS = ["#E53935","#8E24AA","#1E88E5","#00897B","#F4511E","#6D4C41","#546E7A","#43A047"];
 const AVATAR_EMOJI  = ["🦅","🚀","🎯","💰","🔥","⚡","🌙","🎲"];
 function multColor(m: number): string {
-  if (m >= 10) return "#FF14CC";
-  if (m >= 5)  return "#FF6B6B";
-  if (m >= 2)  return "#00C9FF";
-  if (m >= 1.5) return "#00C853";
-  return "#A5D6A7";
+  if (m >= 10) return "#FF4DFF";
+  if (m >= 2)  return "#4DA6FF";
+  return "#FF3A3A";
 }
 
 function calcMult(elapsed: number): number {
@@ -516,12 +514,10 @@ export default function GameScreen() {
       <View style={{ paddingHorizontal: 16 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyRow} contentContainerStyle={{ paddingHorizontal: 0 }}>
           {history.map((h, i) => {
-            const isBig = h >= 10;
-            const isMed = h >= 2 && h < 10;
-            const bg = isBig ? "rgba(255,215,0,0.12)" : isMed ? "rgba(255,107,0,0.1)" : "rgba(255,26,58,0.1)";
-            const col = isBig ? C.gold : isMed ? "#FF6B00" : C.red;
+            const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
+            const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
             return (
-              <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "44" }]}>
+              <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "55" }]}>
                 <Text style={[styles.histText, { color: col }]}>{h.toFixed(2)}x</Text>
               </View>
             );
