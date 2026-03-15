@@ -13,8 +13,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { initializeRevenueCat, SubscriptionProvider } from "@/lib/revenuecat";
 
 SplashScreen.preventAutoHideAsync();
+initializeRevenueCat();
 const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -60,11 +62,13 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <AuthGate>
-                <RootLayoutNav />
-              </AuthGate>
-            </GestureHandlerRootView>
+            <SubscriptionProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <AuthGate>
+                  <RootLayoutNav />
+                </AuthGate>
+              </GestureHandlerRootView>
+            </SubscriptionProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
