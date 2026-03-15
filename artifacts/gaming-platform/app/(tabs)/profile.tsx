@@ -411,7 +411,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuRow} onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert("Support", "Contact us at support@udaan.app\nor WhatsApp: +91 99999 99999");
+            Alert.alert("Support", "Contact us at support@blazeapp.in\nor WhatsApp: +91 99999 99999");
           }} activeOpacity={0.7}>
             <View style={[styles.menuIcon, { backgroundColor: C.green + "20" }]}>
               <Ionicons name="chatbubble-ellipses-outline" size={18} color={C.green} />
@@ -424,7 +424,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuRow} onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert("About", "Udaan v1.0.0\nPremium Crash Game\n\n© 2025 NeonBet");
+            Alert.alert("About", "Blaze v1.0.0\nPremium Crash Game\n\n© 2025 NeonBet");
           }} activeOpacity={0.7}>
             <View style={[styles.menuIcon, { backgroundColor: C.textDim + "20" }]}>
               <Ionicons name="information-circle-outline" size={18} color={C.textMuted} />
@@ -444,7 +444,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.versionText}>Udaan v1.0.0  ·  Made with ❤️</Text>
+        <Text style={styles.versionText}>Blaze v1.0.0  ·  Made with ❤️</Text>
       </ScrollView>
 
       <ChangePasswordModal
