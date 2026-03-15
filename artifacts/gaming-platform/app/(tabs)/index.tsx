@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Dimensions, Platform, ScrollView, StyleSheet,
+  Alert, Animated, Dimensions, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -196,6 +196,20 @@ export default function GameScreen() {
   const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const resultTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
+  const [cashoutPopup, setCashoutPopup] = useState<{ payout: number; mult: number; slot: number } | null>(null);
+  const popupAnim = useRef(new Animated.Value(0)).current;
+  const popupDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCashoutPopup = useCallback((payout: number, mult: number, slot: number) => {
+    if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
+    setCashoutPopup({ payout, mult, slot });
+    popupAnim.setValue(0);
+    Animated.spring(popupAnim, { toValue: 1, useNativeDriver: true, tension: 80, friction: 9 }).start();
+    popupDismissTimer.current = setTimeout(() => {
+      Animated.timing(popupAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => setCashoutPopup(null));
+    }, 3000);
+  }, [popupAnim]);
+
   const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
     setSlots(prev => {
       const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
@@ -254,6 +268,7 @@ export default function GameScreen() {
           result: { text: `+₹${profit.toLocaleString("en-IN")} @ ${m.toFixed(2)}x`, win: true },
         });
         resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
+        showCashoutPopup(payout, m, slotNum);
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
@@ -459,7 +474,11 @@ export default function GameScreen() {
 
   const connected = WSC.state.connected;
 
+  const popupTranslateY = popupAnim.interpolate({ inputRange: [0, 1], outputRange: [-130, 0] });
+  const popupOpacity = popupAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] });
+
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <View style={styles.balanceChip}>
@@ -613,7 +632,7 @@ export default function GameScreen() {
                     </View>
                     <View>
                       <Text style={styles.topUser}>{t.user}</Text>
-                      <Text style={styles.topDate}>{new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, ".")}</Text>
+                      <Text style={styles.topDate}>{new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" }).split("/").join(".")}</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -636,6 +655,33 @@ export default function GameScreen() {
         </View>
       </View>
     </ScrollView>
+
+    {/* ── Cashout popup overlay ── */}
+    {cashoutPopup && (
+      <Animated.View
+        style={[styles.cashoutPopupWrap, {
+          top: insets.top + 12,
+          opacity: popupOpacity,
+          transform: [{ translateY: popupTranslateY }],
+          pointerEvents: "none",
+        }]}
+      >
+        <View style={styles.cashoutPopupInner}>
+          <View style={styles.cashoutPopupLeft}>
+            <Text style={styles.cashoutPopupEmoji}>🚀</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cashoutPopupTitle}>CASHOUT!</Text>
+            <Text style={styles.cashoutPopupAmt}>₹{cashoutPopup.payout.toLocaleString("en-IN")}</Text>
+            <Text style={styles.cashoutPopupMult}>@ {cashoutPopup.mult.toFixed(2)}x · BET {cashoutPopup.slot}</Text>
+          </View>
+          <View style={styles.cashoutPopupBadge}>
+            <Text style={styles.cashoutPopupBadgeText}>WIN</Text>
+          </View>
+        </View>
+      </Animated.View>
+    )}
+    </View>
   );
 }
 
@@ -718,4 +764,30 @@ const styles = StyleSheet.create({
   topStatValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 2 },
   topMult: { fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 2 },
   emptyMsg: { textAlign: "center", fontSize: 13, fontFamily: "Inter_500Medium", color: C.textMuted, paddingVertical: 24 },
+  cashoutPopupWrap: {
+    position: "absolute", left: 16, right: 16, zIndex: 999,
+  },
+  cashoutPopupInner: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    backgroundColor: "rgba(5, 18, 5, 0.82)",
+    borderRadius: 20,
+    borderWidth: 1.5, borderColor: "rgba(0, 200, 83, 0.55)",
+    paddingHorizontal: 18, paddingVertical: 16,
+    shadowColor: "#00C853", shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 24, shadowOpacity: 0.55, elevation: 14,
+  },
+  cashoutPopupLeft: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: "rgba(0,200,83,0.15)", borderWidth: 1.5, borderColor: "rgba(0,200,83,0.35)",
+    alignItems: "center", justifyContent: "center",
+  },
+  cashoutPopupEmoji: { fontSize: 24 },
+  cashoutPopupTitle: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 2.5, marginBottom: 2 },
+  cashoutPopupAmt: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#FFFFFF", lineHeight: 32 },
+  cashoutPopupMult: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.5)", marginTop: 2 },
+  cashoutPopupBadge: {
+    backgroundColor: "rgba(0,200,83,0.18)", borderRadius: 10, borderWidth: 1, borderColor: "rgba(0,200,83,0.4)",
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  cashoutPopupBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5 },
 });
