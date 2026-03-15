@@ -27,7 +27,21 @@ export interface ApiTransaction {
   type: string;
   amount: number;
   note: string;
+  status: string;
   createdAt: string;
+}
+
+export interface PaymentOrder {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+}
+
+export interface PaymentVerifyResult {
+  success: boolean;
+  balance: number;
+  amount: number;
 }
 
 export const api = {
@@ -55,8 +69,23 @@ export const api = {
     }, token),
 
   withdraw: (token: string, amount: number, upiId: string) =>
-    request<{ message: string }>("/wallet/withdraw", {
+    request<{ message: string; balance: number }>("/wallet/withdraw", {
       method: "POST",
       body: JSON.stringify({ amount, upiId }),
+    }, token),
+
+  getPaymentConfig: (token?: string) =>
+    request<{ keyId: string | null; enabled: boolean }>("/payment/config", undefined, token),
+
+  createPaymentOrder: (token: string, amount: number) =>
+    request<PaymentOrder>("/payment/create-order", {
+      method: "POST",
+      body: JSON.stringify({ amount }),
+    }, token),
+
+  verifyPayment: (token: string, data: { paymentId: string; orderId: string; signature: string; amount: number }) =>
+    request<PaymentVerifyResult>("/payment/verify", {
+      method: "POST",
+      body: JSON.stringify(data),
     }, token),
 };

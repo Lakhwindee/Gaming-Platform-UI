@@ -6,7 +6,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
-import Svg, { Circle, Defs, G, Path, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGrad, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { WSC, wsSend } from "@/lib/wsClient";
@@ -35,19 +35,33 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
 }));
 
 function RocketShape({ phase }: { phase: string }) {
-  const SIZE = 22;
+  const S = 34;
+  const isFlying = phase === "flying";
   return (
     <>
-      {phase === "flying" && (
+      {isFlying && (
         <>
-          <Path d={`M -6 ${SIZE * 0.4} L 0 ${SIZE * 1.6} L 6 ${SIZE * 0.4}`} fill="#FF6B00" opacity={0.8} />
-          <Path d={`M -3 ${SIZE * 0.4} L 0 ${SIZE * 1.2} L 3 ${SIZE * 0.4}`} fill="#FFD700" opacity={0.9} />
+          <Ellipse cx={0} cy={S * 0.95} rx={9} ry={S * 0.7} fill="url(#flameOuter)" />
+          <Ellipse cx={0} cy={S * 0.8} rx={5} ry={S * 0.45} fill="url(#flameMid)" />
+          <Ellipse cx={0} cy={S * 0.65} rx={2.5} ry={S * 0.25} fill="url(#flameCore)" />
+          <Ellipse cx={-3} cy={S * 1.1} rx={2} ry={3.5} fill="#FF6B00" opacity={0.4} />
+          <Ellipse cx={3} cy={S * 1.15} rx={1.5} ry={3} fill="#FFD700" opacity={0.35} />
         </>
       )}
-      <Path d={`M 0 -${SIZE} C 6 -${SIZE * 0.6} 8 0 8 ${SIZE * 0.4} L -8 ${SIZE * 0.4} C -8 0 -6 -${SIZE * 0.6} 0 -${SIZE} Z`} fill="#ECECEC" />
-      <Path d={`M -8 ${SIZE * 0.4} L -14 ${SIZE} L -8 ${SIZE * 0.8} Z`} fill="#C0C0C0" />
-      <Path d={`M 8 ${SIZE * 0.4} L 14 ${SIZE} L 8 ${SIZE * 0.8} Z`} fill="#C0C0C0" />
-      <Path d={`M -4 -${SIZE * 0.3} C -2 -${SIZE * 0.5} 2 -${SIZE * 0.5} 4 -${SIZE * 0.3} C 4 0 -4 0 -4 -${SIZE * 0.3} Z`} fill="#88CCFF" opacity={0.7} />
+      <Path d={`M -9 ${S * 0.25} L -19 ${S * 0.62} L -9 ${S * 0.47} Z`} fill="#8090A8" />
+      <Path d={`M 9 ${S * 0.25} L 19 ${S * 0.62} L 9 ${S * 0.47} Z`} fill="#8090A8" />
+      <Path d={`M -9 ${S * 0.28} L -13 ${S * 0.55} L -9 ${S * 0.45} Z`} fill="#A0B0C0" />
+      <Path d={`M 9 ${S * 0.28} L 13 ${S * 0.55} L 9 ${S * 0.45} Z`} fill="#A0B0C0" />
+      <Rect x={-9} y={-S * 0.5} width={18} height={S} rx={4} ry={4} fill="url(#rocketBody)" />
+      <Path d={`M 0 ${-S} L 9 ${-S * 0.5} L -9 ${-S * 0.5} Z`} fill="url(#rocketNose)" />
+      <Ellipse cx={0} cy={-S * 0.5} rx={9} ry={3} fill="#D0D8E8" />
+      <Rect x={-4} y={-S * 0.48} width={8} height={S * 0.32} rx={3} fill="#CC0022" opacity={0.85} />
+      <Circle cx={0} cy={-S * 0.12} r={6} fill="rgba(80,160,255,0.2)" />
+      <Circle cx={0} cy={-S * 0.12} r={6} stroke="#88CCFF" strokeWidth={1.5} fill="none" />
+      <Circle cx={-2} cy={-S * 0.12 - 2} r={2} fill="rgba(255,255,255,0.55)" />
+      <Rect x={-6} y={-S * 0.46} width={3} height={S * 0.92} rx={1.5} fill="rgba(255,255,255,0.2)" />
+      <Rect x={-8} y={S * 0.5} width={16} height={7} rx={2.5} fill="#505868" />
+      <Ellipse cx={0} cy={S * 0.5} rx={8} ry={3} fill="#3A4250" />
     </>
   );
 }
@@ -87,6 +101,29 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
             <Stop offset="0%" stopColor={mColor} stopOpacity={0.15} />
             <Stop offset="100%" stopColor={mColor} stopOpacity={0} />
           </RadialGradient>
+          <SvgLinearGrad id="rocketBody" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0%" stopColor="#C8CED8" />
+            <Stop offset="45%" stopColor="#F0F2F8" />
+            <Stop offset="100%" stopColor="#9098A8" />
+          </SvgLinearGrad>
+          <SvgLinearGrad id="rocketNose" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" />
+            <Stop offset="100%" stopColor="#B8C0D0" />
+          </SvgLinearGrad>
+          <SvgLinearGrad id="flameOuter" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFD700" stopOpacity="0.9" />
+            <Stop offset="45%" stopColor="#FF6B00" stopOpacity="0.7" />
+            <Stop offset="100%" stopColor="#FF1A3A" stopOpacity="0" />
+          </SvgLinearGrad>
+          <SvgLinearGrad id="flameMid" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+            <Stop offset="50%" stopColor="#FFD700" stopOpacity="0.8" />
+            <Stop offset="100%" stopColor="#FF6B00" stopOpacity="0" />
+          </SvgLinearGrad>
+          <SvgLinearGrad id="flameCore" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+            <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </SvgLinearGrad>
         </Defs>
         {STARS.map((s, i) => (
           <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#FFFFFF" opacity={0.4 + (i % 3) * 0.2} />
