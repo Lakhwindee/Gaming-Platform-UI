@@ -44,9 +44,55 @@ const STARS = Array.from({ length: 80 }, (_, i) => ({
   r: 0.5 + (i % 3) * 0.5,
 }));
 
+function BlastShape() {
+  return (
+    <>
+      {/* Outer glow rings */}
+      <Circle cx={0} cy={0} r={38} fill="rgba(255,80,0,0.10)" />
+      <Circle cx={0} cy={0} r={26} fill="rgba(255,120,0,0.18)" />
+      <Circle cx={0} cy={0} r={17} fill="rgba(255,200,0,0.28)" />
+      {/* Core blast */}
+      <Circle cx={0} cy={0} r={10} fill="#FF6B00" />
+      <Circle cx={0} cy={0} r={5} fill="#FFD700" />
+      <Circle cx={0} cy={0} r={2} fill="#FFFFFF" />
+      {/* Debris rays */}
+      {[0,45,90,135,180,225,270,315].map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const r1 = 13, r2 = 30 + (i % 3) * 8;
+        return (
+          <Path
+            key={deg}
+            d={`M ${Math.cos(rad)*r1} ${Math.sin(rad)*r1} L ${Math.cos(rad)*r2} ${Math.sin(rad)*r2}`}
+            stroke={i % 2 === 0 ? "#FF6B00" : "#FFD700"}
+            strokeWidth={i % 2 === 0 ? 2.5 : 1.5}
+            strokeLinecap="round"
+            opacity={0.85}
+          />
+        );
+      })}
+      {/* Diagonal sparks */}
+      {[22,67,112,157,202,247,292,337].map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const r1 = 10, r2 = 18 + (i % 2) * 6;
+        return (
+          <Circle
+            key={deg}
+            cx={Math.cos(rad) * r2}
+            cy={Math.sin(rad) * r2}
+            r={1.5 + (i % 3) * 0.8}
+            fill={i % 3 === 0 ? "#FFFFFF" : i % 3 === 1 ? "#FFD700" : "#FF4500"}
+            opacity={0.9}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function RocketShape({ phase }: { phase: string }) {
   const S = 26;
   const isFlying = phase === "flying";
+  if (phase === "crashed") return <BlastShape />;
   return (
     <>
       {isFlying && (
@@ -164,7 +210,7 @@ function GameCanvas({ phase, mult, countdown, elapsed }: {
           <Text style={[styles.multText, { color: "#FF1A3A", textShadowColor: "#FF1A3A" }]}>
             {mult.toFixed(2)}x
           </Text>
-          <Text style={styles.crashedLabel}>FLEW AWAY!</Text>
+          <Text style={styles.crashedLabel}>💥  BLAST!</Text>
         </View>
       )}
     </View>
@@ -504,7 +550,7 @@ export default function GameScreen() {
           <Text style={styles.balanceValue}>₹{(authState.user?.balance ?? 0).toLocaleString("en-IN")}</Text>
         </View>
         <View style={styles.appLabel}>
-          <Text style={styles.appLabelText}>UDAAN</Text>
+          <Text style={styles.appLabelText}>BLAZE</Text>
         </View>
         <View style={styles.connectionChip}>
           <View style={[styles.dot, { backgroundColor: connected ? "#00E676" : "#FF1A3A" }]} />
@@ -794,7 +840,7 @@ const styles = StyleSheet.create({
   multOverlay: { alignItems: "center", justifyContent: "center" },
   multText: { fontSize: 54, fontFamily: "Inter_700Bold", textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 28 },
   countLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 2 },
-  crashedLabel: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#FF1A3A", letterSpacing: 4, marginTop: 2 },
+  crashedLabel: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FF4500", letterSpacing: 5, marginTop: 4, textShadowColor: "#FF4500", textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
   dualPanel: { flexDirection: "row", gap: 8, marginBottom: 12 },
   betPanel: { flex: 1, backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 11 },
   panelHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
