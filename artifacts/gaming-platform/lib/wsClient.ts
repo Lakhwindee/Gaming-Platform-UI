@@ -43,7 +43,7 @@ export function connectWS(token: string | null) {
   if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }
 
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  const url = domain ? `wss://${domain}/ws` : "ws://localhost:8080/ws";
+  const url = domain ? `wss://${domain}/api/ws` : "ws://localhost:8080/api/ws";
   const ws = new WebSocket(url);
   WSC.socket = ws;
 

@@ -56,9 +56,9 @@ export default defineConfig({
         target: `ws://localhost:${apiPort}`,
         ws: true,
         changeOrigin: true,
-        rewrite: (p) => "/ws",
+        rewrite: () => "/api/ws",
       },
-      "/ws": {
+      "/api/ws": {
         target: `ws://localhost:${apiPort}`,
         ws: true,
         changeOrigin: true,

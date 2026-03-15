@@ -46,7 +46,8 @@ export function connectWS(token: string | null) {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const base = (import.meta.env.BASE_URL as string) ?? '/';
   const wsPath = base.endsWith('/') ? `${base}ws` : `${base}/ws`;
-  const ws = new WebSocket(`${proto}//${window.location.host}${wsPath}`);
+  const wsUrl = window.location.host ? `${proto}//${window.location.host}${wsPath}` : `ws://localhost:8080/api/ws`;
+  const ws = new WebSocket(wsUrl);
   WSC.socket = ws;
 
   ws.onopen = () => {
