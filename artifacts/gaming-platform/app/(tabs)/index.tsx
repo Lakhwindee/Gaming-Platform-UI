@@ -17,6 +17,16 @@ const CV_H = 260;
 const ORIG_X = CV_W * 0.09;
 const ORIG_Y = CV_H * 0.88;
 
+const AVATAR_COLORS = ["#E53935","#8E24AA","#1E88E5","#00897B","#F4511E","#6D4C41","#546E7A","#43A047"];
+const AVATAR_EMOJI  = ["🦅","🚀","🎯","💰","🔥","⚡","🌙","🎲"];
+function multColor(m: number): string {
+  if (m >= 10) return "#FF14CC";
+  if (m >= 5)  return "#FF6B6B";
+  if (m >= 2)  return "#00C9FF";
+  if (m >= 1.5) return "#00C853";
+  return "#A5D6A7";
+}
+
 function calcMult(elapsed: number): number {
   return Math.floor(Math.pow(Math.E, 0.077 * elapsed) * 100) / 100;
 }
@@ -301,8 +311,14 @@ export default function GameScreen() {
   const phase = WSC.state.phase;
   const mult = WSC.state.mult;
   const countdown = WSC.state.countdown;
-  const bots = WSC.state.bots ?? [];
+  const allBets = WSC.state.allBets ?? [];
   const history = WSC.state.history ?? [];
+  const betCount = WSC.state.betCount ?? 0;
+  const cashedCount = WSC.state.cashedCount ?? 0;
+  const totalWin = WSC.state.totalWin ?? 0;
+  const prevRound = WSC.state.prevRound ?? null;
+  const topBets = WSC.state.topBets ?? [];
+  const [betsTab, setBetsTab] = useState<"all" | "prev" | "top">("all");
 
   function placeBet(slotIdx: 0 | 1) {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
@@ -441,7 +457,7 @@ export default function GameScreen() {
     );
   }
 
-  const connected = WSC.connected;
+  const connected = WSC.state.connected;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false}>
@@ -481,18 +497,142 @@ export default function GameScreen() {
           {renderBetPanel(1)}
         </View>
 
-        <View style={styles.liveBets}>
-          <Text style={styles.liveBetsTitle}>LIVE BETS</Text>
-          {bots.map((b, i) => (
-            <View key={i} style={styles.betRow}>
-              <View style={[styles.dot, { backgroundColor: b.status === "cashed" ? "#00C853" : b.status === "crashed" ? C.red : "#FF9800", marginRight: 2 }]} />
-              <Text style={styles.betUser}>{b.user}</Text>
-              <Text style={styles.betAmt}>₹{b.amount.toLocaleString("en-IN")}</Text>
-              <Text style={[styles.betStatus, { color: b.status === "cashed" ? "#00C853" : b.status === "crashed" ? C.red : "#FF9800" }]}>
-                {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
-              </Text>
+        {/* ── Tabbed bets panel ── */}
+        <View style={styles.betsPanel}>
+          {/* Tab bar */}
+          <View style={styles.tabBar}>
+            {(["all", "prev", "top"] as const).map(tab => (
+              <TouchableOpacity key={tab} style={[styles.tab, betsTab === tab && styles.tabActive]} onPress={() => setBetsTab(tab)}>
+                <Text style={[styles.tabText, betsTab === tab && styles.tabTextActive]}>
+                  {tab === "all" ? "All Bets" : tab === "prev" ? "Previous" : "Top"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ── ALL BETS ── */}
+          {betsTab === "all" && (
+            <View>
+              <View style={styles.betsSummaryRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {[0, 1, 2].map(i => (
+                    <View key={i} style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length], marginLeft: i > 0 ? -10 : 0 }]}>
+                      <Text style={styles.avatarText}>{AVATAR_EMOJI[i % AVATAR_EMOJI.length]}</Text>
+                    </View>
+                  ))}
+                  <Text style={styles.betsSummaryCount}>{cashedCount}/{betCount} Bets</Text>
+                </View>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.betsSummaryWin}>₹{totalWin >= 1000 ? (totalWin / 1000).toFixed(2) + "K" : totalWin.toFixed(2)}</Text>
+                  <Text style={styles.betsSummaryLabel}>Total win INR</Text>
+                </View>
+              </View>
+              <View style={styles.betsProgressBar}>
+                <View style={[styles.betsProgressFill, { width: betCount > 0 ? `${Math.min(100, (cashedCount / betCount) * 100)}%` as any : "0%" }]} />
+              </View>
+              <View style={styles.betsColHeader}>
+                <Text style={[styles.betsColText, { flex: 1.8 }]}>Player</Text>
+                <Text style={[styles.betsColText, { flex: 1.5, textAlign: "right" }]}>Bet INR</Text>
+                <Text style={[styles.betsColText, { flex: 0.9, textAlign: "center" }]}>X</Text>
+                <Text style={[styles.betsColText, { flex: 1.5, textAlign: "right" }]}>Win INR</Text>
+              </View>
+              {allBets.slice(0, 18).map((b, i) => (
+                <View key={i} style={styles.betRow2}>
+                  <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length] }]}>
+                    <Text style={styles.avatarText}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</Text>
+                  </View>
+                  <Text style={[styles.betUser2, { flex: 1.4 }]}>{b.user}</Text>
+                  <Text style={[styles.betAmt2, { flex: 1.5 }]}>₹{b.amount.toLocaleString("en-IN")}</Text>
+                  <Text style={[styles.betMult, { flex: 0.9, color: b.status === "cashed" ? multColor(b.cashout ?? 0) : b.status === "lost" ? "#555" : "#888" }]}>
+                    {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
+                  </Text>
+                  <Text style={[styles.betWin, { flex: 1.5, color: b.winAmount > 0 ? "#00C853" : "#555" }]}>
+                    {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString("en-IN")}` : "0.00"}
+                  </Text>
+                </View>
+              ))}
             </View>
-          ))}
+          )}
+
+          {/* ── PREVIOUS ── */}
+          {betsTab === "prev" && (
+            <View>
+              <View style={styles.prevHeader}>
+                <Text style={styles.prevLabel}>Round Result</Text>
+                <Text style={[styles.prevResult, { color: prevRound ? multColor(prevRound.result) : "#888" }]}>
+                  {prevRound ? `${prevRound.result.toFixed(2)}x` : "—"}
+                </Text>
+              </View>
+              <View style={styles.betsColHeader}>
+                <Text style={[styles.betsColText, { flex: 1.8 }]}>Player</Text>
+                <Text style={[styles.betsColText, { flex: 1.5, textAlign: "right" }]}>Bet INR</Text>
+                <Text style={[styles.betsColText, { flex: 0.9, textAlign: "center" }]}>X</Text>
+                <Text style={[styles.betsColText, { flex: 1.5, textAlign: "right" }]}>Win INR</Text>
+              </View>
+              {(prevRound?.bets ?? []).slice(0, 18).map((b, i) => (
+                <View key={i} style={styles.betRow2}>
+                  <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length] }]}>
+                    <Text style={styles.avatarText}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</Text>
+                  </View>
+                  <Text style={[styles.betUser2, { flex: 1.4 }]}>{b.user}</Text>
+                  <Text style={[styles.betAmt2, { flex: 1.5 }]}>₹{b.amount.toLocaleString("en-IN")}</Text>
+                  <Text style={[styles.betMult, { flex: 0.9, color: b.cashout ? multColor(b.cashout) : "#555" }]}>
+                    {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
+                  </Text>
+                  <Text style={[styles.betWin, { flex: 1.5, color: b.winAmount > 0 ? "#00C853" : "#555" }]}>
+                    {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString("en-IN")}` : "0.00"}
+                  </Text>
+                </View>
+              ))}
+              {!prevRound && <Text style={styles.emptyMsg}>No previous round data yet</Text>}
+            </View>
+          )}
+
+          {/* ── TOP ── */}
+          {betsTab === "top" && (
+            <View>
+              <View style={styles.topFilterRow}>
+                {(["X", "Win", "Rounds"] as const).map(f => (
+                  <View key={f} style={[styles.topFilterBtn, f === "X" && styles.topFilterBtnActive]}>
+                    <Text style={[styles.topFilterText, f === "X" && styles.topFilterTextActive]}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.topFilterRow}>
+                {(["Day", "Month", "Year"] as const).map(f => (
+                  <View key={f} style={[styles.topFilterBtn, f === "Day" && styles.topFilterBtnActive]}>
+                    <Text style={[styles.topFilterText, f === "Day" && styles.topFilterTextActive]}>{f}</Text>
+                  </View>
+                ))}
+              </View>
+              {topBets.map((t, i) => (
+                <View key={i} style={styles.topRow}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                    <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[t.avatar % AVATAR_COLORS.length] }]}>
+                      <Text style={styles.avatarText}>{AVATAR_EMOJI[t.avatar % AVATAR_EMOJI.length]}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.topUser}>{t.user}</Text>
+                      <Text style={styles.topDate}>{new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" }).replace(/\//g, ".")}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <View>
+                      <Text style={styles.topStatLabel}>Bet INR</Text>
+                      <Text style={styles.topStatValue}>₹{t.amount.toLocaleString("en-IN")}</Text>
+                      <Text style={styles.topStatLabel}>Win INR</Text>
+                      <Text style={[styles.topStatValue, { color: "#00C853" }]}>₹{t.win.toLocaleString("en-IN")}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={styles.topStatLabel}>Result</Text>
+                      <Text style={[styles.topMult, { color: multColor(t.mult) }]}>{t.mult.toFixed(2)}x</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+              {topBets.length === 0 && <Text style={styles.emptyMsg}>No top wins yet this session</Text>}
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -542,10 +682,40 @@ const styles = StyleSheet.create({
   cancelBtn: { borderRadius: 12, paddingVertical: 12, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: C.red, backgroundColor: "rgba(255,26,58,0.08)" },
   cancelBtnText: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.red, letterSpacing: 0.5 },
   cancelBtnSub: { fontSize: 9, fontFamily: "Inter_500Medium", color: C.textMuted, marginTop: 2 },
-  liveBets: { backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14 },
-  liveBetsTitle: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 10 },
-  betRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)" },
-  betUser: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", color: C.text },
-  betAmt: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.textMuted },
-  betStatus: { fontSize: 12, fontFamily: "Inter_700Bold", minWidth: 46, textAlign: "right" },
+  betsPanel: { backgroundColor: C.bgCard, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, marginTop: 0 },
+  tabBar: { flexDirection: "row", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 3, marginBottom: 14 },
+  tab: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: 16 },
+  tabActive: { backgroundColor: "rgba(255,255,255,0.12)" },
+  tabText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.textMuted },
+  tabTextActive: { color: C.text },
+  betsSummaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  betsSummaryCount: { fontSize: 12, fontFamily: "Inter_500Medium", color: C.textMuted, marginLeft: 8 },
+  betsSummaryWin: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.text },
+  betsSummaryLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: C.textMuted },
+  betsProgressBar: { height: 4, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 2, marginBottom: 12 },
+  betsProgressFill: { height: 4, backgroundColor: "#00C853", borderRadius: 2 },
+  betsColHeader: { flexDirection: "row", alignItems: "center", paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)", marginBottom: 4 },
+  betsColText: { fontSize: 10, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.35)", letterSpacing: 0.5 },
+  betRow2: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)" },
+  avatarCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", marginRight: 2 },
+  avatarText: { fontSize: 13 },
+  betUser2: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text },
+  betAmt2: { fontSize: 11, fontFamily: "Inter_500Medium", color: C.textMuted, textAlign: "right" },
+  betMult: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  betWin: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  prevHeader: { alignItems: "center", paddingVertical: 14, marginBottom: 6 },
+  prevLabel: { fontSize: 11, fontFamily: "Inter_500Medium", color: C.textMuted, letterSpacing: 1.5, marginBottom: 4 },
+  prevResult: { fontSize: 34, fontFamily: "Inter_700Bold" },
+  topFilterRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
+  topFilterBtn: { flex: 1, paddingVertical: 6, alignItems: "center", borderRadius: 8, backgroundColor: "rgba(0,0,0,0.25)", borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  topFilterBtnActive: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.2)" },
+  topFilterText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textMuted },
+  topFilterTextActive: { color: C.text },
+  topRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
+  topUser: { fontSize: 13, fontFamily: "Inter_700Bold", color: C.text },
+  topDate: { fontSize: 10, fontFamily: "Inter_500Medium", color: C.textMuted },
+  topStatLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: C.textMuted },
+  topStatValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 2 },
+  topMult: { fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 2 },
+  emptyMsg: { textAlign: "center", fontSize: 13, fontFamily: "Inter_500Medium", color: C.textMuted, paddingVertical: 24 },
 });
