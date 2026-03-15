@@ -339,9 +339,14 @@ export default function GameScreen() {
   function placeBet(slotIdx: 0 | 1) {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
     const slot = slots[slotIdx];
-    if (slot.status !== "idle") return;
+    const isEffectivelyIdle = slot.status === "idle" ||
+      ((slot.status === "cashedout" || slot.status === "lost") && phase !== "flying");
+    if (!isEffectivelyIdle) return;
     wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
-    updateSlot(slotIdx, { status: (phase === "flying" || phase === "crashed") ? "queued" : "placed" });
+    updateSlot(slotIdx, {
+      status: (phase === "flying" || phase === "crashed") ? "queued" : "placed",
+      result: null,
+    });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
@@ -369,11 +374,17 @@ export default function GameScreen() {
   function renderBetPanel(slotIdx: 0 | 1) {
     const slot = slots[slotIdx];
     const label = slotIdx === 0 ? "BET 1" : "BET 2";
-    const canEdit = slot.status === "idle";
-    const potentialWin = slot.status === "active" ? Math.floor(slot.amount * mult) : 0;
+
+    // After cashout/loss, treat slot as idle outside of flying phase so user can bet next round
+    const effectiveStatus: SlotStatus = (slot.status === "cashedout" || slot.status === "lost") && phase !== "flying"
+      ? "idle"
+      : slot.status;
+
+    const canEdit = effectiveStatus === "idle";
+    const potentialWin = effectiveStatus === "active" ? Math.floor(slot.amount * mult) : 0;
 
     let btnContent: React.ReactNode;
-    if (slot.status === "active" && phase === "flying") {
+    if (effectiveStatus === "active" && phase === "flying") {
       btnContent = (
         <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
@@ -382,7 +393,7 @@ export default function GameScreen() {
           </LinearGradient>
         </TouchableOpacity>
       );
-    } else if (slot.status === "placed") {
+    } else if (effectiveStatus === "placed") {
       btnContent = (
         <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.8} style={{ flex: 1 }}>
           <View style={styles.placedBtn}>
@@ -392,7 +403,7 @@ export default function GameScreen() {
           </View>
         </TouchableOpacity>
       );
-    } else if (slot.status === "queued") {
+    } else if (effectiveStatus === "queued") {
       btnContent = (
         <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.8} style={{ flex: 1 }}>
           <View style={[styles.placedBtn, { borderColor: "rgba(255,152,0,0.45)", backgroundColor: "rgba(255,152,0,0.07)" }]}>
@@ -402,14 +413,14 @@ export default function GameScreen() {
           </View>
         </TouchableOpacity>
       );
-    } else if (slot.status === "cashedout") {
+    } else if (effectiveStatus === "cashedout") {
       btnContent = (
         <View style={[styles.mainBtn, { backgroundColor: "rgba(0,180,80,0.12)", borderWidth: 1, borderColor: "rgba(0,180,80,0.3)", alignItems: "center", justifyContent: "center", flex: 1 }]}>
           <Text style={[styles.mainBtnText, { color: "#00C853" }]}>EXITED @ {slot.cashedOutAt?.toFixed(2)}x ✓</Text>
         </View>
       );
     } else {
-      const canBet = !!authState.user && slot.status === "idle";
+      const canBet = !!authState.user && effectiveStatus === "idle";
       const isNextRound = phase === "flying" || phase === "crashed";
       btnContent = (
         <TouchableOpacity onPress={() => placeBet(slotIdx)} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
