@@ -273,6 +273,10 @@ export default function GameScreen() {
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
+      if (msg.type === "cashout_fail") {
+        updateSlot(slotIdx, { status: "active" });
+      }
+
       if (msg.type === "bet_crash") {
         const m = msg.mult as number;
         const amt = slotRefs.current[slotIdx].amount;

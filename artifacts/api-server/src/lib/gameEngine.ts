@@ -181,6 +181,7 @@ async function processCashout(ws: WebSocket, state: ClientState, slotIdx: 0 | 1,
   const slot = state.slots[slotIdx];
   if (!slot.active || slot.cashedOut || !state.userId) return;
   slot.cashedOut = true;
+  slot.active = false;
   const payout = Math.floor(slot.amount * mult);
 
   const bet = ENG.allBets.find(b => b.user === (state.username ? maskName(state.username) : '') && b.status === 'active');
