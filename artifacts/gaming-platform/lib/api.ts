@@ -103,9 +103,4 @@ export const api = {
       body: JSON.stringify({ currentPassword, newPassword }),
     }, token),
 
-  addCoins: (token: string, coins: number, note: string) =>
-    request<{ balance: number }>("/wallet/add-coins", {
-      method: "POST",
-      body: JSON.stringify({ coins, note }),
-    }, token),
 };

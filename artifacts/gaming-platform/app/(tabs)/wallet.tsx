@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator, Alert, AppState, AppStateStatus, Modal,
+  ActivityIndicator, Alert, AppState, AppStateStatus,
   Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View, Linking,
 } from "react-native";
@@ -11,8 +11,6 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiTransaction, UpiInitResult } from "@/lib/api";
-import { useSubscription } from "@/lib/revenuecat";
-
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 type PayMethod = "gpay" | "phonepe" | "paytm" | "upi";
@@ -91,31 +89,14 @@ function txIcon(type: string) {
   return { name: "remove-circle" as const, color: C.textMuted };
 }
 
-const COIN_PACK_COINS: Record<string, number> = {
-  blaze_coins_100: 100,
-  blaze_coins_500: 500,
-  blaze_coins_1000: 1100,
-  blaze_coins_5000: 6000,
-};
-
-const COIN_PACK_BADGES: Record<string, string | null> = {
-  blaze_coins_100: null,
-  blaze_coins_500: null,
-  blaze_coins_1000: "+10% Bonus",
-  blaze_coins_5000: "+20% Bonus",
-};
-
 export default function WalletScreen() {
   const { state: authState, refreshBalance } = useAuth();
-  const { offerings, isPurchasing, purchase, isLoading: rcLoading } = useSubscription();
   const insets = useSafeAreaInsets();
 
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
   const [tab,          setTab]          = useState<"deposit" | "withdraw" | "history">("deposit");
   const [loading,      setLoading]      = useState(false);
-
-  const [confirmPkg, setConfirmPkg] = useState<any>(null);
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
   const [customAmt,      setCustomAmt]      = useState("");
@@ -293,28 +274,6 @@ export default function WalletScreen() {
 
   const balance = authState.user?.balance ?? 0;
   const methodInfo = PAY_METHODS.find(m => m.id === selectedMethod)!;
-  const coinPackages = offerings?.current?.availablePackages ?? [];
-
-  async function handleRCPurchase(pkg: any) {
-    if (!authState.token) { Alert.alert("Sign In Required"); return; }
-    setConfirmPkg(null);
-    try {
-      await purchase(pkg);
-      const storeId: string = pkg.product?.identifier ?? "";
-      const coins = COIN_PACK_COINS[storeId] ?? Math.round(parseFloat(pkg.product?.price ?? "0") * 80);
-      if (authState.token && coins > 0) {
-        try {
-          await api.addCoins(authState.token, coins, pkg.product?.title ?? pkg.product?.identifier ?? "Coin Pack");
-          await refreshBalance();
-        } catch {}
-      }
-      Alert.alert("Purchase Successful!", "Coins have been added to your balance.");
-    } catch (e: any) {
-      if (e?.code !== "1") {
-        Alert.alert("Purchase Failed", e?.message ?? "Something went wrong. Try again.");
-      }
-    }
-  }
 
   return (
     <LinearGradient colors={[C.bgGrad1, C.bgGrad2, "#0A0018"]} style={styles.root}>
@@ -368,40 +327,6 @@ export default function WalletScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* RevenueCat Confirm Purchase Modal */}
-        <Modal transparent visible={!!confirmPkg} animationType="fade" onRequestClose={() => setConfirmPkg(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Confirm Purchase</Text>
-              {confirmPkg && (
-                <>
-                  <Text style={styles.modalCoins}>
-                    {COIN_PACK_COINS[confirmPkg.product?.identifier ?? ""] ?? "?"} Coins
-                  </Text>
-                  <Text style={styles.modalPrice}>{confirmPkg.product?.priceString ?? ""}</Text>
-                  {COIN_PACK_BADGES[confirmPkg.product?.identifier ?? ""] && (
-                    <View style={styles.modalBadge}>
-                      <Text style={styles.modalBadgeText}>{COIN_PACK_BADGES[confirmPkg.product?.identifier ?? ""]}</Text>
-                    </View>
-                  )}
-                  <Text style={styles.modalNote}>This is a test purchase. No real money will be charged.</Text>
-                </>
-              )}
-              <View style={styles.modalBtns}>
-                <TouchableOpacity style={styles.modalCancel} onPress={() => setConfirmPkg(null)}>
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirm} onPress={() => handleRCPurchase(confirmPkg)}>
-                  {isPurchasing
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.modalConfirmText}>BUY NOW</Text>
-                  }
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* DEPOSIT */}
         {tab === "deposit" && (
@@ -552,52 +477,6 @@ export default function WalletScreen() {
 
             {payState === "idle" && (
               <>
-                {/* RevenueCat Coin Packs */}
-                <Text style={styles.sectionTitle}>BUY COIN PACKS</Text>
-                {rcLoading ? (
-                  <View style={{ alignItems: "center", marginBottom: 20 }}>
-                    <ActivityIndicator color={C.red} />
-                  </View>
-                ) : coinPackages.length === 0 ? (
-                  <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>No packs available</Text>
-                ) : (
-                  <View style={styles.coinPackGrid}>
-                    {coinPackages.map((pkg: any) => {
-                      const storeId: string = pkg.product?.identifier ?? "";
-                      const coins = COIN_PACK_COINS[storeId];
-                      const badge = COIN_PACK_BADGES[storeId];
-                      const price: string = pkg.product?.priceString ?? "";
-                      const isPopular = storeId === "blaze_coins_500";
-                      return (
-                        <TouchableOpacity
-                          key={pkg.identifier}
-                          style={[styles.coinPackCard, isPopular && styles.coinPackCardPopular]}
-                          onPress={() => setConfirmPkg(pkg)}
-                          disabled={isPurchasing}
-                          activeOpacity={0.82}
-                        >
-                          {isPopular && (
-                            <View style={styles.popularBadge}>
-                              <Text style={styles.popularBadgeText}>POPULAR</Text>
-                            </View>
-                          )}
-                          <Text style={styles.coinPackEmoji}>🪙</Text>
-                          <Text style={styles.coinPackAmount}>{coins ?? "?"}</Text>
-                          <Text style={styles.coinPackLabel}>Coins</Text>
-                          {badge && (
-                            <View style={styles.bonusBadge}>
-                              <Text style={styles.bonusBadgeText}>{badge}</Text>
-                            </View>
-                          )}
-                          <Text style={styles.coinPackPrice}>{price}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                <View style={[styles.balanceDivider, { marginVertical: 20 }]} />
-                <Text style={styles.sectionTitle}>OR PAY VIA UPI</Text>
                 <Text style={styles.sectionTitle}>SELECT AMOUNT</Text>
                 <View style={styles.amtGrid}>
                   {AMOUNTS.map(a => (
@@ -893,30 +772,6 @@ const styles = StyleSheet.create({
   manualUpiRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   manualUpiLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textDim },
   manualUpiValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text },
-  coinPackGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 8 },
-  coinPackCard: { width: "47%", backgroundColor: "rgba(20,0,8,0.7)", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.1)", padding: 16, alignItems: "center", gap: 4, position: "relative", overflow: "hidden" },
-  coinPackCardPopular: { borderColor: C.gold, backgroundColor: "rgba(255,215,0,0.07)" },
-  popularBadge: { position: "absolute", top: 0, right: 0, backgroundColor: C.gold, borderBottomLeftRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
-  popularBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#000", letterSpacing: 1 },
-  coinPackEmoji: { fontSize: 28, marginBottom: 2 },
-  coinPackAmount: { fontSize: 22, fontFamily: "Inter_700Bold", color: C.text },
-  coinPackLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, marginBottom: 4 },
-  bonusBadge: { backgroundColor: "rgba(255,58,58,0.2)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: "rgba(255,58,58,0.35)" },
-  bonusBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.red },
-  coinPackPrice: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.gold, marginTop: 2 },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", alignItems: "center", justifyContent: "center" },
-  modalBox: { backgroundColor: "#120008", borderRadius: 24, borderWidth: 1.5, borderColor: "rgba(255,58,58,0.3)", padding: 28, width: 300, alignItems: "center", gap: 10 },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.text },
-  modalCoins: { fontSize: 38, fontFamily: "Inter_700Bold", color: C.gold },
-  modalPrice: { fontSize: 22, fontFamily: "Inter_700Bold", color: C.red },
-  modalBadge: { backgroundColor: "rgba(255,58,58,0.15)", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: "rgba(255,58,58,0.3)" },
-  modalBadgeText: { fontSize: 12, fontFamily: "Inter_700Bold", color: C.red },
-  modalNote: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, textAlign: "center", marginTop: 4 },
-  modalBtns: { flexDirection: "row", gap: 12, marginTop: 8, width: "100%" },
-  modalCancel: { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", alignItems: "center" },
-  modalCancelText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.textMuted },
-  modalConfirm: { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: C.red, alignItems: "center" },
-  modalConfirmText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
   withdrawCard: { gap: 0 },
   fieldInput: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingHorizontal: 14, paddingVertical: 14, marginBottom: 10 },
   fieldPrefix: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.gold, marginRight: 6 },

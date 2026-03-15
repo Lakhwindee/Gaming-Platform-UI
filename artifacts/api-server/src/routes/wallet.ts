@@ -107,33 +107,4 @@ router.post("/wallet/withdraw", async (req, res) => {
   }
 });
 
-router.post("/wallet/add-coins", async (req, res) => {
-  const userId = getUser(req.headers.authorization);
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-  const { coins, note } = req.body as { coins?: number; note?: string };
-  if (!coins || coins < 1 || !Number.isFinite(coins)) {
-    return res.status(400).json({ error: "Invalid coin amount" });
-  }
-  try {
-    const result = await db.transaction(async (tx) => {
-      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId));
-      if (!user) throw new Error("User not found");
-      const newBalance = user.balance + Math.floor(coins);
-      await tx.update(usersTable).set({ balance: newBalance }).where(eq(usersTable.id, userId));
-      await tx.insert(transactionsTable).values({
-        userId,
-        type: "deposit",
-        amount: Math.floor(coins),
-        note: note ?? "Coin pack purchase",
-        txRef: null,
-        status: "completed",
-      });
-      return { balance: newBalance };
-    });
-    res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : "Server error" });
-  }
-});
-
 export default router;
