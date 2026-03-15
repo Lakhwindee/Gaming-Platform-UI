@@ -340,7 +340,7 @@ export default function GameScreen() {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
     const slot = slots[slotIdx];
     const isEffectivelyIdle = slot.status === "idle" ||
-      ((slot.status === "cashedout" || slot.status === "lost") && phase !== "flying");
+      slot.status === "cashedout" || slot.status === "lost";
     if (!isEffectivelyIdle) return;
     wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
     updateSlot(slotIdx, {
@@ -375,8 +375,8 @@ export default function GameScreen() {
     const slot = slots[slotIdx];
     const label = slotIdx === 0 ? "BET 1" : "BET 2";
 
-    // After cashout/loss, treat slot as idle outside of flying phase so user can bet next round
-    const effectiveStatus: SlotStatus = (slot.status === "cashedout" || slot.status === "lost") && phase !== "flying"
+    // After cashout/loss, always reset to idle so user can immediately queue next bet
+    const effectiveStatus: SlotStatus = (slot.status === "cashedout" || slot.status === "lost")
       ? "idle"
       : slot.status;
 
