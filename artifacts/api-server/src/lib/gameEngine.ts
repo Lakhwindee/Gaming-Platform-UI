@@ -84,6 +84,44 @@ interface TopWin {
   date: string;
 }
 
+interface TopHistoryEntry {
+  mult: number;
+  date: string;
+}
+
+function seedTopHistory(): TopHistoryEntry[] {
+  const now = Date.now();
+  const d = (daysAgo: number, h: number, m: number) =>
+    new Date(now - daysAgo * 86400000 + h * 3600000 + m * 60000).toISOString();
+  return [
+    { mult: 36375.32, date: d(1,  2, 10) },
+    { mult: 32131.59, date: d(11, 14, 54) },
+    { mult: 19720.53, date: d(12, 19, 36) },
+    { mult: 11215.28, date: d(3,  9,  0) },
+    { mult: 9266.74,  date: d(10, 17, 25) },
+    { mult: 8259.71,  date: d(0,  8,  4) },
+    { mult: 7842.15,  date: d(7,  21, 33) },
+    { mult: 5621.88,  date: d(14, 11, 20) },
+    { mult: 4238.44,  date: d(15,  7, 45) },
+    { mult: 3891.22,  date: d(0,  14, 22) },
+    { mult: 2847.55,  date: d(5,  16,  0) },
+    { mult: 2156.34,  date: d(8,  22, 15) },
+    { mult: 1893.21,  date: d(13,  8, 30) },
+    { mult: 1452.67,  date: d(4,  13, 45) },
+    { mult: 987.43,   date: d(9,   6, 22) },
+    { mult: 756.89,   date: d(6,  20,  5) },
+    { mult: 543.21,   date: d(11, 12, 40) },
+    { mult: 421.88,   date: d(2,  18, 55) },
+    { mult: 324.76,   date: d(16, 10, 10) },
+    { mult: 287.33,   date: d(0,   5, 48) },
+    { mult: 214.50,   date: d(17,  9, 15) },
+    { mult: 189.77,   date: d(20, 16, 30) },
+    { mult: 155.22,   date: d(22,  7, 10) },
+    { mult: 132.45,   date: d(25, 13, 55) },
+    { mult: 118.90,   date: d(28,  3, 40) },
+  ].sort((a, b) => b.mult - a.mult);
+}
+
 const ENG = {
   phase: 'waiting' as Phase,
   mult: 1.0,
@@ -94,12 +132,16 @@ const ENG = {
   allBets: genAllBets() as RoundBet[],
   prevRound: null as { result: number; bets: RoundBet[] } | null,
   topBets: [
-    { user: '5***8', avatar: 3, amount: 1000, mult: 88.50, win: 88500, date: new Date().toISOString() },
-    { user: '2***1', avatar: 6, amount: 5000, mult: 15.32, win: 76600, date: new Date().toISOString() },
-    { user: '7***4', avatar: 1, amount: 2000, mult: 24.10, win: 48200, date: new Date().toISOString() },
-    { user: '3***9', avatar: 5, amount: 10000, mult: 4.50, win: 45000, date: new Date().toISOString() },
-    { user: '9***2', avatar: 0, amount: 500, mult: 62.00, win: 31000, date: new Date().toISOString() },
+    { user: '5***8', avatar: 3, amount: 1000, mult: 88.50, win: 88500, date: new Date(Date.now() - 2*3600000).toISOString() },
+    { user: '2***1', avatar: 6, amount: 5000, mult: 15.32, win: 76600, date: new Date(Date.now() - 5*86400000).toISOString() },
+    { user: '7***4', avatar: 1, amount: 2000, mult: 24.10, win: 48200, date: new Date(Date.now() - 8*86400000).toISOString() },
+    { user: '3***9', avatar: 5, amount: 10000, mult: 4.50, win: 45000, date: new Date(Date.now() - 3*86400000).toISOString() },
+    { user: '9***2', avatar: 0, amount: 500, mult: 62.00, win: 31000, date: new Date(Date.now() - 12*86400000).toISOString() },
+    { user: '4***7', avatar: 2, amount: 750, mult: 38.44, win: 28830, date: new Date(Date.now() - 1*86400000).toISOString() },
+    { user: '8***5', avatar: 4, amount: 3000, mult: 8.20, win: 24600, date: new Date(Date.now() - 6*86400000).toISOString() },
+    { user: '1***6', avatar: 7, amount: 1500, mult: 14.88, win: 22320, date: new Date(Date.now() - 18*3600000).toISOString() },
   ] as TopWin[],
+  topHistory: seedTopHistory() as TopHistoryEntry[],
   history: [2.14, 1.01, 8.56, 3.22, 1.01, 15.4, 2.87, 1.01, 4.12, 1.01, 22.8, 1.01, 1.63, 5.5, 1.01],
   timer: null as ReturnType<typeof setInterval> | null,
   cdTimer: null as ReturnType<typeof setInterval> | null,
@@ -124,6 +166,7 @@ function statePayload() {
     totalWin,
     prevRound: ENG.prevRound,
     topBets: ENG.topBets.slice(0, 10),
+    topHistory: ENG.topHistory.slice(0, 25),
   };
 }
 
@@ -295,6 +338,10 @@ async function doCrash() {
   ENG.allBets = finalBets;
   ENG.prevRound = { result: ENG.mult, bets: [...finalBets] };
   ENG.history = [ENG.mult, ...ENG.history].slice(0, 20);
+  if (ENG.mult >= 5) {
+    ENG.topHistory = [{ mult: ENG.mult, date: new Date().toISOString() }, ...ENG.topHistory]
+      .sort((a, b) => b.mult - a.mult).slice(0, 50);
+  }
 
   for (const [ws, c] of clients) {
     for (let i = 0; i < 2; i++) {

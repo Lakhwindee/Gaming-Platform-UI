@@ -331,7 +331,10 @@ export default function GameScreen() {
   const totalWin = WSC.state.totalWin ?? 0;
   const prevRound = WSC.state.prevRound ?? null;
   const topBets = WSC.state.topBets ?? [];
+  const topHistory = WSC.state.topHistory ?? [];
   const [betsTab, setBetsTab] = useState<"all" | "prev" | "top">("all");
+  const [topSort, setTopSort] = useState<"X" | "Win" | "Rounds">("X");
+  const [topTime, setTopTime] = useState<"Day" | "Month" | "Year">("Month");
 
   function placeBet(slotIdx: 0 | 1) {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
@@ -622,46 +625,129 @@ export default function GameScreen() {
           {/* ── TOP ── */}
           {betsTab === "top" && (
             <View>
+              {/* Sort row */}
               <View style={styles.topFilterRow}>
                 {(["X", "Win", "Rounds"] as const).map(f => (
-                  <View key={f} style={[styles.topFilterBtn, f === "X" && styles.topFilterBtnActive]}>
-                    <Text style={[styles.topFilterText, f === "X" && styles.topFilterTextActive]}>{f}</Text>
-                  </View>
+                  <TouchableOpacity key={f} onPress={() => setTopSort(f)} style={[styles.topFilterBtn, topSort === f && styles.topFilterBtnActive]}>
+                    <Text style={[styles.topFilterText, topSort === f && styles.topFilterTextActive]}>{f}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
-              <View style={styles.topFilterRow}>
+              {/* Time row */}
+              <View style={[styles.topFilterRow, { marginBottom: 12 }]}>
                 {(["Day", "Month", "Year"] as const).map(f => (
-                  <View key={f} style={[styles.topFilterBtn, f === "Day" && styles.topFilterBtnActive]}>
-                    <Text style={[styles.topFilterText, f === "Day" && styles.topFilterTextActive]}>{f}</Text>
-                  </View>
+                  <TouchableOpacity key={f} onPress={() => setTopTime(f)} style={[styles.topFilterBtn, topTime === f && styles.topFilterBtnActive]}>
+                    <Text style={[styles.topFilterText, topTime === f && styles.topFilterTextActive]}>{f}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
-              {topBets.map((t, i) => (
-                <View key={i} style={styles.topRow}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
-                    <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[t.avatar % AVATAR_COLORS.length] }]}>
-                      <Text style={styles.avatarText}>{AVATAR_EMOJI[t.avatar % AVATAR_EMOJI.length]}</Text>
+
+              {/* ── X sub-tab: top crash multipliers ── */}
+              {topSort === "X" && (() => {
+                const cutoff = topTime === "Day" ? 86400000 : topTime === "Month" ? 30 * 86400000 : 365 * 86400000;
+                const rows = topHistory.filter(h => Date.now() - new Date(h.date).getTime() < cutoff);
+                const fmtDate = (iso: string) => {
+                  const d = new Date(iso);
+                  const dd = String(d.getDate()).padStart(2, "0");
+                  const mm = String(d.getMonth() + 1).padStart(2, "0");
+                  const yy = String(d.getFullYear()).slice(-2);
+                  const hh = String(d.getHours()).padStart(2, "0");
+                  const mi = String(d.getMinutes()).padStart(2, "0");
+                  return `${dd}.${mm}.${yy} ${hh}:${mi}`;
+                };
+                const fmtMult = (m: number) => m >= 1000 ? m.toLocaleString("en-US", { maximumFractionDigits: 2 }) + "x" : m.toFixed(2) + "x";
+                return (
+                  <View>
+                    <View style={styles.topTableHeader}>
+                      <Text style={styles.topTableHeaderTxt}>Date & Time</Text>
+                      <Text style={styles.topTableHeaderTxt}>X</Text>
                     </View>
-                    <View>
-                      <Text style={styles.topUser}>{t.user}</Text>
-                      <Text style={styles.topDate}>{new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "2-digit" }).split("/").join(".")}</Text>
-                    </View>
+                    {rows.map((h, i) => (
+                      <View key={i} style={styles.topTableRow}>
+                        <Text style={styles.topTableDate}>{fmtDate(h.date)}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                          <Text style={styles.topTableMult}>{fmtMult(h.mult)}</Text>
+                          <View style={styles.topShieldBadge}>
+                            <Text style={styles.topShieldTxt}>✓</Text>
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                    {rows.length === 0 && <Text style={styles.emptyMsg}>No records for this period</Text>}
                   </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <View>
-                      <Text style={styles.topStatLabel}>Bet INR</Text>
-                      <Text style={styles.topStatValue}>₹{t.amount.toLocaleString("en-IN")}</Text>
-                      <Text style={styles.topStatLabel}>Win INR</Text>
-                      <Text style={[styles.topStatValue, { color: "#00C853" }]}>₹{t.win.toLocaleString("en-IN")}</Text>
+                );
+              })()}
+
+              {/* ── Win sub-tab: top wins ── */}
+              {topSort === "Win" && (() => {
+                const cutoff = topTime === "Day" ? 86400000 : topTime === "Month" ? 30 * 86400000 : 365 * 86400000;
+                const rows = topBets.filter(t => Date.now() - new Date(t.date).getTime() < cutoff);
+                return (
+                  <View>
+                    <View style={styles.topTableHeader}>
+                      <Text style={styles.topTableHeaderTxt}>Player</Text>
+                      <Text style={styles.topTableHeaderTxt}>Win INR</Text>
                     </View>
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={styles.topStatLabel}>Result</Text>
-                      <Text style={[styles.topMult, { color: multColor(t.mult) }]}>{t.mult.toFixed(2)}x</Text>
-                    </View>
+                    {rows.map((t, i) => (
+                      <View key={i} style={styles.topTableRow}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[t.avatar % AVATAR_COLORS.length], width: 28, height: 28 }]}>
+                            <Text style={[styles.avatarText, { fontSize: 12 }]}>{AVATAR_EMOJI[t.avatar % AVATAR_EMOJI.length]}</Text>
+                          </View>
+                          <View>
+                            <Text style={styles.topTableUser}>{t.user}</Text>
+                            <Text style={[styles.topTableMult, { fontSize: 10, color: multColor(t.mult) }]}>{t.mult.toFixed(2)}x</Text>
+                          </View>
+                        </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                          <Text style={[styles.topTableHeaderTxt, { color: "#00C853", fontSize: 13 }]}>₹{t.win.toLocaleString("en-IN")}</Text>
+                          <View style={styles.topShieldBadge}><Text style={styles.topShieldTxt}>✓</Text></View>
+                        </View>
+                      </View>
+                    ))}
+                    {rows.length === 0 && <Text style={styles.emptyMsg}>No records for this period</Text>}
                   </View>
-                </View>
-              ))}
-              {topBets.length === 0 && <Text style={styles.emptyMsg}>No top wins yet this session</Text>}
+                );
+              })()}
+
+              {/* ── Rounds sub-tab: top players by rounds ── */}
+              {topSort === "Rounds" && (() => {
+                const ROUNDS_DATA = [
+                  { user: "5***8", avatar: 3, rounds: 1842, wins: 1124 },
+                  { user: "2***1", avatar: 6, rounds: 1567, wins: 892 },
+                  { user: "7***4", avatar: 1, rounds: 1344, wins: 755 },
+                  { user: "3***9", avatar: 5, rounds: 1122, wins: 612 },
+                  { user: "9***2", avatar: 0, rounds: 987,  wins: 487 },
+                  { user: "4***7", avatar: 2, rounds: 856,  wins: 398 },
+                  { user: "8***5", avatar: 4, rounds: 742,  wins: 301 },
+                  { user: "1***6", avatar: 7, rounds: 621,  wins: 244 },
+                ];
+                return (
+                  <View>
+                    <View style={styles.topTableHeader}>
+                      <Text style={styles.topTableHeaderTxt}>Player</Text>
+                      <Text style={styles.topTableHeaderTxt}>Rounds</Text>
+                    </View>
+                    {ROUNDS_DATA.map((r, i) => (
+                      <View key={i} style={styles.topTableRow}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <View style={[styles.avatarCircle, { backgroundColor: AVATAR_COLORS[r.avatar % AVATAR_COLORS.length], width: 28, height: 28 }]}>
+                            <Text style={[styles.avatarText, { fontSize: 12 }]}>{AVATAR_EMOJI[r.avatar % AVATAR_EMOJI.length]}</Text>
+                          </View>
+                          <Text style={styles.topTableUser}>{r.user}</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                          <View>
+                            <Text style={[styles.topTableHeaderTxt, { fontSize: 13 }]}>{r.rounds.toLocaleString()}</Text>
+                            <Text style={[styles.topTableDate, { textAlign: "right" }]}>{r.wins} wins</Text>
+                          </View>
+                          <View style={styles.topShieldBadge}><Text style={styles.topShieldTxt}>✓</Text></View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
             </View>
           )}
         </View>
@@ -764,12 +850,14 @@ const styles = StyleSheet.create({
   topFilterBtnActive: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.2)" },
   topFilterText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textMuted },
   topFilterTextActive: { color: C.text },
-  topRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.06)" },
-  topUser: { fontSize: 13, fontFamily: "Inter_700Bold", color: C.text },
-  topDate: { fontSize: 10, fontFamily: "Inter_500Medium", color: C.textMuted },
-  topStatLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: C.textMuted },
-  topStatValue: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 2 },
-  topMult: { fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 2 },
+  topTableHeader: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 7, paddingHorizontal: 2, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)", marginBottom: 2 },
+  topTableHeaderTxt: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textMuted },
+  topTableRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
+  topTableDate: { fontSize: 12, fontFamily: "Inter_500Medium", color: C.textMuted },
+  topTableMult: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#C62AE8" },
+  topTableUser: { fontSize: 13, fontFamily: "Inter_700Bold", color: C.text },
+  topShieldBadge: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(120,120,140,0.2)", borderWidth: 1, borderColor: "rgba(180,180,200,0.25)", alignItems: "center", justifyContent: "center" },
+  topShieldTxt: { fontSize: 13, color: "rgba(180,180,200,0.8)", fontFamily: "Inter_700Bold" },
   emptyMsg: { textAlign: "center", fontSize: 13, fontFamily: "Inter_500Medium", color: C.textMuted, paddingVertical: 24 },
   toastWrap: {
     position: "absolute", alignSelf: "center", zIndex: 999,

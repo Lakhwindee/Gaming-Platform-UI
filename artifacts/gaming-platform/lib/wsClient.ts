@@ -18,6 +18,11 @@ export interface TopWin {
   date: string;
 }
 
+export interface TopHistoryEntry {
+  mult: number;
+  date: string;
+}
+
 export interface WSState {
   phase: Phase;
   mult: number;
@@ -31,6 +36,7 @@ export interface WSState {
   totalWin: number;
   prevRound: { result: number; bets: RoundBet[] } | null;
   topBets: TopWin[];
+  topHistory: TopHistoryEntry[];
   connected: boolean;
 }
 
@@ -41,7 +47,7 @@ const DEFAULT: WSState = {
   phase: "waiting", mult: 1.0, countdown: 5,
   roundId: 0, startTime: 0, history: [],
   allBets: [], betCount: 0, cashedCount: 0, totalWin: 0,
-  prevRound: null, topBets: [], connected: false,
+  prevRound: null, topBets: [], topHistory: [], connected: false,
 };
 
 export const WSC = {
