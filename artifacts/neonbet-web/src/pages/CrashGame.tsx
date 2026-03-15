@@ -79,7 +79,7 @@ function drawRocket(ctx: CanvasRenderingContext2D, cx: number, cy: number, angle
   ctx.restore();
 }
 
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; r: number; color: string };
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; r: number; color: string; ray?: boolean; ox?: number; oy?: number; };
 
 export default function CrashGame() {
   const { state, navigate, addHistory, addNotification } = useGame();
@@ -176,6 +176,7 @@ export default function CrashGame() {
     const W = canvas.width, H = canvas.height;
     const ORIG_X = W * 0.09, ORIG_Y = H * 0.88;
     const EXP_COLORS = ['#FF8800', '#FF4400', '#FFCC00', '#FF2200', '#FFE080', '#FFFFFF'];
+    const RAY_COLORS = ['#FFFFFF', '#FFD700', '#FF6B00', '#FF3A3A', '#FFB800', '#FF9500', '#FFEE80', '#FF5500', '#FFD000', '#FFAAAA'];
 
     function draw() {
       ctx.clearRect(0, 0, W, H);
@@ -193,10 +194,15 @@ export default function CrashGame() {
       if (cvPrevPhase.current === 'flying' && phase === 'crashed') {
         crashTimeRef.current = now;
         const cp = crashPosRef.current;
-        for (let i = 0; i < 55; i++) {
+        for (let i = 0; i < 22; i++) {
           const ang = Math.random() * Math.PI * 2;
-          const spd = 2 + Math.random() * 8;
-          particlesRef.current.push({ x: cp.x, y: cp.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 3, life: 1, r: 2 + Math.random() * 6, color: EXP_COLORS[Math.floor(Math.random() * 6)] });
+          const spd = 1.5 + Math.random() * 5;
+          particlesRef.current.push({ x: cp.x, y: cp.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 2, life: 1, r: 1.5 + Math.random() * 2.5, color: EXP_COLORS[Math.floor(Math.random() * EXP_COLORS.length)] });
+        }
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10) * Math.PI * 2;
+          const spd = 3.5 + Math.random() * 3;
+          particlesRef.current.push({ x: cp.x, y: cp.y, ox: cp.x, oy: cp.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1, r: 0, color: RAY_COLORS[i % RAY_COLORS.length], ray: true });
         }
       }
       if (isWaiting) particlesRef.current = [];
@@ -295,7 +301,7 @@ export default function CrashGame() {
       }
 
       // PLANE
-      const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X + 20, y: ORIG_Y - 10 };
+      const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X, y: ORIG_Y };
       if (!isWaiting) {
         const dT = 0.25;
         const pA = getPos(Math.max(elapsed - dT, 0), calcMult(Math.max(elapsed - dT, 0.001)), W, H);
@@ -316,11 +322,25 @@ export default function CrashGame() {
 
       // EXPLOSION PARTICLES
       particlesRef.current = particlesRef.current.filter(p => p.life > 0).map(p => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.vx *= 0.97; p.r *= 0.97; p.life -= 0.025;
-        ctx.globalAlpha = p.life; ctx.shadowColor = p.color; ctx.shadowBlur = 10;
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        if (p.ray) {
+          p.x += p.vx; p.y += p.vy; p.life -= 0.04;
+          ctx.globalAlpha = p.life * 0.9;
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 2.5 * p.life;
+          ctx.lineCap = 'round';
+          ctx.shadowColor = p.color; ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.moveTo(p.ox!, p.oy!);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        } else {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.vx *= 0.97; p.r *= 0.96; p.life -= 0.028;
+          ctx.globalAlpha = p.life; ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+          ctx.fillStyle = p.color;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        }
         return p;
       });
 
