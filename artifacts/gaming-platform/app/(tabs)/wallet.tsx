@@ -210,16 +210,19 @@ export default function WalletScreen() {
 
   async function handleConfirmPaid() {
     if (!authState.token || !pendingTxn) return;
+    const utr = utrInput.trim();
+    if (!utr) return;
     setConfirming(true);
     setAutoFailMsg("");
     try {
-      await api.upiConfirm(authState.token, pendingTxn.txnRef);
+      await api.upiConfirm(authState.token, pendingTxn.txnRef, utr);
       await refreshBalance();
       upiAppOpenedRef.current = false;
       setPayState("success");
       setTimeout(() => {
         setPayState("idle");
         setPendingTxn(null);
+        setUtrInput("");
         setCustomAmt("");
         setSelectedAmt(500);
         setAutoFailMsg("");
@@ -390,24 +393,44 @@ export default function WalletScreen() {
                     )}
 
                     {payState === "confirming" && !confirming && (
-                      <View style={styles.yesNoRow}>
+                      <>
+                        <View style={styles.utrHintBox}>
+                          <Text style={styles.utrHintStep}>
+                            <Text style={styles.utrHintBold}>Google Pay</Text> → Activity → Payment tap karo → copy{" "}
+                            <Text style={styles.utrHintBold}>UPI Transaction ID</Text>
+                          </Text>
+                        </View>
+                        <View style={styles.utrFieldWrap}>
+                          <Text style={styles.utrFieldLabel}>TRANSACTION ID / UTR</Text>
+                          <View style={[styles.utrFieldRow, utrInput.length > 0 && { borderColor: C.green }]}>
+                            <TextInput
+                              style={styles.utrFieldInput}
+                              placeholder="Paste here from Google Pay"
+                              placeholderTextColor={C.textDim}
+                              value={utrInput}
+                              onChangeText={v => { setUtrInput(v); setAutoFailMsg(""); }}
+                              autoFocus
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                            />
+                            {utrInput.length > 0 && (
+                              <Ionicons name="checkmark-circle" size={20} color={C.green} />
+                            )}
+                          </View>
+                        </View>
                         <TouchableOpacity
-                          style={styles.noPaidBtn}
-                          onPress={handleCancelPayment}
-                          activeOpacity={0.85}
-                        >
-                          <Ionicons name="close" size={20} color="#fff" />
-                          <Text style={styles.noPaidText}>NO</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.yesPaidBtn, { backgroundColor: methodInfo.color }]}
+                          style={[styles.confirmUtrBtn, { opacity: utrInput.trim().length > 0 ? 1 : 0.4 }]}
                           onPress={handleConfirmPaid}
+                          disabled={utrInput.trim().length === 0}
                           activeOpacity={0.85}
                         >
-                          <Ionicons name="checkmark" size={20} color="#fff" />
-                          <Text style={styles.yesPaidText}>YES, I PAID</Text>
+                          <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                          <Text style={styles.confirmUtrText}>CONFIRM PAYMENT</Text>
                         </TouchableOpacity>
-                      </View>
+                        <TouchableOpacity style={styles.didntPayBtn} onPress={handleCancelPayment} activeOpacity={0.7}>
+                          <Text style={styles.didntPayText}>I didn't pay — Cancel</Text>
+                        </TouchableOpacity>
+                      </>
                     )}
 
                     {payState === "waiting" && !confirming && noAppFound && (
@@ -728,11 +751,17 @@ const styles = StyleSheet.create({
   payPendingTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, textAlign: "center", marginTop: 4 },
   payPendingSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textMuted, textAlign: "center", lineHeight: 20 },
   txnRefText: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, letterSpacing: 0.5 },
-  yesNoRow: { flexDirection: "row", gap: 12, width: "100%" },
-  noPaidBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,50,80,0.25)", borderRadius: 14, borderWidth: 1.5, borderColor: "rgba(255,50,80,0.4)", paddingVertical: 14 },
-  noPaidText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#FF3250" },
-  yesPaidBtn: { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 14, paddingVertical: 14 },
-  yesPaidText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#fff" },
+  utrHintBox: { width: "100%", backgroundColor: "rgba(255,215,0,0.07)", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "rgba(255,215,0,0.18)" },
+  utrHintStep: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, lineHeight: 18, textAlign: "center" },
+  utrHintBold: { fontFamily: "Inter_700Bold", color: C.gold },
+  utrFieldWrap: { width: "100%", gap: 6 },
+  utrFieldLabel: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.textMuted, letterSpacing: 1.2 },
+  utrFieldRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, borderWidth: 1.5, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  utrFieldInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: C.text },
+  confirmUtrBtn: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.green, borderRadius: 14, paddingVertical: 14 },
+  confirmUtrText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
+  didntPayBtn: { paddingVertical: 8 },
+  didntPayText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.red, textAlign: "center" },
   paidBtn: { width: "100%", borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   paidBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
   reopenBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 6 },
