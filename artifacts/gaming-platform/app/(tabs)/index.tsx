@@ -29,12 +29,13 @@ function calcMult(elapsed: number): number {
   return Math.floor(Math.pow(Math.E, 0.077 * elapsed) * 100) / 100;
 }
 function getPos(elapsed: number): { x: number; y: number } {
-  const MAX_T = 34;
+  const MAX_T = 40;
   const t = Math.min(elapsed / MAX_T, 1);
-  const x = ORIG_X + t * (CV_W - ORIG_X - 20);
-  const yPow = Math.pow(t, 1.65);
-  const y = ORIG_Y - yPow * (CV_H * 0.87);
-  return { x, y };
+  // x accelerates (like Aviator: starts slow, curves right)
+  const x = ORIG_X + t * t * (CV_W * 0.88 - ORIG_X);
+  // y decelerates (fast rise early, slows as it goes right)
+  const y = ORIG_Y - Math.sqrt(t) * (CV_H * 0.76);
+  return { x, y: Math.max(y, 22) };
 }
 
 const STARS = Array.from({ length: 80 }, (_, i) => ({

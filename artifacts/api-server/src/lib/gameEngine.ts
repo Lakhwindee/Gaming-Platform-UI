@@ -257,7 +257,7 @@ async function startCountdown() {
   ENG.phase = 'waiting';
   ENG.mult = 1.0;
   ENG.countdown = 5;
-  ENG.crashPoint = genCrash();
+  ENG.crashPoint = consumeForcedCrash() ?? genCrash();
 
   for (const [, c] of clients) {
     for (const slot of c.slots) {
@@ -496,4 +496,26 @@ export function handleConnection(ws: WebSocket) {
 
 export function startGameEngine(_wss: WebSocketServer) {
   startCountdown();
+}
+
+export function getEngineSnapshot() {
+  return {
+    phase: ENG.phase,
+    mult: ENG.mult,
+    countdown: ENG.countdown,
+    roundId: ENG.roundId,
+    crashPoint: ENG.crashPoint,
+    activeBets: ENG.allBets.length,
+    clientCount: 0,
+  };
+}
+
+let _forcedCrash: number | null = null;
+export function setForcedCrash(point: number | null) {
+  _forcedCrash = point;
+}
+export function consumeForcedCrash(): number | null {
+  const v = _forcedCrash;
+  _forcedCrash = null;
+  return v;
 }
