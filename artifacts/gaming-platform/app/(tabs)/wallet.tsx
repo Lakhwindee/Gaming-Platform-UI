@@ -133,41 +133,18 @@ export default function WalletScreen() {
 
   useEffect(() => {
     if (payState !== "waiting") return;
-    const sub = AppState.addEventListener("change", async (next: AppStateStatus) => {
+    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && next === "active") {
-        if (!upiAppOpenedRef.current) {
-          appStateRef.current = next;
-          return;
-        }
-        const token = tokenRef.current;
-        const txn   = pendingTxnRef.current;
-        if (!token || !txn) { appStateRef.current = next; return; }
-        setPayState("confirming");
-        setConfirming(true);
-        setAutoFailMsg("");
-        try {
-          const result = await api.upiConfirm(token, txn.txnRef);
-          await refreshBalance();
-          upiAppOpenedRef.current = false;
-          setPayState("success");
-          setTimeout(() => {
-            setPayState("idle");
-            setPendingTxn(null);
-            setCustomAmt("");
-            setSelectedAmt(500);
-            setAutoFailMsg("");
-          }, 3000);
-        } catch (e) {
-          setAutoFailMsg(e instanceof Error ? e.message : "Verification failed. Tap below to retry.");
+        if (upiAppOpenedRef.current) {
+          // User returned from UPI app — ask if they actually paid (NO auto-credit)
           setPayState("confirming");
-        } finally {
-          setConfirming(false);
+          setAutoFailMsg("");
         }
       }
       appStateRef.current = next;
     });
     return () => sub.remove();
-  }, [payState, refreshBalance]);
+  }, [payState]);
 
   const loadTx = useCallback(async () => {
     if (!authState.token) return;
@@ -233,10 +210,17 @@ export default function WalletScreen() {
 
   async function handleConfirmPaid() {
     if (!authState.token || !pendingTxn) return;
+    const utr = utrInput.trim();
+    if (utr.length < 6) {
+      setAutoFailMsg("Please enter your UTR / Transaction ID from Google Pay to confirm payment.");
+      return;
+    }
     setConfirming(true);
+    setAutoFailMsg("");
     try {
-      const result = await api.upiConfirm(authState.token, pendingTxn.txnRef, utrInput.trim() || undefined);
+      const result = await api.upiConfirm(authState.token, pendingTxn.txnRef, utr);
       await refreshBalance();
+      upiAppOpenedRef.current = false;
       setPayState("success");
       setTimeout(() => {
         setPayState("idle");
@@ -244,15 +228,10 @@ export default function WalletScreen() {
         setUtrInput("");
         setCustomAmt("");
         setSelectedAmt(500);
+        setAutoFailMsg("");
       }, 3000);
-      const got = result.totalCredit;
-      Alert.alert(
-        "Payment Confirmed!",
-        "₹" + got.toLocaleString("en-IN") + " added to your wallet" +
-        (result.bonus > 0 ? "\n(includes ₹" + result.bonus + " bonus!)" : ""),
-      );
     } catch (e) {
-      Alert.alert("Confirmation Failed", e instanceof Error ? e.message : "If you paid, contact support.");
+      setAutoFailMsg(e instanceof Error ? e.message : "Confirmation failed. Contact support.");
     } finally {
       setConfirming(false);
     }
@@ -396,11 +375,9 @@ export default function WalletScreen() {
 
                     {!confirming && (
                       <Text style={styles.payPendingTitle}>
-                        {payState === "confirming" && autoFailMsg
-                          ? "Payment Not Found"
-                          : payState === "confirming"
-                            ? "Verifying Payment…"
-                            : "Complete Payment in " + methodInfo.label}
+                        {payState === "confirming"
+                          ? "Did you complete the payment?"
+                          : "Complete Payment in " + methodInfo.label}
                       </Text>
                     )}
 
@@ -420,26 +397,47 @@ export default function WalletScreen() {
 
                     {payState === "confirming" && !confirming && (
                       <>
+                        <View style={styles.utrInfoBox}>
+                          <Ionicons name="information-circle" size={14} color={C.gold} />
+                          <Text style={styles.utrInfoText}>
+                            Open Google Pay → tap the payment → copy the 12-digit{" "}
+                            <Text style={{ color: C.gold, fontFamily: "Inter_700Bold" }}>UTR number</Text>
+                          </Text>
+                        </View>
                         <View style={styles.utrBox}>
-                          <Text style={styles.utrLabel}>ENTER UTR / TRANSACTION ID (OPTIONAL)</Text>
-                          <View style={styles.utrInput}>
+                          <Text style={styles.utrLabel}>UTR / TRANSACTION ID  (REQUIRED)</Text>
+                          <View style={[styles.utrInput, utrInput.length > 0 && utrInput.length < 6 && { borderColor: C.red }]}>
                             <TextInput
                               style={styles.utrInputText}
-                              placeholder="12-digit UTR number"
+                              placeholder="Enter UTR from Google Pay"
                               placeholderTextColor={C.textDim}
                               value={utrInput}
-                              onChangeText={setUtrInput}
-                              keyboardType="numeric"
-                              maxLength={16}
+                              onChangeText={v => { setUtrInput(v); setAutoFailMsg(""); }}
+                              keyboardType="default"
+                              maxLength={24}
+                              autoFocus
                             />
+                            {utrInput.length >= 6 && (
+                              <Ionicons name="checkmark-circle" size={18} color={C.green} />
+                            )}
                           </View>
                         </View>
                         <TouchableOpacity
-                          style={[styles.paidBtn, { backgroundColor: methodInfo.color }]}
+                          style={[styles.paidBtn, {
+                            backgroundColor: utrInput.trim().length >= 6 ? methodInfo.color : "rgba(100,100,100,0.4)",
+                          }]}
                           onPress={handleConfirmPaid}
                           activeOpacity={0.85}
+                          disabled={utrInput.trim().length < 6 || confirming}
                         >
                           <Text style={styles.paidBtnText}>CONFIRM PAYMENT</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.notPaidBtn}
+                          onPress={handleCancelPayment}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.notPaidText}>I did NOT pay — Cancel</Text>
                         </TouchableOpacity>
                       </>
                     )}
@@ -478,7 +476,7 @@ export default function WalletScreen() {
                       </TouchableOpacity>
                     )}
 
-                    {!confirming && (
+                    {payState === "waiting" && !confirming && (
                       <TouchableOpacity onPress={handleCancelPayment} style={styles.cancelPayBtn} activeOpacity={0.7}>
                         <Text style={styles.cancelPayText}>Cancel</Text>
                       </TouchableOpacity>
@@ -762,10 +760,14 @@ const styles = StyleSheet.create({
   payPendingTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, textAlign: "center", marginTop: 4 },
   payPendingSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textMuted, textAlign: "center", lineHeight: 20 },
   txnRefText: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, letterSpacing: 0.5 },
+  utrInfoBox: { flexDirection: "row", alignItems: "flex-start", gap: 6, backgroundColor: "rgba(255,215,0,0.07)", borderRadius: 10, padding: 10, borderWidth: 1, borderColor: "rgba(255,215,0,0.2)", width: "100%" },
+  utrInfoText: { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, lineHeight: 17 },
   utrBox: { width: "100%", gap: 6 },
-  utrLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 1 },
-  utrInput: { flexDirection: "row", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10 },
+  utrLabel: { fontSize: 10, fontFamily: "Inter_700Bold", color: C.red, letterSpacing: 1.2 },
+  utrInput: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, borderWidth: 1.5, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
   utrInputText: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: C.text },
+  notPaidBtn: { paddingVertical: 8 },
+  notPaidText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.red, textAlign: "center" },
   paidBtn: { width: "100%", borderRadius: 14, paddingVertical: 14, alignItems: "center" },
   paidBtnText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#fff", letterSpacing: 1 },
   reopenBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 6 },
