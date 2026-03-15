@@ -191,13 +191,44 @@ router.get("/admin", (_req, res) => {
               <input type="number" id="crashInput" placeholder="e.g. 1.50" step="0.01" min="1.01" />
               <button onclick="forceCrash()" class="btn-sm" style="padding:14px 18px;font-size:13px">SET</button>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-              <button class="btn-sm" onclick="document.getElementById('crashInput').value='1.01';forceCrash()">1.01x</button>
-              <button class="btn-sm" onclick="document.getElementById('crashInput').value='1.50';forceCrash()">1.50x</button>
-              <button class="btn-sm green" onclick="document.getElementById('crashInput').value='5.00';forceCrash()">5.00x</button>
-              <button class="btn-sm green" onclick="document.getElementById('crashInput').value='10.00';forceCrash()">10.00x</button>
-              <button class="btn-sm blue" onclick="document.getElementById('crashInput').value='25.00';forceCrash()">25.00x</button>
-              <button class="btn-sm blue" onclick="document.getElementById('crashInput').value='100.00';forceCrash()">100x</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+              <div style="width:100%;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🔴 Very Low</div>
+              <button class="btn-sm" onclick="setC('1.01')">1.01x</button>
+              <button class="btn-sm" onclick="setC('1.20')">1.20x</button>
+              <button class="btn-sm" onclick="setC('1.30')">1.30x</button>
+              <button class="btn-sm" onclick="setC('1.50')">1.50x</button>
+              <button class="btn-sm" onclick="setC('1.75')">1.75x</button>
+              <button class="btn-sm" onclick="setC('2.00')">2.00x</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <div style="width:100%;font-size:10px;color:#FF6B00;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🟠 Low–Medium</div>
+              <button class="btn-sm" style="background:#FF6B00" onclick="setC('2.50')">2.50x</button>
+              <button class="btn-sm" style="background:#FF6B00" onclick="setC('3.00')">3.00x</button>
+              <button class="btn-sm" style="background:#FF6B00" onclick="setC('4.00')">4.00x</button>
+              <button class="btn-sm" style="background:#FF6B00" onclick="setC('5.00')">5.00x</button>
+              <button class="btn-sm" style="background:#FF6B00" onclick="setC('7.00')">7.00x</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <div style="width:100%;font-size:10px;color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🟢 Medium–High</div>
+              <button class="btn-sm green" onclick="setC('10.00')">10x</button>
+              <button class="btn-sm green" onclick="setC('12.00')">12x</button>
+              <button class="btn-sm green" onclick="setC('15.00')">15x</button>
+              <button class="btn-sm green" onclick="setC('20.00')">20x</button>
+              <button class="btn-sm green" onclick="setC('25.00')">25x</button>
+              <button class="btn-sm green" onclick="setC('30.00')">30x</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <div style="width:100%;font-size:10px;color:var(--blue);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🔵 High</div>
+              <button class="btn-sm blue" onclick="setC('50.00')">50x</button>
+              <button class="btn-sm blue" onclick="setC('75.00')">75x</button>
+              <button class="btn-sm blue" onclick="setC('100.00')">100x</button>
+              <button class="btn-sm blue" onclick="setC('150.00')">150x</button>
+              <button class="btn-sm blue" onclick="setC('200.00')">200x</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+              <div style="width:100%;font-size:10px;color:var(--pink);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🩷 Extreme</div>
+              <button class="btn-sm" style="background:var(--pink)" onclick="setC('500.00')">500x</button>
+              <button class="btn-sm" style="background:var(--pink)" onclick="setC('1000.00')">1000x</button>
             </div>
             <div id="forcedCrashStatus" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
           </div>
@@ -362,6 +393,10 @@ async function loadTransactions() {
   } catch(e) { toast(e.message, true); }
 }
 
+function setC(v) {
+  document.getElementById('crashInput').value = v;
+  forceCrash();
+}
 async function forceCrash() {
   const v = parseFloat(document.getElementById('crashInput').value);
   if (isNaN(v) || v < 1.01) { toast('Enter a valid multiplier (min 1.01)', true); return; }
