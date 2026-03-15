@@ -1,32 +1,36 @@
-const neonBlue = "#00D4FF";
-const neonPurple = "#A855F7";
-const neonGreen = "#00FF88";
-const neonGold = "#FFD700";
-const neonRed = "#FF3B5C";
+const C = {
+  bg: "#08020E",
+  bgGrad1: "#0D0208",
+  bgGrad2: "#180010",
+  bgCard: "rgba(180,0,40,0.13)",
+  bgCardBright: "rgba(220,0,50,0.18)",
+  border: "rgba(255,30,60,0.22)",
+  borderBright: "rgba(255,50,80,0.45)",
 
-export default {
-  dark: {
-    background: "#0A0A0F",
-    surface: "#12121A",
-    surfaceElevated: "#1A1A26",
-    surfaceBorder: "#252535",
-    text: "#FFFFFF",
-    textSecondary: "#8888AA",
-    textMuted: "#44445A",
-    tint: neonBlue,
-    tintSecondary: neonPurple,
-    neonBlue,
-    neonPurple,
-    neonGreen,
-    neonGold,
-    neonRed,
-    tabIconDefault: "#44445A",
-    tabIconSelected: neonBlue,
-    cardGradientStart: "#1A1A2E",
-    cardGradientEnd: "#16213E",
-    success: "#00FF88",
-    warning: "#FFD700",
-    danger: "#FF3B5C",
-    overlay: "rgba(0,0,0,0.7)",
-  },
+  primary: "#CC0022",
+  primaryBright: "#FF1A3A",
+  gold: "#FFD700",
+  goldDim: "#C8A800",
+  green: "#00C853",
+  greenDim: "#009C41",
+  orange: "#FF6B00",
+  orangeDim: "#C05000",
+  red: "#FF1A3A",
+
+  text: "#FFFFFF",
+  textSoft: "#E8D0D8",
+  textMuted: "#AA7788",
+  textDim: "#664455",
+
+  tabBg: "#110008",
+  tabBorder: "rgba(255,30,60,0.3)",
+  tabActive: "#FF4060",
+  tabInactive: "#664455",
+
+  overlay: "rgba(0,0,0,0.75)",
+  success: "#00C853",
+  warning: "#FFD700",
+  danger: "#FF1A3A",
 };
+
+export default C;

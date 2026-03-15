@@ -33,6 +33,18 @@ export const betsTable = pgTable("bets", {
   placedAt: timestamp("placed_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const transactionsTable = pgTable("transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => usersTable.id).notNull(),
+  type: varchar("type", { length: 16 }).notNull(),
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  note: text("note").notNull().default(""),
+  txRef: varchar("tx_ref", { length: 128 }),
+  status: varchar("status", { length: 16 }).notNull().default("completed"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type User = typeof usersTable.$inferSelect;
 export type Bet = typeof betsTable.$inferSelect;
 export type GameRound = typeof gameRoundsTable.$inferSelect;
+export type Transaction = typeof transactionsTable.$inferSelect;

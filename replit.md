@@ -35,40 +35,50 @@ artifacts-monorepo/
 └── package.json            # Root package with hoisted devDeps
 ```
 
-## Gaming Platform (artifacts/gaming-platform)
+## Aviator Mobile App (artifacts/gaming-platform)
 
-Premium online gaming platform with dark casino-style UI built with Expo React Native.
+Dedicated single-game Aviator/Crash mobile app (ASTRNVT-style). Red/dark premium casino theme, built with Expo React Native.
 
-### Features
-- **Game Lobby**: Home screen with 3 animated game cards, live player count, balance display
-- **Crash Game**: Real-time multiplier graph, cash-out mechanic, multiplayer view
-- **Dice Roll**: Predict high/low (1-3 vs 4-6), instant results, animated dice
-- **Coin Flip**: Heads or tails, animated coin, 1.98x payout
-- **Leaderboard**: Podium view, animated rankings, 10 mock players
-- **Game History**: Full game log with P&L, stats summary bar
-- **Profile**: XP bar, win rate ring, stats grid, settings menu
-- **Auth**: Login/Register with smooth tab switcher
-
-### Design
-- Dark theme: `#0A0A0F` background, neon accents (blue, purple, gold, green, red)
+### Theme
+- `#08020E` background, `#CC0022` primary red, `#FFD700` gold, `#00C853` green
 - Font: Inter (400, 500, 600, 700)
-- Custom app icon and splash screen (AI-generated diamond gem)
-- Smooth spring animations, haptic feedback
-- Liquid glass tab bar on iOS 26+, BlurView fallback
+- Haptic feedback on all game events
+
+### Screens (3 tabs)
+- **Fly (index)** — Main Aviator game: SVG rocket animation, real-time WebSocket multiplier, BET/CASHOUT buttons, history chips, live bets panel
+- **Wallet** — Balance display, quick deposit packages (₹100/500/1000/5000), custom deposit, UPI withdrawal, transaction history
+- **Profile** — Stats (wins/losses/wagered), XP bar, level, win rate ring, settings menu, logout
+
+### Auth
+- Login/Register on single screen (tab switcher)
+- JWT stored in AsyncStorage, auto-restored on launch
+- Auth gate: unauthenticated → login; authenticated → tabs
 
 ### Navigation
-- 4 tabs: Lobby, Ranks, History, Profile
-- Stack screens: auth, game/crash, game/dice, game/coinflip
+- Stack: `(auth)` + `(tabs)` — AuthGate redirects between them
+- Removed old screens: game/crash, game/dice, game/coinflip, history, leaderboard
 
 ### State
-- React Context + AsyncStorage for persistence
-- User balance, game history, leaderboard data
-- Points-based wallet system
+- `AuthContext` (reducer) — user, token, balance, login/register/logout/refreshBalance
+- `WSC` module-level WS singleton (lib/wsClient.ts) — connects to `/ws`, reconnects on close
+- `wsSend()` for bet/cashout messages
+
+### Key Files
+- `context/AuthContext.tsx` — auth state, WS auth, balance updates
+- `lib/wsClient.ts` — WebSocket singleton
+- `lib/api.ts` — REST API client (auth + wallet endpoints)
+- `constants/colors.ts` — red/dark theme palette
+- `app/(tabs)/index.tsx` — main Aviator game screen with SVG canvas
+- `app/(tabs)/wallet.tsx` — wallet with deposits/withdrawals
+- `app/(tabs)/profile.tsx` — player profile and stats
 
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
 Express 5 API server. Routes at `/api`.
+- Auth: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- Wallet: `GET /api/wallet/balance`, `GET /api/wallet/transactions`, `POST /api/wallet/deposit`, `POST /api/wallet/withdraw`
+- WebSocket: `ws://localhost:8080/ws` — game engine broadcasts phase/mult/bots to all clients
 
 ### `lib/db` (`@workspace/db`)
 Drizzle ORM + PostgreSQL. Run `pnpm --filter @workspace/db run push` for migrations.

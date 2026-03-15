@@ -1,0 +1,84 @@
+export type Phase = "waiting" | "flying" | "crashed";
+
+export interface BotBet {
+  user: string;
+  amount: number;
+  status: "active" | "cashed" | "crashed";
+  cashout: number | null;
+}
+
+export interface WSState {
+  phase: Phase;
+  mult: number;
+  countdown: number;
+  roundId: number;
+  startTime: number;
+  history: number[];
+  bots: BotBet[];
+  connected: boolean;
+}
+
+type Listener = () => void;
+type MsgListener = (msg: Record<string, unknown>) => void;
+
+const DEFAULT: WSState = {
+  phase: "waiting", mult: 1.0, countdown: 5,
+  roundId: 0, startTime: 0, history: [], bots: [], connected: false,
+};
+
+export const WSC = {
+  state: { ...DEFAULT } as WSState,
+  listeners: new Set<Listener>(),
+  msgListeners: new Set<MsgListener>(),
+  socket: null as WebSocket | null,
+  token: null as string | null,
+  reconnectTimer: null as ReturnType<typeof setTimeout> | null,
+};
+
+function notify() { WSC.listeners.forEach(fn => fn()); }
+
+export function connectWS(token: string | null) {
+  WSC.token = token;
+  if (WSC.socket) { WSC.socket.onclose = null; WSC.socket.close(); WSC.socket = null; }
+  if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }
+
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
+  const url = domain ? `wss://${domain}/ws` : "ws://localhost:8080/ws";
+  const ws = new WebSocket(url);
+  WSC.socket = ws;
+
+  ws.onopen = () => {
+    WSC.state.connected = true;
+    notify();
+    if (WSC.token) ws.send(JSON.stringify({ type: "auth", token: WSC.token }));
+  };
+
+  ws.onmessage = (e: MessageEvent) => {
+    let msg: Record<string, unknown>;
+    try { msg = JSON.parse(e.data as string); } catch { return; }
+    if (msg.type === "state") {
+      WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true };
+      notify();
+    }
+    WSC.msgListeners.forEach(fn => fn(msg));
+  };
+
+  ws.onclose = () => {
+    WSC.state.connected = false;
+    notify();
+    WSC.reconnectTimer = setTimeout(() => connectWS(WSC.token), 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+export function wsSend(msg: object) {
+  if (WSC.socket?.readyState === WebSocket.OPEN) WSC.socket.send(JSON.stringify(msg));
+}
+
+export function disconnectWS() {
+  if (WSC.socket) { WSC.socket.onclose = null; WSC.socket.close(); WSC.socket = null; }
+  if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }
+  WSC.state.connected = false;
+  notify();
+}
