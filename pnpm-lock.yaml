@@ -157,6 +157,9 @@ importers:
 
   .:
     dependencies:
+      '@replit/revenuecat-sdk':
+        specifier: ^4.1.0
+        version: 4.1.0(typescript@5.9.3)
       react-native-purchases:
         specifier: ^9.12.0
         version: 9.12.0(react-native-web@0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.2.14)(react@19.1.0))(react@19.1.0)
@@ -788,6 +791,10 @@ importers:
         version: 0.31.9
 
   scripts:
+    dependencies:
+      replit-revenuecat-v2:
+        specifier: '*'
+        version: 2.0.2(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2372,6 +2379,11 @@ packages:
 
   '@react-navigation/routers@7.5.3':
     resolution: {integrity: sha512-1tJHg4KKRJuQ1/EvJxatrMef3NZXEPzwUIUZ3n1yJ2t7Q97siwRtbynRpQG9/69ebbtiZ8W3ScOZF/OmhvM4Rg==}
+
+  '@replit/revenuecat-sdk@4.1.0':
+    resolution: {integrity: sha512-l3fBsTaGBJNIl9dMxwHEe4AD92J34rBKLeTsKllb8pgi/P5KoORBeB/sbNAGLcJNl6Z10qKckJvI9WdsNOWnTw==}
+    peerDependencies:
+      typescript: ^5
 
   '@replit/vite-plugin-cartographer@0.5.0':
     resolution: {integrity: sha512-U1LKR78LU0F/nQFRVzaFSH2tX189oFUNsut25KQh24bFN0N9OJEkrCMiJfMBtLXGabjUX4aw2OWJ0u8TjBlxkg==}
@@ -5164,6 +5176,7 @@ packages:
 
   replit-revenuecat-v2@2.0.2:
     resolution: {integrity: sha512-DUOiF+uuyaO8qkQoSyt+1KybhDEr++DVg9ndkH+vmAVSL0BwpyladioZXTVeyD4k6lmdMsBUwg+Sf/L22RvOEw==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
     peerDependencies:
       typescript: ^5
 
@@ -8185,6 +8198,10 @@ snapshots:
   '@react-navigation/routers@7.5.3':
     dependencies:
       nanoid: 3.3.11
+
+  '@replit/revenuecat-sdk@4.1.0(typescript@5.9.3)':
+    dependencies:
+      typescript: 5.9.3
 
   '@replit/vite-plugin-cartographer@0.5.0':
     dependencies:

@@ -11,6 +11,7 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { api, ApiTransaction, UpiInitResult } from "@/lib/api";
+import { useSubscription } from "@/lib/revenuecat";
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 type PayMethod = "gpay" | "phonepe" | "paytm" | "upi";
@@ -90,11 +91,12 @@ function txIcon(type: string) {
 
 export default function WalletScreen() {
   const { state: authState, refreshBalance } = useAuth();
+  const { offerings, purchase, isPurchasing } = useSubscription();
   const insets = useSafeAreaInsets();
 
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
-  const [tab,          setTab]          = useState<"deposit" | "withdraw" | "history">("deposit");
+  const [tab,          setTab]          = useState<"buy" | "deposit" | "withdraw" | "history">("buy");
   const [loading,      setLoading]      = useState(false);
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
@@ -318,14 +320,70 @@ export default function WalletScreen() {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {(["deposit", "withdraw", "history"] as const).map(t => (
+          {(["buy", "deposit", "withdraw", "history"] as const).map(t => (
             <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === "deposit" ? "Deposit" : t === "withdraw" ? "Withdraw" : "History"}
+                {t === "buy" ? "🪙 Coins" : t === "deposit" ? "UPI" : t === "withdraw" ? "Withdraw" : "History"}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* BUY COINS (RevenueCat) */}
+        {tab === "buy" && (
+          <View>
+            <Text style={styles.sectionTitle}>BUY CHIPS</Text>
+            <Text style={[styles.sectionTitle, { fontSize: 11, color: C.textMuted, marginTop: -8, marginBottom: 12 }]}>
+              Instant credit · Secure · No UPI needed
+            </Text>
+            {!offerings?.current ? (
+              <View style={{ alignItems: "center", padding: 40 }}>
+                <Text style={{ fontSize: 32, marginBottom: 12 }}>🪙</Text>
+                <Text style={{ color: C.textMuted, fontSize: 13, textAlign: "center" }}>
+                  Loading packages…
+                </Text>
+              </View>
+            ) : (
+              offerings.current.availablePackages.map((pkg) => {
+                const product = pkg.product;
+                const isPopular = pkg.packageType === "MONTHLY" || offerings.current!.availablePackages.indexOf(pkg) === 1;
+                return (
+                  <TouchableOpacity
+                    key={pkg.identifier}
+                    style={[styles.coinPkg, isPopular && styles.coinPkgPopular]}
+                    onPress={() => purchase(pkg)}
+                    disabled={isPurchasing}
+                    activeOpacity={0.85}
+                  >
+                    {isPopular && (
+                      <View style={styles.coinPopularBadge}>
+                        <Text style={styles.coinPopularText}>BEST VALUE</Text>
+                      </View>
+                    )}
+                    <View style={styles.coinPkgLeft}>
+                      <Text style={styles.coinPkgIcon}>🪙</Text>
+                      <View>
+                        <Text style={styles.coinPkgName}>{product.title}</Text>
+                        <Text style={styles.coinPkgDesc}>{product.description}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.coinPkgRight}>
+                      <Text style={styles.coinPkgPrice}>{product.priceString}</Text>
+                      {isPurchasing && <ActivityIndicator size="small" color={C.gold} style={{ marginTop: 4 }} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+
+            <View style={[styles.infoBox, { marginTop: 16 }]}>
+              <Ionicons name="shield-checkmark" size={14} color={C.green} />
+              <Text style={styles.infoText}>
+                Purchases are processed securely via the app store. Coins are credited instantly to your game wallet.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* DEPOSIT */}
         {tab === "deposit" && (
@@ -794,4 +852,14 @@ const styles = StyleSheet.create({
   txRight: { alignItems: "flex-end" },
   txAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
   txDate: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, marginTop: 2 },
+  coinPkg: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.08)", padding: 16, marginBottom: 10, position: "relative" },
+  coinPkgPopular: { borderColor: C.gold, backgroundColor: "rgba(255,215,0,0.06)" },
+  coinPopularBadge: { position: "absolute", top: -10, right: 12, backgroundColor: C.gold, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  coinPopularText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#000", letterSpacing: 1 },
+  coinPkgLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  coinPkgIcon: { fontSize: 30 },
+  coinPkgName: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 2 },
+  coinPkgDesc: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted },
+  coinPkgRight: { alignItems: "flex-end" },
+  coinPkgPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.gold },
 });

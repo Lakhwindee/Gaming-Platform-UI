@@ -29,13 +29,16 @@ function calcMult(elapsed: number): number {
   return Math.floor(Math.pow(Math.E, 0.077 * elapsed) * 100) / 100;
 }
 function getPos(elapsed: number): { x: number; y: number } {
-  const MAX_T = 40;
-  const t = Math.min(elapsed / MAX_T, 1);
-  // x accelerates (like Aviator: starts slow, curves right)
-  const x = ORIG_X + t * t * (CV_W * 0.88 - ORIG_X);
-  // y decelerates (fast rise early, slows as it goes right)
-  const y = ORIG_Y - Math.sqrt(t) * (CV_H * 0.76);
-  return { x, y: Math.max(y, 22) };
+  const norm = Math.min(elapsed / 52, 1);
+  // Aviator-style: rocket goes UP first (fast vertical rise), then curves RIGHT (slow → fast horizontal)
+  const xProg = Math.pow(norm, 3.2);                               // cubic: barely moves right at start
+  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35); // sub-linear: fast rise, then flattens
+  const maxX = CV_W * 0.91 - ORIG_X;
+  const maxY = ORIG_Y - CV_H * 0.05;
+  return {
+    x: ORIG_X + maxX * xProg,
+    y: Math.max(CV_H * 0.04, ORIG_Y - maxY * yProg),
+  };
 }
 
 const STARS = Array.from({ length: 80 }, (_, i) => ({

@@ -97,6 +97,12 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const { state, addHistory, addNotification } = useGame();
   const [, setTick] = useState(0);
   const [betsTab, setBetsTab] = useState<BetsTab>('all');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const [slot1, setSlot1] = useState<SlotState>(mkSlot(100));
   const [slot2, setSlot2] = useState<SlotState>(mkSlot(200));
@@ -669,17 +675,14 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       </div>
   );
 
-  const canvasEl = (
-    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
-      <canvas ref={canvasRef} width={480} height={260} style={{ width: '100%', height: 'auto', display: 'block' }} />
-    </div>
-  );
-
+  // ── Mobile layout ──
   if (isMobile) {
     return (
       <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', paddingBottom: '20px', boxSizing: 'border-box' }}>
         {historyStrip}
-        <div style={{ margin: '0 12px' }}>{canvasEl}</div>
+        <div style={{ margin: '0 12px', borderRadius: '16px', overflow: 'hidden' }}>
+          <canvas ref={canvasRef} width={480} height={280} style={{ width: '100%', height: 'auto', display: 'block' }} />
+        </div>
         <div style={{ display: 'flex', gap: '8px', padding: '12px', boxSizing: 'border-box' }}>
           <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
           <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
@@ -689,24 +692,25 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     );
   }
 
-  // ── Desktop layout (Aviator-style wide) ──
+  // ── Desktop layout (Aviator-style) ──
+  // Canvas full-width on top, bet panels side-by-side below, bets table below that
   return (
-    <div style={{ width: '100%', padding: '0 20px 20px', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto', padding: '0 16px 24px', boxSizing: 'border-box' }}>
       {historyStrip}
-      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
 
-        {/* Left: Canvas + Bets Table */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {canvasEl}
-          {betsSection}
-        </div>
-
-        {/* Right: Bet Panels stacked */}
-        <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {renderBetPanel(0)}
-          {renderBetPanel(1)}
-        </div>
+      {/* Canvas — full width */}
+      <div style={{ borderRadius: '18px', overflow: 'hidden', marginBottom: '14px' }}>
+        <canvas ref={canvasRef} width={1000} height={460} style={{ width: '100%', height: 'auto', display: 'block' }} />
       </div>
+
+      {/* Bet Panels — side by side */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+        <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
+        <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
+      </div>
+
+      {/* Bets table */}
+      {betsSection}
     </div>
   );
 }
