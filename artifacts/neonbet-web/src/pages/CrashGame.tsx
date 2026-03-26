@@ -193,12 +193,13 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
-    const W = canvas.width, H = canvas.height;
-    const ORIG_X = W * 0.09, ORIG_Y = H * 0.88;
     const EXP_COLORS = ['#FF8800', '#FF4400', '#FFCC00', '#FF2200', '#FFE080', '#FFFFFF'];
     const RAY_COLORS = ['#FFFFFF', '#FFD700', '#FF6B00', '#FF3A3A', '#FFB800', '#FF9500', '#FFEE80', '#FF5500', '#FFD000', '#FFAAAA'];
 
     function draw() {
+      const W = canvas.width, H = canvas.height;
+      if (!W || !H) { animRef.current = requestAnimationFrame(draw); return; }
+      const ORIG_X = W * 0.09, ORIG_Y = H * 0.88;
       ctx.clearRect(0, 0, W, H);
       const now = Date.now();
       const t = now / 1000;
@@ -207,7 +208,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const isCrashed = phase === 'crashed';
       const isWaiting = phase === 'waiting';
 
-      const elapsed = isFlying ? (now - startTime) / 1000 : lastElRef.current;
+      const rawElapsed = isFlying && startTime > 0 ? (now - startTime) / 1000 : 0;
+      const elapsed = isFlying ? Math.max(0, rawElapsed) : lastElRef.current;
       if (isFlying) { lastElRef.current = elapsed; crashPosRef.current = getPos(elapsed, m, W, H); }
       if (isWaiting) { lastElRef.current = 0; smoothAngRef.current = -0.22; }
 
