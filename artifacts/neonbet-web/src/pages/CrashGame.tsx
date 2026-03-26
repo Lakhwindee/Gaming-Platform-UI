@@ -16,11 +16,17 @@ const STARS = Array.from({ length: 180 }, () => ({
 function calcMult(t: number) { return Math.max(1, Math.pow(1.0006, t * 1000) * (1 + t * 0.012)); }
 
 function getPos(t: number, _m: number, W: number, H: number) {
-  const origX = W * 0.09, origY = H * 0.88;
-  const maxX = W * 0.90 - origX, maxY = origY - H * 0.08;
-  const prog = Math.min(1, t / 60);
-  const eased = 1 - Math.pow(1 - prog, 2.6);
-  return { x: origX + eased * maxX, y: origY - eased * maxY };
+  const origX = W * 0.07, origY = H * 0.88;
+  const maxX = W * 0.91 - origX;
+  const maxY = origY - H * 0.05;
+  const norm = Math.min(1, t / 52);
+  // Aviator-style: starts VERTICAL (goes up first), curves to HORIZONTAL (right later)
+  const xProg = Math.pow(norm, 3.2);                              // x: slow start, accelerates
+  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35); // y: fast rise, then flattens
+  return {
+    x: origX + maxX * xProg,
+    y: Math.max(H * 0.04, origY - maxY * yProg),
+  };
 }
 
 function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, t: number, crashed: boolean, waiting: boolean) {
@@ -91,12 +97,6 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const { state, addHistory, addNotification } = useGame();
   const [, setTick] = useState(0);
   const [betsTab, setBetsTab] = useState<BetsTab>('all');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   const [slot1, setSlot1] = useState<SlotState>(mkSlot(100));
   const [slot2, setSlot2] = useState<SlotState>(mkSlot(200));
