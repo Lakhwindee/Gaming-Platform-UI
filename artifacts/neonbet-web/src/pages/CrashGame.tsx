@@ -410,138 +410,205 @@ export default function CrashGame() {
     wsSend({ type: 'cashout' });
   }
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const { phase, mult: m, countdown, history, bots } = WSC.state;
   const displayHistory = history.length > 0 ? history : HISTORY_ITEMS;
   const multColor = phase === 'crashed' ? 'var(--neon-red)' : m >= 5 ? 'var(--neon-green)' : m >= 2 ? 'var(--neon-gold)' : 'var(--neon-blue)';
 
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px', animation: 'slideIn 0.3s ease' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <h1 style={{ fontWeight: 900, fontSize: '22px', color: 'var(--primary)' }}>🚀 BLAZE CRASH</h1>
-        {WSC.state.connected && <span style={{ background: 'rgba(0,204,102,0.12)', color: 'var(--neon-green)', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, border: '1px solid rgba(0,204,102,0.25)' }}>● LIVE</span>}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {displayHistory.slice(0, 12).map((v, i) => (
-            <div key={i} style={{ background: v <= 1.5 ? 'var(--neon-red)20' : v >= 10 ? 'var(--neon-gold)20' : 'var(--neon-green)20', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
-          ))}
-        </div>
+  const BetControls = () => (
+    <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: isMobile ? '16px' : '24px' }}>
+      {!isMobile && <h3 style={{ fontWeight: 700, marginBottom: '20px', fontSize: '16px' }}>🎯 Place Bet</h3>}
+
+      <label style={{ display: 'block', color: 'var(--text3)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', letterSpacing: '1px' }}>BET AMOUNT</label>
+      <input type="number" value={betAmount}
+        onChange={e => { const v = Number(e.target.value); setBetAmount(v); betRef.current = v; betAmtRef.current = v; }}
+        disabled={phase !== 'waiting'}
+        style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '11px 14px', color: 'var(--text)', fontSize: '16px', fontWeight: 700, marginBottom: '8px' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginBottom: '14px' }}>
+        {[100, 250, 500, 1000].map(v => (
+          <button key={v} onClick={() => { setBetAmount(v); betRef.current = v; betAmtRef.current = v; }} disabled={phase !== 'waiting'}
+            style={{ background: betAmount === v ? 'var(--primary)22' : 'var(--bg3)', border: `1px solid ${betAmount === v ? 'var(--primary)' : 'var(--border)'}`, color: betAmount === v ? 'var(--primary)' : 'var(--text2)', borderRadius: '8px', padding: '8px 4px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{v}</button>
+        ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
-        {/* Canvas */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: '#04000C', borderRadius: 'var(--radius-lg)', border: '1px solid #2A0A20', overflow: 'hidden' }}>
-            <canvas ref={canvasRef} width={720} height={380} style={{ width: '100%', display: 'block' }} />
+      <label style={{ display: 'block', color: 'var(--text3)', fontSize: '11px', fontWeight: 700, marginBottom: '6px', letterSpacing: '1px' }}>AUTO CASHOUT</label>
+      <input type="number" value={autoCashout} step="0.1" min="1.1"
+        onChange={e => setAutoCashout(Number(e.target.value))}
+        style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '11px 14px', color: 'var(--text)', fontSize: '15px', fontWeight: 700, marginBottom: '16px' }} />
+
+      {!hasActiveBet ? (
+        <button onClick={placeBet} disabled={phase !== 'waiting'}
+          style={{ width: '100%', background: phase === 'waiting' ? 'linear-gradient(135deg,var(--primary),#FF7050)' : 'var(--bg3)', color: phase === 'waiting' ? '#fff' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '15px', fontWeight: 800, fontSize: '16px', cursor: phase === 'waiting' ? 'pointer' : 'not-allowed', letterSpacing: '0.3px' }}>
+          {phase === 'waiting' ? `🚀 Launch ₹${betAmount.toLocaleString()}` : phase === 'flying' ? '⏳ Round in progress…' : '💥 Wait for next round…'}
+        </button>
+      ) : (
+        <button onClick={cashOut} disabled={phase !== 'flying' || !!cashedOutAt}
+          style={{ width: '100%', background: !cashedOutAt && phase === 'flying' ? 'var(--neon-green)' : 'var(--bg3)', color: !cashedOutAt && phase === 'flying' ? '#000' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '15px', fontWeight: 800, fontSize: '16px', cursor: !cashedOutAt && phase === 'flying' ? 'pointer' : 'not-allowed' }}>
+          {cashedOutAt ? `✅ Exited at ${cashedOutAt.toFixed(2)}x` : `🪂 Eject! ₹${Math.floor(betAmount * m).toLocaleString()}`}
+        </button>
+      )}
+
+      {phase === 'flying' && (
+        <div style={{ marginTop: '12px', padding: '12px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: `1px solid ${multColor}40` }}>
+          <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>ALTITUDE</div>
+          <div style={{ fontSize: '32px', fontWeight: 900, color: multColor, lineHeight: 1 }}>{m.toFixed(2)}x</div>
+          {hasActiveBet && !cashedOutAt && <div style={{ color: 'var(--neon-green)', fontSize: '13px', fontWeight: 700, marginTop: '4px' }}>→ ₹{Math.floor(betAmount * m).toLocaleString()}</div>}
+        </div>
+      )}
+      {phase === 'waiting' && (
+        <div style={{ marginTop: '12px', padding: '12px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: '1px solid var(--primary)30' }}>
+          <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>NEXT ROUND</div>
+          <div style={{ fontSize: '32px', fontWeight: 900, color: 'var(--primary)', lineHeight: 1 }}>{countdown}s</div>
+        </div>
+      )}
+
+      {state.user ? (
+        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '10px', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: 'var(--text3)', fontSize: '12px' }}>Balance</span>
+          <span style={{ fontWeight: 800, color: 'var(--neon-gold)', fontSize: '15px' }}>₹{state.user.balance.toLocaleString('en-IN')}</span>
+        </div>
+      ) : (
+        <button onClick={() => navigate('profile')}
+          style={{ marginTop: '10px', width: '100%', background: 'rgba(255,58,58,0.08)', border: '1px solid rgba(255,58,58,0.25)', borderRadius: '10px', padding: '11px', color: 'var(--primary)', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>
+          🔐 Login to bet with real balance
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ padding: isMobile ? '0' : '24px', maxWidth: '1200px', margin: '0 auto', animation: 'slideIn 0.3s ease' }}>
+
+      {/* History strip */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: isMobile ? '10px 12px' : '0 0 16px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        {!isMobile && <span style={{ fontWeight: 900, fontSize: '18px', color: 'var(--primary)', whiteSpace: 'nowrap' }}>🚀 BLAZE</span>}
+        {!isMobile && WSC.state.connected && <span style={{ background: 'rgba(0,204,102,0.12)', color: 'var(--neon-green)', borderRadius: '20px', padding: '3px 10px', fontSize: '11px', fontWeight: 700, border: '1px solid rgba(0,204,102,0.25)', whiteSpace: 'nowrap' }}>● LIVE</span>}
+        {displayHistory.slice(0, isMobile ? 10 : 14).map((v, i) => (
+          <div key={i} style={{ flexShrink: 0, background: v <= 1.5 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,215,0,0.15)' : 'rgba(0,204,102,0.12)', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
+        ))}
+      </div>
+
+      {isMobile ? (
+        /* ─── MOBILE LAYOUT ─── */
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Canvas */}
+          <div style={{ background: '#04000C', borderTop: '1px solid #2A0A20', borderBottom: '1px solid #2A0A20' }}>
+            <canvas ref={canvasRef} width={720} height={400} style={{ width: '100%', display: 'block' }} />
           </div>
 
           {resultMsg && (
-            <div style={{ padding: '16px 20px', borderRadius: 'var(--radius)', background: resultMsg.win ? 'var(--neon-green)15' : 'var(--neon-red)15', border: `1px solid ${resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)'}40`, color: resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)', fontWeight: 700, fontSize: '18px', textAlign: 'center', animation: 'scaleIn 0.3s ease' }}>
-              {resultMsg.win ? '✅' : '✈️💨'} {resultMsg.text}
+            <div style={{ margin: '0 12px 0', padding: '12px 16px', borderRadius: '0 0 var(--radius) var(--radius)', background: resultMsg.win ? 'rgba(0,204,102,0.12)' : 'rgba(255,58,58,0.12)', border: `1px solid ${resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)'}40`, color: resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)', fontWeight: 700, fontSize: '16px', textAlign: 'center' }}>
+              {resultMsg.win ? '✅' : '💥'} {resultMsg.text}
             </div>
           )}
 
-          {/* Live Bets */}
-          <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 700, fontSize: '14px' }}>👥 Live Bets</span>
-              <span style={{ color: 'var(--text3)', fontSize: '13px' }}>{bots.length + (hasActiveBet ? 1 : 0)} players</span>
+          {/* Bet Panel */}
+          <div style={{ padding: '12px' }}>
+            <BetControls />
+          </div>
+
+          {/* Live Bets compact */}
+          <div style={{ margin: '0 12px 12px', background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: '13px' }}>👥 Live Bets</span>
+              <span style={{ color: 'var(--text3)', fontSize: '12px' }}>{bots.length + (hasActiveBet ? 1 : 0)} players</span>
             </div>
-            <div style={{ maxHeight: '140px', overflowY: 'auto' }}>
+            <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
               {hasActiveBet && (
-                <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--neon-blue)08' }}>
+                <div style={{ padding: '9px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 700, fontSize: '13px' }}>{state.user?.username ?? 'You'}</span>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cashedOutAt ? 'var(--neon-green)' : 'var(--neon-blue)', animation: 'pulse 1.5s infinite' }} />
-                    <span style={{ fontWeight: 700, fontSize: '14px' }}>{state.user?.username ?? 'You'}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text2)', fontSize: '13px' }}>₹{betAmount.toLocaleString()}</span>
-                    {cashedOutAt ? <span style={{ color: 'var(--neon-green)', fontWeight: 700 }}>✅ {cashedOutAt.toFixed(2)}x</span>
-                      : <span style={{ color: 'var(--neon-blue)', fontSize: '12px' }}>In flight…</span>}
+                    <span style={{ color: 'var(--text2)', fontSize: '12px' }}>₹{betAmount.toLocaleString()}</span>
+                    {cashedOutAt ? <span style={{ color: 'var(--neon-green)', fontWeight: 700, fontSize: '12px' }}>✅ {cashedOutAt.toFixed(2)}x</span>
+                      : <span style={{ color: 'var(--neon-blue)', fontSize: '11px' }}>Flying…</span>}
                   </div>
                 </div>
               )}
-              {bots.map((b, i) => (
-                <div key={i} style={{ padding: '10px 18px', borderBottom: i < bots.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: b.status === 'crashed' ? 'var(--neon-red)' : b.status === 'cashed' ? 'var(--neon-green)' : 'var(--neon-blue)', animation: b.status === 'active' ? 'pulse 1.5s infinite' : 'none' }} />
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>{b.user}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text2)', fontSize: '13px' }}>₹{b.amount.toLocaleString()}</span>
-                    {b.status === 'cashed'  && <span style={{ color: 'var(--neon-green)', fontWeight: 700, fontSize: '13px' }}>✈️ {b.cashout?.toFixed(2)}x</span>}
-                    {b.status === 'crashed' && <span style={{ color: 'var(--neon-red)', fontWeight: 700, fontSize: '13px' }}>💥 Lost</span>}
-                    {b.status === 'active'  && <span style={{ color: 'var(--neon-blue)', fontSize: '12px' }}>Flying…</span>}
+              {bots.slice(0, 5).map((b, i) => (
+                <div key={i} style={{ padding: '9px 16px', borderBottom: i < 4 ? '1px solid var(--border)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px' }}>{b.user}</span>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text2)', fontSize: '12px' }}>₹{b.amount.toLocaleString()}</span>
+                    {b.status === 'cashed'  && <span style={{ color: 'var(--neon-green)', fontWeight: 700, fontSize: '12px' }}>✅ {b.cashout?.toFixed(2)}x</span>}
+                    {b.status === 'crashed' && <span style={{ color: 'var(--neon-red)', fontWeight: 700, fontSize: '12px' }}>💥</span>}
                   </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
-
-        {/* Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '24px' }}>
-            <h3 style={{ fontWeight: 700, marginBottom: '20px', fontSize: '16px' }}>🎯 Place Bet</h3>
-
-            <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>BET AMOUNT</label>
-            <input type="number" value={betAmount} onChange={e => { setBetAmount(Number(e.target.value)); betRef.current = Number(e.target.value); betAmtRef.current = Number(e.target.value); }} disabled={phase !== 'waiting'} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '16px', fontWeight: 700, marginBottom: '8px' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '6px', marginBottom: '16px' }}>
-              {[100, 250, 500, 1000].map(v => (
-                <button key={v} onClick={() => { setBetAmount(v); betRef.current = v; betAmtRef.current = v; }} disabled={phase !== 'waiting'} style={{ background: betAmount === v ? 'var(--neon-blue)20' : 'var(--bg3)', border: `1px solid ${betAmount === v ? 'var(--neon-blue)' : 'var(--border)'}`, color: betAmount === v ? 'var(--neon-blue)' : 'var(--text2)', borderRadius: '8px', padding: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>{v}</button>
-              ))}
+      ) : (
+        /* ─── DESKTOP LAYOUT ─── */
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px' }}>
+          {/* Left: Canvas + Live Bets */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: '#04000C', borderRadius: 'var(--radius-lg)', border: '1px solid #2A0A20', overflow: 'hidden' }}>
+              <canvas ref={canvasRef} width={720} height={380} style={{ width: '100%', display: 'block' }} />
             </div>
 
-            <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>AUTO CASHOUT</label>
-            <input type="number" value={autoCashout} step="0.1" min="1.1" onChange={e => setAutoCashout(Number(e.target.value))} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '12px 14px', color: 'var(--text)', fontSize: '15px', fontWeight: 700, marginBottom: '20px' }} />
-
-            {!hasActiveBet ? (
-              <button onClick={placeBet} disabled={phase !== 'waiting'} style={{ width: '100%', background: phase === 'waiting' ? 'linear-gradient(135deg,#1060E0,#4490FF)' : 'var(--bg3)', color: phase === 'waiting' ? '#fff' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '16px', fontWeight: 800, fontSize: '16px', cursor: phase === 'waiting' ? 'pointer' : 'not-allowed' }}>
-                {phase === 'waiting' ? `✈️ Board — ₹${betAmount.toLocaleString()}` : phase === 'flying' ? '🛫 Round in progress…' : '💥 Crashed — wait…'}
-              </button>
-            ) : (
-              <button onClick={cashOut} disabled={phase !== 'flying' || !!cashedOutAt} style={{ width: '100%', background: !cashedOutAt && phase === 'flying' ? 'var(--neon-green)' : 'var(--bg3)', color: !cashedOutAt && phase === 'flying' ? '#000' : 'var(--text2)', border: 'none', borderRadius: 'var(--radius)', padding: '16px', fontWeight: 800, fontSize: '16px', cursor: !cashedOutAt && phase === 'flying' ? 'pointer' : 'not-allowed', animation: !cashedOutAt && phase === 'flying' ? 'neonPulse 1.5s infinite' : 'none' }}>
-                {cashedOutAt ? `✅ Exited at ${cashedOutAt.toFixed(2)}x` : `🪂 Eject! ₹${Math.floor(betAmount * m).toLocaleString()}`}
-              </button>
-            )}
-
-            {phase === 'flying' && (
-              <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: `1px solid ${multColor}40` }}>
-                <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>ALTITUDE</div>
-                <div style={{ fontSize: '36px', fontWeight: 900, color: multColor, textShadow: `0 0 20px ${multColor}`, lineHeight: 1 }}>{m.toFixed(2)}x</div>
-                {hasActiveBet && !cashedOutAt && <div style={{ color: 'var(--neon-green)', fontSize: '14px', fontWeight: 700, marginTop: '6px' }}>→ ₹{Math.floor(betAmount * m).toLocaleString()}</div>}
+            {resultMsg && (
+              <div style={{ padding: '14px 20px', borderRadius: 'var(--radius)', background: resultMsg.win ? 'rgba(0,204,102,0.12)' : 'rgba(255,58,58,0.12)', border: `1px solid ${resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)'}40`, color: resultMsg.win ? 'var(--neon-green)' : 'var(--neon-red)', fontWeight: 700, fontSize: '18px', textAlign: 'center', animation: 'scaleIn 0.3s ease' }}>
+                {resultMsg.win ? '✅' : '💥'} {resultMsg.text}
               </div>
             )}
 
-            {phase === 'waiting' && (
-              <div style={{ marginTop: '14px', padding: '14px', borderRadius: '12px', textAlign: 'center', background: 'var(--bg3)', border: '1px solid var(--neon-blue)30' }}>
-                <div style={{ color: 'var(--text3)', fontSize: '11px', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>NEXT FLIGHT</div>
-                <div style={{ fontSize: '36px', fontWeight: 900, color: 'var(--neon-blue)', lineHeight: 1 }}>{countdown}s</div>
+            <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '14px' }}>👥 Live Bets</span>
+                <span style={{ color: 'var(--text3)', fontSize: '13px' }}>{bots.length + (hasActiveBet ? 1 : 0)} players</span>
               </div>
-            )}
-
-            {state.user ? (
-              <div style={{ marginTop: '12px', padding: '12px', borderRadius: '10px', background: 'var(--bg3)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text2)', fontSize: '13px' }}>Balance</span>
-                <span style={{ fontWeight: 700, color: 'var(--neon-gold)', fontSize: '14px' }}>₹{state.user.balance.toLocaleString()}</span>
+              <div style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                {hasActiveBet && (
+                  <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(77,166,255,0.04)' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: cashedOutAt ? 'var(--neon-green)' : 'var(--neon-blue)', animation: 'pulse 1.5s infinite' }} />
+                      <span style={{ fontWeight: 700, fontSize: '14px' }}>{state.user?.username ?? 'You'}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text2)', fontSize: '13px' }}>₹{betAmount.toLocaleString()}</span>
+                      {cashedOutAt ? <span style={{ color: 'var(--neon-green)', fontWeight: 700 }}>✅ {cashedOutAt.toFixed(2)}x</span>
+                        : <span style={{ color: 'var(--neon-blue)', fontSize: '12px' }}>In flight…</span>}
+                    </div>
+                  </div>
+                )}
+                {bots.map((b, i) => (
+                  <div key={i} style={{ padding: '10px 18px', borderBottom: i < bots.length - 1 ? '1px solid var(--border)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: b.status === 'crashed' ? 'var(--neon-red)' : b.status === 'cashed' ? 'var(--neon-green)' : 'var(--neon-blue)', animation: b.status === 'active' ? 'pulse 1.5s infinite' : 'none' }} />
+                      <span style={{ fontWeight: 600, fontSize: '14px' }}>{b.user}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text2)', fontSize: '13px' }}>₹{b.amount.toLocaleString()}</span>
+                      {b.status === 'cashed'  && <span style={{ color: 'var(--neon-green)', fontWeight: 700, fontSize: '13px' }}>✅ {b.cashout?.toFixed(2)}x</span>}
+                      {b.status === 'crashed' && <span style={{ color: 'var(--neon-red)', fontWeight: 700, fontSize: '13px' }}>💥 Lost</span>}
+                      {b.status === 'active'  && <span style={{ color: 'var(--neon-blue)', fontSize: '12px' }}>Flying…</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <button onClick={() => navigate('profile')} style={{ marginTop: '12px', width: '100%', background: 'var(--neon-purple)20', border: '1px solid var(--neon-purple)40', borderRadius: '10px', padding: '12px', color: 'var(--neon-purple)', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>
-                🔐 Login to bet with real balance
-              </button>
-            )}
+            </div>
           </div>
 
-          {/* History */}
-          <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '20px' }}>
-            <h3 style={{ fontWeight: 700, marginBottom: '14px', fontSize: '14px' }}>🏁 Flight History</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {displayHistory.map((v, i) => (
-                <div key={i} style={{ background: v <= 1.5 ? 'var(--neon-red)15' : v >= 10 ? 'var(--neon-gold)15' : 'var(--neon-green)15', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
-              ))}
+          {/* Right: Controls + History */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <BetControls />
+            <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: '18px' }}>
+              <h3 style={{ fontWeight: 700, marginBottom: '12px', fontSize: '13px', color: 'var(--text3)', letterSpacing: '1px' }}>🏁 HISTORY</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {displayHistory.map((v, i) => (
+                  <div key={i} style={{ background: v <= 1.5 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,215,0,0.15)' : 'rgba(0,204,102,0.12)', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
