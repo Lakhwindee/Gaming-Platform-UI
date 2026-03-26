@@ -251,36 +251,22 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
 
       if (isFlying || isCrashed) {
         const drawEl = elapsed; const N = 90;
-        ctx.shadowColor = '#FF5500'; ctx.shadowBlur = 20;
-        ctx.strokeStyle = 'rgba(255,80,0,0.3)'; ctx.lineWidth = 10;
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        // Outer glow (matches expo: rgba(255,107,0,0.25) strokeWidth 8)
+        ctx.strokeStyle = 'rgba(255,107,0,0.25)'; ctx.lineWidth = 8;
         ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
         for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
         ctx.stroke();
-        ctx.shadowBlur = 8; ctx.strokeStyle = 'rgba(255,140,20,0.65)'; ctx.lineWidth = 4;
+        // Mid stroke (matches expo: rgba(255,107,0,0.5) strokeWidth 3)
+        ctx.strokeStyle = 'rgba(255,107,0,0.5)'; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
         for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
         ctx.stroke();
-        ctx.shadowBlur = 3; ctx.strokeStyle = '#FFCC44'; ctx.lineWidth = 2;
+        // Inner gold line (matches expo: #FFD700 strokeWidth 1.5)
+        ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
         for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
-        ctx.stroke(); ctx.shadowBlur = 0;
-        ctx.fillStyle = '#FFCC44'; ctx.shadowColor = '#FF8800'; ctx.shadowBlur = 10;
-        ctx.beginPath(); ctx.arc(ORIG_X, ORIG_Y, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
-        const curPt = getPos(drawEl, m, W, H);
-        ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = 1;
-        ctx.setLineDash([4, 8]);
-        ctx.font = 'bold 11px Inter,sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-        [2, 5, 10, 25].forEach(mv => {
-          if (m >= mv) {
-            let gt = 0;
-            for (let ss = 0; ss < 400; ss++) { if (calcMult(ss * 0.1) >= mv) { gt = ss * 0.1; break; } }
-            const gp = getPos(gt, mv, W, H);
-            ctx.beginPath(); ctx.moveTo(ORIG_X, gp.y); ctx.lineTo(curPt.x + 8, gp.y); ctx.stroke();
-            ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(`${mv}x`, ORIG_X - 4, gp.y);
-          }
-        });
-        ctx.setLineDash([]);
+        ctx.stroke();
       }
 
       const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X + 12, y: ORIG_Y - 18 };
@@ -330,18 +316,21 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         ctx.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42);
         if (isCrashed) {
           ctx.shadowBlur = 0;
-          ctx.fillStyle = '#FF4500';
-          ctx.font = 'bold 20px Inter,sans-serif';
-          ctx.fillText('BLAST!', W / 2, H * 0.42 + 50);
+          ctx.fillStyle = '#FF6B00';
+          ctx.font = 'bold 22px Inter,sans-serif';
+          ctx.fillText('💥  BLAST!', W / 2, H * 0.42 + 54);
         }
         ctx.shadowBlur = 0; ctx.restore();
       } else if (isWaiting) {
         const cd = WSC.state.countdown;
         ctx.save();
-        ctx.font = 'bold 18px Inter,sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.fillText(cd > 0 ? `Starting in ${cd.toFixed(0)}s` : 'Starting...', W / 2, H * 0.42);
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.font = 'bold 13px Inter,sans-serif';
+        ctx.fillText('NEXT ROUND IN', W / 2, H * 0.38);
+        ctx.fillStyle = 'rgba(200,180,210,0.75)';
+        ctx.font = 'bold 40px Inter,sans-serif';
+        ctx.fillText(cd > 0 ? `${cd.toFixed(0)}s` : '...', W / 2, H * 0.48);
         ctx.restore();
       }
 
