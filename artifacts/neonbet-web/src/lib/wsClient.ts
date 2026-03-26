@@ -1,10 +1,21 @@
 export type Phase = 'waiting' | 'flying' | 'crashed';
 
-export interface BotBet {
+export interface RoundBet {
   user: string;
+  avatar: number;
   amount: number;
-  status: string;
+  status: 'active' | 'cashed' | 'lost';
   cashout: number | null;
+  winAmount: number;
+}
+
+export interface TopBet {
+  user: string;
+  avatar: number;
+  amount: number;
+  mult: number;
+  win: number;
+  date: string;
 }
 
 export interface WSState {
@@ -14,8 +25,14 @@ export interface WSState {
   roundId: number;
   startTime: number;
   history: number[];
-  bots: BotBet[];
   connected: boolean;
+  synced: boolean;
+  allBets: RoundBet[];
+  betCount: number;
+  cashedCount: number;
+  totalWin: number;
+  prevRound: { result: number; bets: RoundBet[] } | null;
+  topBets: TopBet[];
 }
 
 type Listener = () => void;
@@ -23,7 +40,9 @@ type MsgListener = (msg: Record<string, unknown>) => void;
 
 const DEFAULT: WSState = {
   phase: 'waiting', mult: 1.0, countdown: 5,
-  roundId: 0, startTime: 0, history: [], bots: [], connected: false,
+  roundId: 0, startTime: 0, history: [], connected: false, synced: false,
+  allBets: [], betCount: 0, cashedCount: 0, totalWin: 0,
+  prevRound: null, topBets: [],
 };
 
 export const WSC = {

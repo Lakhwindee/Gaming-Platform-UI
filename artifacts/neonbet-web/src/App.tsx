@@ -1,58 +1,76 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import Profile from './pages/Profile';
 import AuthModal from './pages/AuthModal';
 import WalletModal from './pages/WalletModal';
 import CrashGame from './pages/CrashGame';
+import { WSC } from './lib/wsClient';
 import './index.css';
 
 type Tab = 'game' | 'wallet' | 'profile';
 
 function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { state, toggleWallet } = useGame();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const update = () => setTick(n => n + 1);
+    WSC.listeners.add(update);
+    return () => { WSC.listeners.delete(update); };
+  }, []);
+  const connected = WSC.state.connected;
   return (
     <header style={{
-      height: '56px', background: 'var(--bg2)',
+      height: '58px', background: 'var(--bg2)',
       borderBottom: '1px solid var(--border)',
-      display: 'flex', alignItems: 'center',
-      padding: '0 16px', gap: '12px',
-      position: 'sticky', top: 0, zIndex: 100,
-      flexShrink: 0,
+      display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+      alignItems: 'center', padding: '0 14px',
+      position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-        <span style={{ fontSize: '22px' }}>🚀</span>
-        <span style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '-0.5px', color: '#FF3A3A' }}>BLAZE</span>
-        <span style={{
-          fontSize: '10px', fontWeight: 700, letterSpacing: '1px',
-          color: '#00CC66', background: 'rgba(0,204,102,0.12)',
-          border: '1px solid rgba(0,204,102,0.3)',
-          borderRadius: '6px', padding: '2px 7px',
-        }}>● LIVE</span>
-      </div>
-
-      {state.user ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text3)', fontWeight: 600 }}>BALANCE</div>
-            <div style={{ fontSize: '15px', fontWeight: 900, color: 'var(--neon-gold)' }}>
+      {/* Left: Balance or Login */}
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        {state.user ? (
+          <button onClick={toggleWallet} style={{
+            background: 'rgba(255,58,58,0.12)', border: '1px solid rgba(255,58,58,0.28)',
+            borderRadius: '10px', padding: '6px 10px', cursor: 'pointer', textAlign: 'left',
+          }}>
+            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', fontWeight: 700, letterSpacing: '0.8px' }}>BALANCE</div>
+            <div style={{ fontSize: '15px', fontWeight: 900, color: '#FFD700', lineHeight: 1 }}>
               ₹{state.user.balance.toLocaleString('en-IN')}
             </div>
-          </div>
-          <button onClick={toggleWallet} style={{
+          </button>
+        ) : (
+          <button onClick={onAuthOpen} style={{
             background: 'var(--primary)', color: '#fff',
             border: 'none', borderRadius: '10px',
-            padding: '9px 18px', fontWeight: 800,
+            padding: '9px 16px', fontWeight: 800,
             fontSize: '13px', cursor: 'pointer',
-          }}>+ Add Money</button>
+          }}>Login / Register</button>
+        )}
+      </div>
+
+      {/* Center: BLAZE */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '2px', color: '#FF3A3A', fontFamily: 'Inter, sans-serif' }}>BLAZE</span>
+      </div>
+
+      {/* Right: LIVE badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          background: connected ? 'rgba(0,230,118,0.12)' : 'rgba(255,58,58,0.12)',
+          border: `1px solid ${connected ? 'rgba(0,230,118,0.3)' : 'rgba(255,58,58,0.3)'}`,
+          borderRadius: '8px', padding: '5px 10px',
+        }}>
+          <div style={{
+            width: '7px', height: '7px', borderRadius: '50%',
+            background: connected ? '#00E676' : '#FF3A3A',
+            boxShadow: connected ? '0 0 6px #00E676' : '0 0 6px #FF3A3A',
+          }} />
+          <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.8px', color: connected ? '#00E676' : '#FF5555' }}>
+            {connected ? 'LIVE' : 'OFF'}
+          </span>
         </div>
-      ) : (
-        <button onClick={onAuthOpen} style={{
-          background: 'var(--primary)', color: '#fff',
-          border: 'none', borderRadius: '10px',
-          padding: '10px 22px', fontWeight: 800,
-          fontSize: '14px', cursor: 'pointer',
-        }}>Sign In / Register</button>
-      )}
+      </div>
     </header>
   );
 }
@@ -103,23 +121,18 @@ function AppContent() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: 'var(--bg)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
       <Header onAuthOpen={() => setAuthOpen(true)} />
 
-      <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        <div style={{ display: tab === 'game' ? 'block' : 'none', height: '100%' }}>
-          <CrashGame />
-        </div>
-        {tab === 'profile' && (
-          <div style={{ height: '100%', overflowY: 'auto' }}>
-            <Profile onAuthOpen={() => setAuthOpen(true)} />
-          </div>
-        )}
+      <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        {tab === 'game'    && <CrashGame navigate={setTab as (t: string) => void} />}
+        {tab === 'wallet'  && <div style={{ padding: '20px', color: '#fff' }}>Open wallet via bottom nav</div>}
+        {tab === 'profile' && <Profile />}
       </main>
 
       <BottomNav tab={tab} setTab={setTab} onWalletOpen={handleWalletOpen} />
 
-      {authOpen  && <AuthModal onClose={() => setAuthOpen(false)} />}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       {state.walletOpen && <WalletModal />}
     </div>
   );
