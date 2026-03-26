@@ -312,6 +312,13 @@ export default function CrashGame({ onAuthOpen }: { onAuthOpen?: () => void }) {
   const { state } = useGame();
   const user = state.user;
 
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const [, setTick] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
@@ -618,50 +625,24 @@ export default function CrashGame({ onAuthOpen }: { onAuthOpen?: () => void }) {
     emptyMsg: { color: C.textMuted, fontSize: 12, textAlign: "center" as const, padding: "16px 0" } as React.CSSProperties,
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────
-  return (
-    <div style={{ flex: 1, backgroundColor: C.bg, minHeight: "100vh", fontFamily: "Inter,sans-serif", position: "relative" }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", overflowY: "auto" }}>
-        <div style={{ paddingBottom: 24 }}>
-
-          {/* ── Header — exact same as expo ── */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 10px" }}>
-            <div style={{ backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 10px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 9, fontWeight: 600, color: C.textMuted, letterSpacing: 1.5 }}>BALANCE</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.gold }}>₹{(user?.balance ?? 0).toLocaleString("en-IN")}</div>
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: C.red, letterSpacing: 4 }}>BLAZE</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 5, backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 9px", border: `1px solid ${C.border}` }}>
-              <div style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: connected ? "#00E676" : "#FF1A3A" }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted }}>{connected ? "LIVE" : "OFFLINE"}</span>
-            </div>
+  // ── Shared JSX pieces ─────────────────────────────────────────────────────
+  const historyChips = (
+    <div style={{ display: "flex", overflowX: "auto", gap: 5, marginBottom: 10, scrollbarWidth: "none" as any }}>
+      {history.map((h, i) => {
+        const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
+        const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
+        return (
+          <div key={i} style={{ flexShrink: 0, borderRadius: 8, padding: "4px 9px", backgroundColor: bg, border: `1px solid ${col}55` }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: col }}>{h.toFixed(2)}x</span>
           </div>
+        );
+      })}
+    </div>
+  );
 
-          <div style={{ padding: "0 16px" }}>
-            {/* ── History chips — exact same as expo ── */}
-            <div style={{ display: "flex", overflowX: "auto", gap: 5, marginBottom: 10, scrollbarWidth: "none" }}>
-              {history.map((h, i) => {
-                const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
-                const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
-                return (
-                  <div key={i} style={{ flexShrink: 0, borderRadius: 8, padding: "4px 9px", backgroundColor: bg, border: `1px solid ${col}55` }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: col }}>{h.toFixed(2)}x</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── Game Canvas — SVG-based, exact same as expo ── */}
-            <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
-
-            {/* ── Dual bet panels — exact same as expo ── */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-              {renderBetPanel(0)}
-              {renderBetPanel(1)}
-            </div>
-
-            {/* ── Tabbed bets panel — exact same as expo ── */}
-            <div style={{ backgroundColor: C.bgCard, borderRadius: 16, border: `1px solid ${C.border}`, padding: 14 }}>
+  // ── PLACEHOLDER so code compiles; full betsPanel below ────────────────────
+  const betsPanel = (
+    <div style={{ backgroundColor: C.bgCard, borderRadius: 16, border: `1px solid ${C.border}`, padding: 14 }}>
               {/* Tab bar */}
               <div style={{ display: "flex", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 3, marginBottom: 14 }}>
                 {(["all", "prev", "top"] as const).map(tab => (
@@ -851,24 +832,98 @@ export default function CrashGame({ onAuthOpen }: { onAuthOpen?: () => void }) {
                   )}
                 </div>
               )}
+    </div>
+  );
+
+  // ── Shared header content ─────────────────────────────────────────────────
+  const headerContent = (
+    <>
+      <div style={{ backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 10px", border: `1px solid ${C.border}` }}>
+        <div style={{ fontSize: 9, fontWeight: 600, color: C.textMuted, letterSpacing: 1.5 }}>BALANCE</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.gold }}>₹{(user?.balance ?? 0).toLocaleString("en-IN")}</div>
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: C.red, letterSpacing: 4 }}>BLAZE</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {!user && (
+          <button onClick={onAuthOpen} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 9, padding: "7px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", letterSpacing: 0.5 }}>Login</button>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 9px", border: `1px solid ${C.border}` }}>
+          <div style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: connected ? "#00E676" : "#FF1A3A" }} />
+          <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted }}>{connected ? "LIVE" : "OFFLINE"}</span>
+        </div>
+      </div>
+    </>
+  );
+
+  // ── Cashout toast ─────────────────────────────────────────────────────────
+  const toast = cashoutPopup && (
+    <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", backgroundColor: "rgba(10,5,20,0.96)", border: `1px solid rgba(0,200,83,0.3)`, borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, zIndex: 1000, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }}>
+      <span style={{ fontSize: 22 }}>🚀</span>
+      <div>
+        <div style={{ color: C.text, fontSize: 12, fontWeight: 700 }}>{cashoutPopup.mult.toFixed(2)}x  ·  WIN</div>
+        <div style={{ color: "#00C853", fontSize: 16, fontWeight: 700 }}>+₹{cashoutPopup.payout.toLocaleString("en-IN")}</div>
+      </div>
+      <div style={{ backgroundColor: "rgba(0,200,83,0.15)", borderRadius: 6, padding: "2px 6px" }}>
+        <span style={{ color: "#00C853", fontSize: 11, fontWeight: 700 }}>✓</span>
+      </div>
+    </div>
+  );
+
+  // ── MOBILE layout (< 768px) — exact expo look ────────────────────────────
+  if (!isDesktop) {
+    return (
+      <div style={{ flex: 1, backgroundColor: C.bg, minHeight: "100vh", fontFamily: "Inter,sans-serif", position: "relative" }}>
+        <div style={{ maxWidth: 480, margin: "0 auto" }}>
+          <div style={{ paddingBottom: 24 }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 10px" }}>
+              {headerContent}
+            </div>
+            <div style={{ padding: "0 16px" }}>
+              {historyChips}
+              <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {renderBetPanel(0)}
+                {renderBetPanel(1)}
+              </div>
+              {betsPanel}
             </div>
           </div>
         </div>
+        {toast}
+      </div>
+    );
+  }
+
+  // ── DESKTOP layout (≥ 768px) — 2-column wide layout ─────────────────────
+  return (
+    <div style={{ flex: 1, backgroundColor: C.bg, minHeight: "100vh", fontFamily: "Inter,sans-serif", position: "relative" }}>
+      {/* Desktop header */}
+      <div style={{ backgroundColor: C.bgCard, borderBottom: `1px solid ${C.border}`, padding: "12px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
+        {headerContent}
       </div>
 
-      {/* ── Cashout toast — same as expo ── */}
-      {cashoutPopup && (
-        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", backgroundColor: "rgba(10,5,20,0.96)", border: `1px solid rgba(0,200,83,0.3)`, borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, zIndex: 1000, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }}>
-          <span style={{ fontSize: 22 }}>🚀</span>
-          <div>
-            <div style={{ color: C.text, fontSize: 12, fontWeight: 700 }}>{cashoutPopup.mult.toFixed(2)}x  ·  WIN</div>
-            <div style={{ color: "#00C853", fontSize: 16, fontWeight: 700 }}>+₹{cashoutPopup.payout.toLocaleString("en-IN")}</div>
-          </div>
-          <div style={{ backgroundColor: "rgba(0,200,83,0.15)", borderRadius: 6, padding: "2px 6px" }}>
-            <span style={{ color: "#00C853", fontSize: 11, fontWeight: 700 }}>✓</span>
+      {/* Main 2-column layout */}
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 24px 24px", display: "flex", gap: 20, alignItems: "flex-start" }}>
+
+        {/* LEFT COLUMN — game area (62%) */}
+        <div style={{ flex: "0 0 62%", minWidth: 0 }}>
+          {historyChips}
+          <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
+          {/* Bet panels side by side */}
+          <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+            {renderBetPanel(0)}
+            {renderBetPanel(1)}
           </div>
         </div>
-      )}
+
+        {/* RIGHT COLUMN — bets (38%) */}
+        <div style={{ flex: "0 0 38%", minWidth: 0, position: "sticky", top: 80, maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
+          {betsPanel}
+        </div>
+      </div>
+
+      {toast}
     </div>
   );
 }
