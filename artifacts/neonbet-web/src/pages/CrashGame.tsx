@@ -16,13 +16,13 @@ const STARS = Array.from({ length: 180 }, () => ({
 function calcMult(t: number) { return Math.max(1, Math.pow(1.0006, t * 1000) * (1 + t * 0.012)); }
 
 function getPos(t: number, _m: number, W: number, H: number) {
-  const origX = W * 0.07, origY = H * 0.88;
+  const origX = W * 0.09, origY = H * 0.88;
   const maxX = W * 0.91 - origX;
   const maxY = origY - H * 0.05;
   const norm = Math.min(1, t / 52);
-  // Aviator-style: starts VERTICAL (goes up first), curves to HORIZONTAL (right later)
-  const xProg = Math.pow(norm, 3.2);                              // x: slow start, accelerates
-  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35); // y: fast rise, then flattens
+  // Aviator-style: UP first (fast vertical rise), then curves RIGHT (slow → fast horizontal)
+  const xProg = Math.pow(norm, 3.2);
+  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35);
   return {
     x: origX + maxX * xProg,
     y: Math.max(H * 0.04, origY - maxY * yProg),
@@ -304,7 +304,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         ctx.setLineDash([]);
       }
 
-      const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X, y: ORIG_Y };
+      const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X + 12, y: ORIG_Y - 18 };
       if (!isWaiting) {
         const dT = 0.25;
         const pA = getPos(Math.max(elapsed - dT, 0), calcMult(Math.max(elapsed - dT, 0.001)), W, H);
