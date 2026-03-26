@@ -419,7 +419,7 @@ export default function CrashGame() {
 
   const { phase, mult: m, countdown, history, bots } = WSC.state;
   const displayHistory = history.length > 0 ? history : HISTORY_ITEMS;
-  const multColor = phase === 'crashed' ? 'var(--neon-red)' : m >= 5 ? 'var(--neon-green)' : m >= 2 ? 'var(--neon-gold)' : 'var(--neon-blue)';
+  const multColor = phase === 'crashed' ? 'var(--neon-red)' : m >= 10 ? 'var(--neon-purple)' : m >= 2 ? 'var(--neon-blue)' : 'var(--neon-red)';
 
   const BetControls = () => (
     <div style={{ background: 'var(--bg2)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', padding: isMobile ? '16px' : '24px' }}>
@@ -490,7 +490,7 @@ export default function CrashGame() {
         {!isMobile && <span style={{ fontWeight: 900, fontSize: '18px', color: 'var(--primary)', whiteSpace: 'nowrap' }}>🚀 BLAZE</span>}
         {!isMobile && WSC.state.connected && <span style={{ background: 'rgba(0,204,102,0.12)', color: 'var(--neon-green)', borderRadius: '20px', padding: '3px 10px', fontSize: '11px', fontWeight: 700, border: '1px solid rgba(0,204,102,0.25)', whiteSpace: 'nowrap' }}>● LIVE</span>}
         {displayHistory.slice(0, isMobile ? 10 : 14).map((v, i) => (
-          <div key={i} style={{ flexShrink: 0, background: v <= 1.5 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,215,0,0.15)' : 'rgba(0,204,102,0.12)', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
+          <div key={i} style={{ flexShrink: 0, background: v < 2 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,77,255,0.15)' : 'rgba(77,166,255,0.15)', color: v < 2 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-purple)' : 'var(--neon-blue)', borderRadius: '8px', padding: '4px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
         ))}
       </div>
 
@@ -602,7 +602,7 @@ export default function CrashGame() {
               <h3 style={{ fontWeight: 700, marginBottom: '12px', fontSize: '13px', color: 'var(--text3)', letterSpacing: '1px' }}>🏁 HISTORY</h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {displayHistory.map((v, i) => (
-                  <div key={i} style={{ background: v <= 1.5 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,215,0,0.15)' : 'rgba(0,204,102,0.12)', color: v <= 1.5 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-gold)' : 'var(--neon-green)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
+                  <div key={i} style={{ background: v < 2 ? 'rgba(255,58,58,0.15)' : v >= 10 ? 'rgba(255,77,255,0.15)' : 'rgba(77,166,255,0.15)', color: v < 2 ? 'var(--neon-red)' : v >= 10 ? 'var(--neon-purple)' : 'var(--neon-blue)', borderRadius: '8px', padding: '5px 10px', fontSize: '12px', fontWeight: 700 }}>{v.toFixed(2)}x</div>
                 ))}
               </div>
             </div>
