@@ -61,9 +61,11 @@ function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: 
   ctx.beginPath(); ctx.roundRect(-S * 0.8, -S * 0.3, S * 1.1, S * 0.6, S * 0.14); ctx.fill();
   ctx.fillStyle = '#EE1133';
   ctx.beginPath(); ctx.rect(-S * 0.18, -S * 0.3, S * 0.22, S * 0.6); ctx.fill();
-  ctx.fillStyle = '#CC1133';
+  const noseGrd = ctx.createLinearGradient(S * 0.85, 0, S * 0.3, 0);
+  noseGrd.addColorStop(0, '#FFFFFF'); noseGrd.addColorStop(1, '#B8C0D0');
+  ctx.fillStyle = noseGrd;
   ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.3, S * 0.3); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(255,100,130,0.4)';
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
   ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.62, -S * 0.1); ctx.closePath(); ctx.fill();
   ctx.shadowColor = '#88CCFF'; ctx.shadowBlur = 8;
   ctx.fillStyle = 'rgba(80,160,255,0.35)';
@@ -246,35 +248,6 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       });
       ctx.globalAlpha = 1;
 
-      const mX = W * 0.88, mY = H * 0.09;
-      ctx.shadowColor = 'rgba(200,220,255,0.35)'; ctx.shadowBlur = 28;
-      ctx.fillStyle = '#F0F0D8';
-      ctx.beginPath(); ctx.arc(mX, mY, 24, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(200,200,190,0.45)';
-      [[mX - 7, mY - 5, 4.5], [mX + 6, mY + 7, 3.5], [mX - 3, mY + 8, 2.5]].forEach(([mx, my, mr]) => {
-        ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
-      });
-      ctx.fillStyle = 'rgba(2,8,20,0.38)';
-      ctx.beginPath(); ctx.arc(mX + 7, mY, 22, 0, Math.PI * 2); ctx.fill();
-
-      [[0.12, 0.28, 80, 0.10], [0.46, 0.20, 65, 0.07], [0.78, 0.26, 75, 0.09]].forEach(([rx, ry, rs, ra]) => {
-        ctx.globalAlpha = ra; ctx.fillStyle = '#8AAABB';
-        ctx.beginPath(); ctx.arc(rx * W, ry * H, rs, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(rx * W + 50, ry * H + 8, rs * 0.65, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(rx * W - 45, ry * H + 10, rs * 0.55, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
-      });
-
-      const cg = ctx.createLinearGradient(0, H * 0.83, 0, H);
-      cg.addColorStop(0, 'rgba(30,70,120,0)'); cg.addColorStop(1, 'rgba(40,80,140,0.28)');
-      ctx.fillStyle = cg; ctx.fillRect(0, H * 0.83, W, H * 0.17);
-      ctx.globalAlpha = 0.45;
-      for (let i = 0; i < 55; i++) {
-        ctx.fillStyle = ['#FFE080', '#FF9040', '#80C8FF', '#FFFFFF'][(i * 7) % 4];
-        ctx.fillRect((i * 137.5) % W, H * 0.87 + (i * 23.7) % (H * 0.11), 1.5, 1.5);
-      }
-      ctx.globalAlpha = 1;
 
       if (isFlying || isCrashed) {
         const drawEl = elapsed; const N = 90;
@@ -320,10 +293,11 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       }
       let angle = smoothAngRef.current;
       if (isCrashed) angle += ((now - crashTimeRef.current) / 1000) * 3.5;
-      if (isFlying) {
-        const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 26);
-        cG.addColorStop(0, 'rgba(180,210,255,0.18)'); cG.addColorStop(1, 'rgba(180,210,255,0)');
-        ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(pos.x, pos.y, 26, 0, Math.PI * 2); ctx.fill();
+      if (isFlying || isCrashed) {
+        const glowCol = canvasMultColor(m, isCrashed);
+        const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 22);
+        cG.addColorStop(0, glowCol + '26'); cG.addColorStop(1, 'transparent');
+        ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(pos.x, pos.y, 22, 0, Math.PI * 2); ctx.fill();
       }
       drawRocket(ctx, pos.x, pos.y, isWaiting ? -0.22 : angle, t, isCrashed, isWaiting);
 
@@ -687,7 +661,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     return (
       <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', paddingBottom: '20px', boxSizing: 'border-box' }}>
         {historyStrip}
-        <div style={{ margin: '0 12px', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ margin: '0 12px', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,40,40,0.18)' }}>
           <canvas ref={canvasRef} width={480} height={280} style={{ width: '100%', height: 'auto', display: 'block' }} />
         </div>
         <div style={{ display: 'flex', gap: '8px', padding: '12px', boxSizing: 'border-box' }}>
@@ -706,7 +680,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       {historyStrip}
 
       {/* Canvas — full width */}
-      <div style={{ borderRadius: '18px', overflow: 'hidden', marginBottom: '14px' }}>
+      <div style={{ borderRadius: '18px', overflow: 'hidden', marginBottom: '14px', border: '1px solid rgba(255,40,40,0.18)' }}>
         <canvas ref={canvasRef} width={1000} height={460} style={{ width: '100%', height: 'auto', display: 'block' }} />
       </div>
 

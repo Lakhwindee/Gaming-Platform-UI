@@ -27,9 +27,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.loading) return;
     const inAuth = segments[0] === "(auth)";
-    if (!state.user && !inAuth) {
-      router.replace("/(auth)/login");
-    } else if (state.user && inAuth) {
+    // Only redirect logged-in users away from auth screens; never force login
+    if (state.user && inAuth) {
       router.replace("/(tabs)");
     }
   }, [state.user, state.loading, segments]);
