@@ -90,6 +90,12 @@ interface SlotState {
 const mkSlot = (amt: number): SlotState => ({ amount: amt, input: String(amt), status: 'idle', cashedOutAt: null, result: null });
 
 function multColor(m: number) { return m >= 10 ? '#FF4DFF' : m >= 2 ? '#4DA6FF' : '#FF3A3A'; }
+function canvasMultColor(m: number, crashed: boolean) {
+  if (crashed) return '#FF1A3A';
+  if (m >= 10) return '#FFD700';
+  if (m >= 3)  return '#FF6B00';
+  return '#FFFFFF';
+}
 
 type BetsTab = 'all' | 'prev' | 'top';
 
@@ -229,8 +235,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       cvPrevPhase.current = phase;
 
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, '#04000C'); sky.addColorStop(0.4, '#08000F');
-      sky.addColorStop(0.75, '#0C0015'); sky.addColorStop(1, '#100018');
+      sky.addColorStop(0, '#08020E'); sky.addColorStop(0.4, '#0D0208');
+      sky.addColorStop(0.75, '#130010'); sky.addColorStop(1, '#180018');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
 
       STARS.forEach(s => {
@@ -339,21 +345,20 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         return p;
       });
 
-      // Altitude display
+      // Altitude display — colours match mobile: gold/orange/white + red on crash
       if (isFlying || isCrashed) {
-        const col = multColor(m);
-        const label = isCrashed ? 'BLAST!' : `${m.toFixed(2)}x`;
+        const col = canvasMultColor(m, isCrashed);
         ctx.save();
-        ctx.font = `bold ${isCrashed ? 34 : 52}px Inter,sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.shadowColor = col; ctx.shadowBlur = 28;
+        ctx.shadowColor = col; ctx.shadowBlur = 32;
         ctx.fillStyle = col;
-        ctx.fillText(label, W / 2, H * 0.42);
+        ctx.font = 'bold 52px Inter,sans-serif';
+        ctx.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42);
         if (isCrashed) {
-          ctx.font = 'bold 22px Inter,sans-serif';
-          ctx.fillStyle = 'rgba(255,255,255,0.6)';
           ctx.shadowBlur = 0;
-          ctx.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42 + 42);
+          ctx.fillStyle = '#FF4500';
+          ctx.font = 'bold 20px Inter,sans-serif';
+          ctx.fillText('BLAST!', W / 2, H * 0.42 + 50);
         }
         ctx.shadowBlur = 0; ctx.restore();
       } else if (isWaiting) {
