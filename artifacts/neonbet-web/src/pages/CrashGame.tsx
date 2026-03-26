@@ -189,7 +189,7 @@ export default function CrashGame() {
 
       const elapsed = isFlying ? (now - startTime) / 1000 : lastElRef.current;
       if (isFlying) { lastElRef.current = elapsed; crashPosRef.current = getPos(elapsed, m, W, H); }
-      if (isWaiting) { lastElRef.current = 0; smoothAngRef.current = -0.3; }
+      if (isWaiting) { lastElRef.current = 0; smoothAngRef.current = -0.22; }
 
       if (cvPrevPhase.current === 'flying' && phase === 'crashed') {
         crashTimeRef.current = now;
@@ -322,21 +322,25 @@ export default function CrashGame() {
 
       // EXPLOSION PARTICLES
       particlesRef.current = particlesRef.current.filter(p => p.life > 0).map(p => {
+        const shimmer = 0.65 + 0.35 * Math.abs(Math.sin(now / 55 + p.x * 0.05 + p.y * 0.03));
         if (p.ray) {
-          p.x += p.vx; p.y += p.vy; p.life -= 0.04;
-          ctx.globalAlpha = p.life * 0.9;
+          p.x += p.vx * 0.88; p.y += p.vy * 0.88; p.life -= 0.035;
+          ctx.globalAlpha = p.life * shimmer;
           ctx.strokeStyle = p.color;
-          ctx.lineWidth = 2.5 * p.life;
+          ctx.lineWidth = 3 * p.life;
           ctx.lineCap = 'round';
-          ctx.shadowColor = p.color; ctx.shadowBlur = 14;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 12 + 10 * shimmer;
           ctx.beginPath();
           ctx.moveTo(p.ox!, p.oy!);
           ctx.lineTo(p.x, p.y);
           ctx.stroke();
           ctx.shadowBlur = 0; ctx.globalAlpha = 1;
         } else {
-          p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.vx *= 0.97; p.r *= 0.96; p.life -= 0.028;
-          ctx.globalAlpha = p.life; ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+          p.x += p.vx; p.y += p.vy; p.vy += 0.10; p.vx *= 0.97; p.r *= 0.97; p.life -= 0.022;
+          ctx.globalAlpha = p.life * shimmer;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8 + 8 * shimmer;
           ctx.fillStyle = p.color;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
           ctx.shadowBlur = 0; ctx.globalAlpha = 1;
