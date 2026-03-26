@@ -122,10 +122,10 @@ function AppContent() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
-      <Header onAuthOpen={() => setAuthOpen(true)} />
+      {tab !== 'game' && <Header onAuthOpen={() => setAuthOpen(true)} />}
 
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        {tab === 'game'    && <CrashGame navigate={setTab as (t: string) => void} />}
+        {tab === 'game'    && <CrashGame onAuthOpen={() => setAuthOpen(true)} />}
         {tab === 'wallet'  && <div style={{ padding: '20px', color: '#fff' }}>Open wallet via bottom nav</div>}
         {tab === 'profile' && <Profile />}
       </main>
