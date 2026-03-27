@@ -186,8 +186,19 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   useEffect(() => { slot1Ref.current = slot1; slot2Ref.current = slot2; stateRef.current = state; });
 
   const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
-    if (idx === 0) setSlot1(s => ({ ...s, ...patch }));
-    else setSlot2(s => ({ ...s, ...patch }));
+    if (idx === 0) {
+      setSlot1(s => {
+        const next = { ...s, ...patch };
+        slot1Ref.current = next;
+        return next;
+      });
+    } else {
+      setSlot2(s => {
+        const next = { ...s, ...patch };
+        slot2Ref.current = next;
+        return next;
+      });
+    }
   }, []);
 
   // Phase change listener
@@ -273,6 +284,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           result: { text: `+₹${payout.toLocaleString('en-IN')} @ ${m.toFixed(2)}x`, win: true },
         });
         playCashout(); // 🎵 Win chime
+      }
+      if (msg.type === 'cashout_fail') {
+        // Cashout timed out or failed — revert to active so button stays visible
+        updateSlot(s === 2 ? 1 : 0, { status: 'active' });
       }
     };
     WSC.msgListeners.add(handler);
