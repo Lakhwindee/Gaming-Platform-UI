@@ -114,6 +114,7 @@ export default function WalletScreen() {
   const [upiId,       setUpiId]       = useState("");
   const [autoFailMsg,  setAutoFailMsg]  = useState("");
   const [noAppFound,   setNoAppFound]   = useState(false);
+  const [wagerReq,     setWagerReq]     = useState(0);
 
   const appStateRef    = useRef(AppState.currentState);
   const tokenRef       = useRef(authState.token);
@@ -249,6 +250,12 @@ export default function WalletScreen() {
     upiAppOpenedRef.current = false;
   }
 
+  useEffect(() => {
+    if (tab === "withdraw" && authState.token) {
+      api.getBalance(authState.token).then(d => setWagerReq(d.wagerRequirement ?? 0)).catch(() => {});
+    }
+  }, [tab]);
+
   async function handleWithdraw() {
     const amt = parseInt(withdrawAmt, 10);
     if (isNaN(amt) || amt < 200) { Alert.alert("Invalid", "Minimum withdrawal is ₹200"); return; }
@@ -269,7 +276,19 @@ export default function WalletScreen() {
               Alert.alert("Requested!", "₹" + amt.toLocaleString("en-IN") + " withdrawal submitted.\nYou'll receive it within 24 hours.");
               setWithdrawAmt(""); setUpiId("");
             } catch (e) {
-              Alert.alert("Failed", e instanceof Error ? e.message : "Try again");
+              const raw = e instanceof Error ? e.message : "Try again";
+              try {
+                const parsed = JSON.parse(raw);
+                if (parsed?.error === "wager_required" && parsed?.pending) {
+                  setWagerReq(parsed.pending);
+                  Alert.alert(
+                    "🔒 Withdrawal Locked",
+                    `Aapne jo deposit kiya hai uske barabar bets lagani hongi.\n\nAbhi ₹${Number(parsed.pending).toLocaleString("en-IN")} ki aur bets lagani hain.`
+                  );
+                  return;
+                }
+              } catch {}
+              Alert.alert("Failed", raw);
             } finally {
               setLoading(false);
             }
@@ -608,6 +627,26 @@ export default function WalletScreen() {
         {tab === "withdraw" && (
           <View>
             <View style={styles.withdrawCard}>
+
+              {/* Wagering Requirement Notice */}
+              {wagerReq > 0 && (
+                <View style={{ backgroundColor: "rgba(255,165,0,0.10)", borderWidth: 1, borderColor: "rgba(255,165,0,0.30)", borderRadius: 14, padding: 14, marginBottom: 18 }}>
+                  <Text style={{ fontWeight: "800", fontSize: 13, color: "#FFA500", marginBottom: 6 }}>🔒 Withdrawal Lock</Text>
+                  <Text style={{ fontSize: 12, color: "#CC9020", marginBottom: 10, lineHeight: 18 }}>
+                    {"Aapne jo deposit kiya hai uske barabar bets lagani hongi tabhi withdrawal hogi.\nAbhi "}
+                    <Text style={{ color: "#FFA500", fontWeight: "800" }}>{"₹" + wagerReq.toLocaleString("en-IN")}</Text>
+                    {" ki aur bets lagani hain."}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#CC9020", letterSpacing: 1, marginBottom: 6, textTransform: "uppercase" }}>Wagering Progress</Text>
+                  <View style={{ backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 8, height: 10, overflow: "hidden" }}>
+                    <View style={{ height: 10, borderRadius: 8, backgroundColor: "#FFA500", width: "5%" }} />
+                  </View>
+                  <Text style={{ fontSize: 11, color: "#996600", marginTop: 6, textAlign: "right" }}>
+                    {"₹" + wagerReq.toLocaleString("en-IN") + " remaining"}
+                  </Text>
+                </View>
+              )}
+
               <Text style={styles.sectionTitle}>WITHDRAWAL AMOUNT</Text>
               <View style={styles.fieldInput}>
                 <Text style={styles.fieldPrefix}>₹</Text>

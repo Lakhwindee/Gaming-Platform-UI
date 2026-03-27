@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
 const router = Router();
@@ -91,7 +91,10 @@ router.post("/payment/upi-confirm", async (req, res) => {
       if (!user) throw new Error("User not found");
 
       const newBalance = user.balance + totalCredit;
-      await tx.update(usersTable).set({ balance: newBalance }).where(eq(usersTable.id, userId));
+      await tx.update(usersTable).set({
+        balance: newBalance,
+        wagerRequirement: sql`wager_requirement + ${depositAmount}`,
+      }).where(eq(usersTable.id, userId));
 
       const noteStr = bonus > 0
         ? `UPI deposit ₹${depositAmount} + ₹${bonus} bonus${utr ? ` | UTR: ${utr}` : ""}`

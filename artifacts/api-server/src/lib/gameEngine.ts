@@ -228,9 +228,9 @@ async function autoPlaceQueuedBets() {
       slot.queued = null;
       try {
         const rows = await db.update(usersTable)
-          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1` })
+          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1`, wagerRequirement: sql`GREATEST(0, wager_requirement - ${amount})` })
           .where(sql`id = ${c.userId} AND balance >= ${amount}`)
-          .returning({ balance: usersTable.balance });
+          .returning({ balance: usersTable.balance, wagerRequirement: usersTable.wagerRequirement });
         if (!rows.length) {
           ws.send(JSON.stringify({ type: 'bet_fail', slot: i + 1, error: 'Insufficient balance for queued bet' }));
           continue;
@@ -483,9 +483,9 @@ export function handleConnection(ws: WebSocket) {
 
       try {
         const rows = await db.update(usersTable)
-          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1` })
+          .set({ balance: sql`balance - ${amount}`, totalWagered: sql`total_wagered + ${amount}`, totalLosses: sql`total_losses + 1`, wagerRequirement: sql`GREATEST(0, wager_requirement - ${amount})` })
           .where(sql`id = ${state.userId} AND balance >= ${amount}`)
-          .returning({ balance: usersTable.balance });
+          .returning({ balance: usersTable.balance, wagerRequirement: usersTable.wagerRequirement });
         if (!rows.length) { ws.send(JSON.stringify({ type: 'bet_fail', slot: slotIdx + 1, error: 'Insufficient balance' })); return; }
 
         const betRows = await db.insert(betsTable).values({

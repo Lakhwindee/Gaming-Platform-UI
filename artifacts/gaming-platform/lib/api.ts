@@ -7,7 +7,7 @@ async function request<T>(path: string, opts?: RequestInit, token?: string): Pro
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { ...headers, ...((opts?.headers as Record<string, string>) ?? {}) } });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Request failed");
+  if (!res.ok) throw new Error(typeof data === 'object' ? JSON.stringify(data) : (data.error ?? "Request failed"));
   return data as T;
 }
 
@@ -72,6 +72,9 @@ export const api = {
     }),
 
   me: (token: string) => request<ApiUser>("/auth/me", undefined, token),
+
+  getBalance: (token: string) =>
+    request<{ balance: number; wagerRequirement: number }>("/wallet/balance", undefined, token),
 
   getTransactions: (token: string) =>
     request<ApiTransaction[]>("/wallet/transactions", undefined, token),

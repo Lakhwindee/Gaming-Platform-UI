@@ -104,6 +104,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   const [withdrawAmt, setWithdrawAmt] = useState('');
   const [upiId,       setUpiId]       = useState('');
   const [withdrawErr, setWithdrawErr] = useState('');
+  const [wagerReq,    setWagerReq]    = useState(0);
 
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
@@ -125,8 +126,12 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
     if (!token) return;
     setTxLoading(true);
     try {
-      const data = await api.getTransactions(token);
+      const [data, bal] = await Promise.all([
+        api.getTransactions(token),
+        api.getBalance(token).catch(() => null),
+      ]);
       setTransactions(data);
+      if (bal && 'wagerRequirement' in bal) setWagerReq((bal as any).wagerRequirement ?? 0);
     } catch {
       setTransactions([]);
     } finally {
@@ -136,7 +141,12 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
   useEffect(() => {
     if (tab === 'history') loadTx();
-  }, [tab, loadTx]);
+    if (tab === 'withdraw' && token) {
+      api.getBalance(token).then(bal => {
+        if (bal && 'wagerRequirement' in bal) setWagerReq((bal as any).wagerRequirement ?? 0);
+      }).catch(() => {});
+    }
+  }, [tab, loadTx, token]);
 
   // Cleanup on unmount
   useEffect(() => () => { stopListeners(); }, []); // eslint-disable-line
@@ -268,7 +278,16 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
       alert(`₹${amt.toLocaleString('en-IN')} withdrawal submitted. You'll receive it within 24 hours.`);
       setWithdrawAmt(''); setUpiId('');
     } catch (e) {
-      setWithdrawErr(e instanceof Error ? e.message : 'Failed. Try again.');
+      const raw = e instanceof Error ? e.message : 'Failed. Try again.';
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.error === 'wager_required' && parsed?.pending) {
+          setWagerReq(parsed.pending);
+          setWithdrawErr(`WAGER_BLOCK:${parsed.pending}`);
+          return;
+        }
+      } catch {}
+      setWithdrawErr(raw);
     } finally {
       setLoading(false);
     }
@@ -529,6 +548,33 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
       {/* ── WITHDRAW ── */}
       {tab === 'withdraw' && (
         <div style={card}>
+
+          {/* Wagering Requirement Notice */}
+          {wagerReq > 0 && (
+            <div style={{ background: 'rgba(255,165,0,0.10)', border: '1px solid rgba(255,165,0,0.30)', borderRadius: 14, padding: '14px 16px', marginBottom: 16 }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: '#FFA500', marginBottom: 6 }}>
+                🔒 Withdrawal Lock
+              </div>
+              <div style={{ fontSize: 12, color: '#CC9020', marginBottom: 10, lineHeight: 1.5 }}>
+                Aapne jo deposit kiya hai uske barabar bets lagani hongi tabhi withdrawal hogi.<br/>
+                Abhi <strong style={{ color: '#FFA500' }}>₹{wagerReq.toLocaleString('en-IN')}</strong> ki aur bets lagani hain.
+              </div>
+              {/* Progress Bar */}
+              <div style={{ fontSize: 10, color: '#CC9020', letterSpacing: 1, marginBottom: 5, textTransform: 'uppercase' }}>Wagering Progress</div>
+              <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: 8, height: 10, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 8,
+                  background: 'linear-gradient(90deg,#FFA500,#FFD700)',
+                  width: `${Math.min(100, Math.max(5, 100 - (wagerReq / Math.max(wagerReq, 1)) * 100))}%`,
+                  transition: 'width 0.4s ease',
+                }} />
+              </div>
+              <div style={{ fontSize: 11, color: '#996600', marginTop: 5, textAlign: 'right' }}>
+                ₹{wagerReq.toLocaleString('en-IN')} remaining
+              </div>
+            </div>
+          )}
+
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 8 }}>WITHDRAW AMOUNT (₹)</div>
           <input
             type="number"
@@ -556,7 +602,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
             }}
           />
 
-          {withdrawErr && (
+          {withdrawErr && !withdrawErr.startsWith('WAGER_BLOCK:') && (
             <div style={{ background: 'rgba(255,26,58,0.10)', border: '1px solid rgba(255,26,58,0.25)', borderRadius: 10, padding: '8px 12px', fontSize: 12, color: C.red, marginBottom: 12 }}>
               ⚠ {withdrawErr}
             </div>

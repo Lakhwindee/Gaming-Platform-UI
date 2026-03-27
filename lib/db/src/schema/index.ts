@@ -5,10 +5,11 @@ export const usersTable = pgTable("users", {
   username: varchar("username", { length: 32 }).notNull().unique(),
   email: varchar("email", { length: 128 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  balance: bigint("balance", { mode: "number" }).notNull().default(10000),
+  balance: bigint("balance", { mode: "number" }).notNull().default(0),
   totalWins: integer("total_wins").notNull().default(0),
   totalLosses: integer("total_losses").notNull().default(0),
   totalWagered: bigint("total_wagered", { mode: "number" }).notNull().default(0),
+  wagerRequirement: bigint("wager_requirement", { mode: "number" }).notNull().default(0),
   vipLevel: varchar("vip_level", { length: 16 }).notNull().default("Bronze"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

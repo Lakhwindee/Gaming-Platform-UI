@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import jwt from "jsonwebtoken";
 
 const router = Router();
@@ -21,9 +21,9 @@ router.get("/wallet/balance", async (req, res) => {
   const userId = getUser(req.headers.authorization);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   try {
-    const [user] = await db.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId));
+    const [user] = await db.select({ balance: usersTable.balance, wagerRequirement: usersTable.wagerRequirement }).from(usersTable).where(eq(usersTable.id, userId));
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json({ balance: user.balance });
+    res.json({ balance: user.balance, wagerRequirement: user.wagerRequirement ?? 0 });
   } catch (e) {
     res.status(500).json({ error: "Server error" });
   }
@@ -54,19 +54,18 @@ router.post("/wallet/deposit", async (req, res) => {
   }
   try {
     const result = await db.transaction(async (tx) => {
-      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId));
+      const [user] = await tx.select({ balance: usersTable.balance, wagerRequirement: usersTable.wagerRequirement }).from(usersTable).where(eq(usersTable.id, userId));
       if (!user) throw new Error("User not found");
-      const newBalance = user.balance + Math.floor(amount);
-      await tx.update(usersTable).set({ balance: newBalance }).where(eq(usersTable.id, userId));
+      const dep = Math.floor(amount);
+      const newBalance = user.balance + dep;
+      const newWagerReq = (user.wagerRequirement ?? 0) + dep;
+      await tx.update(usersTable).set({ balance: newBalance, wagerRequirement: newWagerReq }).where(eq(usersTable.id, userId));
       await tx.insert(transactionsTable).values({
-        userId,
-        type: "deposit",
-        amount: Math.floor(amount),
+        userId, type: "deposit", amount: dep,
         note: txRef ? `Deposit via ${txRef}` : "Manual deposit",
-        txRef: txRef ?? null,
-        status: "completed",
+        txRef: txRef ?? null, status: "completed",
       });
-      return { balance: newBalance };
+      return { balance: newBalance, wagerRequirement: newWagerReq };
     });
     res.json(result);
   } catch (e) {
@@ -86,24 +85,36 @@ router.post("/wallet/withdraw", async (req, res) => {
   }
   try {
     const result = await db.transaction(async (tx) => {
-      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId));
+      const [user] = await tx.select({ balance: usersTable.balance, wagerRequirement: usersTable.wagerRequirement }).from(usersTable).where(eq(usersTable.id, userId));
       if (!user) throw new Error("User not found");
+
+      // ── Wagering requirement check ──────────────────────────────────
+      const pending = user.wagerRequirement ?? 0;
+      if (pending > 0) {
+        throw new Error(`WAGER_REQUIRED:${pending}`);
+      }
+
       if (user.balance < amount) throw new Error("Insufficient balance");
       const newBalance = user.balance - Math.floor(amount);
       await tx.update(usersTable).set({ balance: newBalance }).where(eq(usersTable.id, userId));
       await tx.insert(transactionsTable).values({
-        userId,
-        type: "withdraw",
-        amount: Math.floor(amount),
-        note: `Withdrawal to ${upiId}`,
-        txRef: null,
-        status: "pending",
+        userId, type: "withdraw", amount: Math.floor(amount),
+        note: `Withdrawal to ${upiId}`, txRef: null, status: "pending",
       });
       return { balance: newBalance };
     });
     res.json({ message: "Withdrawal requested. Processing within 24 hours.", balance: result.balance });
   } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : "Server error" });
+    const msg = e instanceof Error ? e.message : "Server error";
+    if (msg.startsWith("WAGER_REQUIRED:")) {
+      const pending = parseInt(msg.split(":")[1]);
+      return res.status(400).json({
+        error: "wager_required",
+        pending,
+        message: `Withdrawal ke liye pehle ₹${pending.toLocaleString('en-IN')} ki bets lagani hongi. Abhi tak ki progress dekhen wallet mein.`,
+      });
+    }
+    res.status(400).json({ error: msg });
   }
 });
 

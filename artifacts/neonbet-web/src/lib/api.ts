@@ -31,7 +31,7 @@ async function req<T>(method: string, path: string, body?: object, token?: strin
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? 'Request failed');
+  if (!res.ok) throw new Error(typeof data === 'object' ? JSON.stringify(data) : (data.error ?? 'Request failed'));
   return data as T;
 }
 
@@ -75,6 +75,9 @@ export const api = {
 
   changePassword: (token: string, currentPassword: string, newPassword: string) =>
     req<{ message: string }>('POST', '/auth/change-password', { currentPassword, newPassword }, token),
+
+  getBalance: (token: string) =>
+    req<{ balance: number; wagerRequirement: number }>('GET', '/wallet/balance', undefined, token),
 
   getTransactions: (token: string) =>
     req<ApiTransaction[]>('GET', '/wallet/transactions', undefined, token),
