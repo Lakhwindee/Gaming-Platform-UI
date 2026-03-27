@@ -598,67 +598,41 @@ export default function GameScreen() {
         </View>
       );
     } else {
-      const canBet = !!authState.user && effectiveStatus === "idle";
-      const isNextQueue = phase === "flying" || phase === "crashed";
-      // Confirm only needed during FLYING (game live) — crashed phase is safe to bet directly
-      const needsConfirm = phase === "flying";
-      // Use state for rendering, ref for handler (avoids stale closure with React Compiler)
-      const awaitingConfirm = pendingConfirm[slotIdx];
-
-      function handleBetPress() {
-        if (!canBet) return;
-        if (!needsConfirm) { placeBet(slotIdx); return; }
-        // Always read from ref — avoids stale closure under React Compiler memoization
-        const currentlyPending = pendingConfirmRef.current[slotIdx];
-        if (!currentlyPending) {
-          // First tap: show confirm state, auto-reset after 3s
-          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-          next[slotIdx] = true;
-          pendingConfirmRef.current = next;
-          setPendingConfirm([...next] as [boolean, boolean]);
-          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          confirmTimers.current[slotIdx] = setTimeout(() => {
-            const reset: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-            reset[slotIdx] = false;
-            pendingConfirmRef.current = reset;
-            setPendingConfirm([...reset] as [boolean, boolean]);
-          }, 3000);
-        } else {
-          // Second tap: actually place bet
-          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-          next[slotIdx] = false;
-          pendingConfirmRef.current = next;
-          setPendingConfirm([...next] as [boolean, boolean]);
-          placeBet(slotIdx);
-        }
-      }
+      // Flying phase: completely disabled — no bet, no confirm (Aviator-style)
+      const isFlying = phase === "flying";
+      const isCrashed = phase === "crashed";
+      const canBet = !!authState.user && effectiveStatus === "idle" && !isFlying;
 
       btnContent = (
-        <TouchableOpacity onPress={handleBetPress} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
+        <TouchableOpacity
+          onPress={() => canBet ? placeBet(slotIdx) : undefined}
+          disabled={!canBet}
+          activeOpacity={isFlying ? 1 : 0.85}
+          style={{ flex: 1 }}
+        >
           <LinearGradient
             colors={
-              !canBet
-                ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
-                : awaitingConfirm && needsConfirm
-                  ? ["#FF6D00", "#E65100"]
-                  : isNextQueue
-                    ? ["#FF9800", "#E65100"]
+              isFlying
+                ? ["rgba(255,26,58,0.10)", "rgba(180,10,30,0.10)"]
+                : isCrashed
+                  ? ["#FF9800", "#E65100"]
+                  : !authState.user
+                    ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
                     : ["#00C853", "#009C41"]
             }
-            style={styles.mainBtn}
+            style={[styles.mainBtn, isFlying && { borderWidth: 1, borderColor: "rgba(255,26,58,0.25)" }]}
           >
-            <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
-              {!authState.user
-                ? "SIGN IN"
-                : awaitingConfirm && needsConfirm
-                  ? "✓  CONFIRM NEXT ROUND?"
-                  : isNextQueue
+            <Text style={[styles.mainBtnText, (isFlying || !authState.user) && { color: isFlying ? "#FF4D4D" : "#556" }]}>
+              {isFlying
+                ? "ROUND LIVE"
+                : !authState.user
+                  ? "SIGN IN"
+                  : isCrashed
                     ? `NEXT  ₹${slot.amount.toLocaleString("en-IN")}`
                     : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
             </Text>
-            {isNextQueue && !(awaitingConfirm && needsConfirm) && canBet && <Text style={styles.mainBtnSub2}>tap to queue for next round</Text>}
-            {awaitingConfirm && needsConfirm && <Text style={styles.mainBtnSub2}>tap again • auto-cancel 3s</Text>}
+            {isFlying && <Text style={[styles.mainBtnSub2, { color: "rgba(255,77,77,0.5)" }]}>wait for next round</Text>}
+            {isCrashed && canBet && <Text style={styles.mainBtnSub2}>queued for next round</Text>}
           </LinearGradient>
         </TouchableOpacity>
       );

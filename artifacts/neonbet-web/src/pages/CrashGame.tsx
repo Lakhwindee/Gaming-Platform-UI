@@ -568,68 +568,41 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         </button>
       );
     } else {
-      // Allow betting in any phase — flying/crashed bets get queued for next round
-      // But require 2-step confirm during flying/crashed to prevent accidental bets
-      const canBet = !!state.user && effectiveStatus === 'idle';
-      const isNextQueue = canBet && (phase === 'flying' || phase === 'crashed');
-      // Confirm only during FLYING (live game) — crashed phase bet placed directly
-      const needsConfirm = canBet && phase === 'flying';
-      // Use state for rendering, ref for handler (prevents stale closures)
-      const awaitingConfirm = pendingConfirm[slotIdx];
-
-      function handleBetClick() {
-        if (!canBet) return;
-        if (!needsConfirm) { placeBet(slotIdx); return; }
-        const currentlyPending = pendingConfirmRef.current[slotIdx];
-        if (!currentlyPending) {
-          // First click: show confirm state, auto-reset after 3s
-          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-          next[slotIdx] = true;
-          pendingConfirmRef.current = next;
-          setPendingConfirm([...next] as [boolean, boolean]);
-          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          confirmTimers.current[slotIdx] = setTimeout(() => {
-            const reset: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-            reset[slotIdx] = false;
-            pendingConfirmRef.current = reset;
-            setPendingConfirm([...reset] as [boolean, boolean]);
-          }, 3000);
-        } else {
-          // Second click: actually place bet
-          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
-          next[slotIdx] = false;
-          pendingConfirmRef.current = next;
-          setPendingConfirm([...next] as [boolean, boolean]);
-          placeBet(slotIdx);
-        }
-      }
+      // Flying phase: completely disabled — Aviator-style (no bet, no confirm)
+      const isFlying = phase === 'flying';
+      const isCrashed = phase === 'crashed';
+      const canBet = !!state.user && effectiveStatus === 'idle' && !isFlying;
 
       btnContent = (
-        <button onClick={handleBetClick} disabled={!canBet} style={{
-          width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
-          cursor: canBet ? 'pointer' : 'not-allowed',
-          background: !canBet
-            ? 'rgba(20,10,20,0.4)'
-            : awaitingConfirm && needsConfirm
-              ? 'linear-gradient(135deg,#FF6D00,#E65100)'
-              : isNextQueue
+        <button
+          onClick={() => canBet ? placeBet(slotIdx) : undefined}
+          disabled={!canBet}
+          style={{
+            width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
+            cursor: canBet ? 'pointer' : 'default',
+            background: isFlying
+              ? 'rgba(255,26,58,0.08)'
+              : isCrashed
                 ? 'linear-gradient(135deg,#FF9800,#E65100)'
-                : 'linear-gradient(135deg,#00C853,#009C41)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-          transition: 'background 0.2s',
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
-            {!state.user
-              ? 'SIGN IN'
-              : awaitingConfirm && needsConfirm
-                ? '✓  CONFIRM NEXT ROUND?'
-                : isNextQueue
+                : !state.user
+                  ? 'rgba(20,10,20,0.4)'
+                  : 'linear-gradient(135deg,#00C853,#009C41)',
+            border: isFlying ? '1px solid rgba(255,26,58,0.2)' : 'none',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+            transition: 'background 0.2s',
+          }}
+        >
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px', color: isFlying ? '#FF4D4D' : canBet ? '#fff' : C.textDim }}>
+            {isFlying
+              ? 'ROUND LIVE'
+              : !state.user
+                ? 'SIGN IN'
+                : isCrashed
                   ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}`
                   : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {isNextQueue && !(awaitingConfirm && needsConfirm) && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>tap to queue for next round</span>}
-          {awaitingConfirm && needsConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', letterSpacing: '1px' }}>tap again to confirm • auto-cancel 3s</span>}
+          {isFlying && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,77,77,0.5)', letterSpacing: '1px' }}>wait for next round</span>}
+          {isCrashed && canBet && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>queued for next round</span>}
         </button>
       );
     }
