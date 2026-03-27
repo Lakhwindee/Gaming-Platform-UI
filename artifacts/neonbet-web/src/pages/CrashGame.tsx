@@ -228,7 +228,11 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   useEffect(() => {
     const handler = (msg: Record<string, unknown>) => {
       const s = Number(msg.slot ?? 1);
-      if (msg.type === 'bet_ok') updateSlot(s === 2 ? 1 : 0, { status: 'active' });
+      if (msg.type === 'bet_ok') {
+        // Keep as 'placed' so cancel button stays visible — same as Expo
+        // Phase transition (waiting→flying) will promote to 'active' automatically
+        updateSlot(s === 2 ? 1 : 0, { status: 'placed' });
+      }
       if (msg.type === 'bet_queued') updateSlot(s === 2 ? 1 : 0, { status: 'queued' });
       if (msg.type === 'bet_fail') {
         const idx = s === 2 ? 1 : 0;
@@ -442,7 +446,11 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   }
   function cancelBet(slotIdx: 0 | 1) {
     const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
-    if (slot.status !== 'placed' && slot.status !== 'queued') return;
+    const canCancel = slot.status === 'placed' || slot.status === 'queued' ||
+      // Also allow during first 3.5s of flying (server enforces the window)
+      (slot.status === 'active' && WSC.state.phase === 'flying' &&
+        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 3500);
+    if (!canCancel) return;
     wsSend({ type: 'cancel_bet', slot: slotIdx + 1 });
     updateSlot(slotIdx, { status: 'idle' });
   }

@@ -502,8 +502,12 @@ export default function GameScreen() {
   }
 
   function cancelBet(slotIdx: 0 | 1) {
-    const slot = slots[slotIdx];
-    if (slot.status !== "placed" && slot.status !== "queued") return;
+    const slot = slotRefs.current[slotIdx];
+    const canCancel = slot.status === "placed" || slot.status === "queued" ||
+      // Also allow during first 3.5s of flying (server enforces the window)
+      (slot.status === "active" && WSC.state.phase === "flying" &&
+        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 3500);
+    if (!canCancel) return;
     wsSend({ type: "cancel_bet", slot: slotIdx + 1 });
     updateSlot(slotIdx, { status: "idle" });
     if (Platform.OS !== "web") Haptics.selectionAsync();
