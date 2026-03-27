@@ -166,7 +166,7 @@ function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
   const angle = Math.atan2(pB.y - pA.y, pB.x - pA.x);
   const angleDeg = (angle * 180) / Math.PI + 90;
 
-  const mColor = phase === "crashed" ? "#FF1A3A" : mult >= 10 ? "#FFD700" : mult >= 3 ? "#FF6B00" : "#FFFFFF";
+  const mColor = phase === "crashed" ? "#FF1A3A" : "#FFFFFF";
 
   return (
     <View style={[styles.canvas, IS_DESKTOP_WEB && { width: "100%" }]}>

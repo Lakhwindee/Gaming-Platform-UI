@@ -420,7 +420,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       }
 
       // Multiplier overlay — exact Expo text positioning
-      const mColor2 = isCrashed ? '#FF1A3A' : m >= 10 ? '#FFD700' : m >= 3 ? '#FF6B00' : '#FFFFFF';
+      const mColor2 = isCrashed ? '#FF1A3A' : '#FFFFFF';
       ctx!.save();
       ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
       if (isFlying) {
