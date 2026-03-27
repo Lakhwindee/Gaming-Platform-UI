@@ -514,7 +514,6 @@ export default function GameScreen() {
         <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
             <Text style={styles.mainBtnText}>CASHOUT  ₹{potentialWin.toLocaleString("en-IN")}</Text>
-            <Text style={styles.mainBtnSub}>{mult.toFixed(2)}x</Text>
           </LinearGradient>
         </TouchableOpacity>
       );
