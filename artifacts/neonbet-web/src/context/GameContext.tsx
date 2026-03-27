@@ -135,6 +135,7 @@ type Ctx = {
   addNotification: (msg: string, type?: Notification['type']) => void;
   toggleWallet: () => void;
   toggleChat: () => void;
+  refreshBalance: () => Promise<void>;
 };
 
 const GameCtx = createContext<Ctx | null>(null);
@@ -210,8 +211,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const toggleWallet = () => dispatch({ type: 'TOGGLE_WALLET' });
   const toggleChat = () => dispatch({ type: 'TOGGLE_CHAT' });
 
+  const refreshBalance = async () => {
+    const token = localStorage.getItem('nb_token');
+    if (!token) return;
+    try {
+      const u = await api.me(token);
+      dispatch({ type: 'UPDATE_BALANCE', amount: u.balance });
+    } catch {}
+  };
+
   return (
-    <GameCtx.Provider value={{ state, login, register, logout, addHistory, navigate, playGame, addNotification, toggleWallet, toggleChat }}>
+    <GameCtx.Provider value={{ state, login, register, logout, addHistory, navigate, playGame, addNotification, toggleWallet, toggleChat, refreshBalance }}>
       {children}
     </GameCtx.Provider>
   );

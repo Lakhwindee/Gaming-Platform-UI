@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import Profile from './pages/Profile';
 import AuthModal from './pages/AuthModal';
-import WalletModal from './pages/WalletModal';
+import Wallet from './pages/Wallet';
 import CrashGame from './pages/CrashGame';
 import { WSC } from './lib/wsClient';
 import { setSoundEnabled } from './lib/soundEngine';
@@ -112,7 +112,7 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   );
 }
 
-function BottomNav({ tab, setTab, onWalletOpen }: { tab: Tab; setTab: (t: Tab) => void; onWalletOpen: () => void }) {
+function BottomNav({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   const items: { id: Tab; icon: string; label: string }[] = [
     { id: 'game',    icon: '🚀', label: 'Game' },
     { id: 'wallet',  icon: '💰', label: 'Wallet' },
@@ -129,7 +129,7 @@ function BottomNav({ tab, setTab, onWalletOpen }: { tab: Tab; setTab: (t: Tab) =
         const active = tab === item.id;
         return (
           <button key={item.id}
-            onClick={() => item.id === 'wallet' ? onWalletOpen() : setTab(item.id)}
+            onClick={() => setTab(item.id)}
             style={{
               flex: 1, height: '64px',
               display: 'flex', flexDirection: 'column',
@@ -147,26 +147,19 @@ function BottomNav({ tab, setTab, onWalletOpen }: { tab: Tab; setTab: (t: Tab) =
 }
 
 function AppContent() {
-  const { state, toggleWallet } = useGame();
   const [tab, setTab] = useState<Tab>('game');
   const [authOpen, setAuthOpen] = useState(false);
-
-  function handleWalletOpen() {
-    if (!state.user) { setAuthOpen(true); return; }
-    toggleWallet();
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#08020E', overflow: 'hidden' }}>
       <Header onAuthOpen={() => setAuthOpen(true)} />
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {tab === 'game'    && <CrashGame navigate={setTab as (t: string) => void} />}
-        {tab === 'wallet'  && <div style={{ padding: '20px', color: '#fff' }}>Wallet — use bottom nav</div>}
+        {tab === 'wallet'  && <Wallet onAuthOpen={() => { setAuthOpen(true); setTab('game'); }} />}
         {tab === 'profile' && <Profile onAuthOpen={() => setAuthOpen(true)} />}
       </main>
-      <BottomNav tab={tab} setTab={setTab} onWalletOpen={handleWalletOpen} />
+      <BottomNav tab={tab} setTab={setTab} />
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
-      {state.walletOpen && <WalletModal />}
     </div>
   );
 }
