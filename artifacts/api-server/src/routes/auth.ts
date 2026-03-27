@@ -55,7 +55,9 @@ router.post("/auth/register", async (req, res) => {
     return res.json({ token, user: sanitizeUser(user) });
   } catch (e: unknown) {
     const msg = String((e as { message?: string }).message ?? "");
-    if (msg.includes("unique")) return res.status(400).json({ error: "Username or email already taken" });
+    const cause = String(((e as { cause?: { message?: string } }).cause?.message) ?? "");
+    const isDuplicate = msg.includes("unique") || msg.includes("duplicate") || cause.includes("unique") || cause.includes("duplicate");
+    if (isDuplicate) return res.status(400).json({ error: "Username or email already taken" });
     console.error("Register error:", e);
     return res.status(500).json({ error: "Server error" });
   }
