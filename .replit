@@ -17,27 +17,6 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "artifacts/neonbet-web: web"
-
-[[workflows.workflow]]
-name = "artifacts/neonbet-web: web"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=19702 BASE_PATH=/neonbet-web/ pnpm --filter @workspace/neonbet-web run dev"
-waitForPort = 19702
-
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
