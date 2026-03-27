@@ -600,12 +600,14 @@ export default function GameScreen() {
     } else {
       const canBet = !!authState.user && effectiveStatus === "idle";
       const isNextQueue = phase === "flying" || phase === "crashed";
+      // Confirm only needed during FLYING (game live) — crashed phase is safe to bet directly
+      const needsConfirm = phase === "flying";
       // Use state for rendering, ref for handler (avoids stale closure with React Compiler)
       const awaitingConfirm = pendingConfirm[slotIdx];
 
       function handleBetPress() {
         if (!canBet) return;
-        if (!isNextQueue) { placeBet(slotIdx); return; }
+        if (!needsConfirm) { placeBet(slotIdx); return; }
         // Always read from ref — avoids stale closure under React Compiler memoization
         const currentlyPending = pendingConfirmRef.current[slotIdx];
         if (!currentlyPending) {
@@ -638,7 +640,7 @@ export default function GameScreen() {
             colors={
               !canBet
                 ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
-                : awaitingConfirm
+                : awaitingConfirm && needsConfirm
                   ? ["#FF6D00", "#E65100"]
                   : isNextQueue
                     ? ["#FF9800", "#E65100"]
@@ -649,14 +651,14 @@ export default function GameScreen() {
             <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
               {!authState.user
                 ? "SIGN IN"
-                : awaitingConfirm
+                : awaitingConfirm && needsConfirm
                   ? "✓  CONFIRM NEXT ROUND?"
                   : isNextQueue
                     ? `NEXT  ₹${slot.amount.toLocaleString("en-IN")}`
                     : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
             </Text>
-            {isNextQueue && !awaitingConfirm && canBet && <Text style={styles.mainBtnSub2}>tap to queue for next round</Text>}
-            {awaitingConfirm && <Text style={styles.mainBtnSub2}>tap again • auto-cancel 3s</Text>}
+            {isNextQueue && !(awaitingConfirm && needsConfirm) && canBet && <Text style={styles.mainBtnSub2}>tap to queue for next round</Text>}
+            {awaitingConfirm && needsConfirm && <Text style={styles.mainBtnSub2}>tap again • auto-cancel 3s</Text>}
           </LinearGradient>
         </TouchableOpacity>
       );

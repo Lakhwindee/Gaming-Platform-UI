@@ -572,12 +572,14 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       // But require 2-step confirm during flying/crashed to prevent accidental bets
       const canBet = !!state.user && effectiveStatus === 'idle';
       const isNextQueue = canBet && (phase === 'flying' || phase === 'crashed');
+      // Confirm only during FLYING (live game) — crashed phase bet placed directly
+      const needsConfirm = canBet && phase === 'flying';
       // Use state for rendering, ref for handler (prevents stale closures)
       const awaitingConfirm = pendingConfirm[slotIdx];
 
       function handleBetClick() {
         if (!canBet) return;
-        if (!isNextQueue) { placeBet(slotIdx); return; }
+        if (!needsConfirm) { placeBet(slotIdx); return; }
         const currentlyPending = pendingConfirmRef.current[slotIdx];
         if (!currentlyPending) {
           // First click: show confirm state, auto-reset after 3s
@@ -609,7 +611,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           cursor: canBet ? 'pointer' : 'not-allowed',
           background: !canBet
             ? 'rgba(20,10,20,0.4)'
-            : awaitingConfirm
+            : awaitingConfirm && needsConfirm
               ? 'linear-gradient(135deg,#FF6D00,#E65100)'
               : isNextQueue
                 ? 'linear-gradient(135deg,#FF9800,#E65100)'
@@ -620,14 +622,14 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
             {!state.user
               ? 'SIGN IN'
-              : awaitingConfirm
+              : awaitingConfirm && needsConfirm
                 ? '✓  CONFIRM NEXT ROUND?'
                 : isNextQueue
                   ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}`
                   : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {isNextQueue && !awaitingConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>tap to queue for next round</span>}
-          {awaitingConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', letterSpacing: '1px' }}>tap again to confirm • auto-cancel 3s</span>}
+          {isNextQueue && !(awaitingConfirm && needsConfirm) && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>tap to queue for next round</span>}
+          {awaitingConfirm && needsConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', letterSpacing: '1px' }}>tap again to confirm • auto-cancel 3s</span>}
         </button>
       );
     }
