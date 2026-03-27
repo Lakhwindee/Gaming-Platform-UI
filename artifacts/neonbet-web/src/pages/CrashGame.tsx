@@ -562,24 +562,24 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         </button>
       );
     } else {
-      // Only allow betting during waiting phase — block completely during flying/crashed
-      const canBet = !!state.user && effectiveStatus === 'idle' && phase === 'waiting';
-      const roundLive = isNextRound && !!state.user && effectiveStatus === 'idle';
+      // Allow betting in any phase — flying/crashed bets get queued for next round
+      const canBet = !!state.user && effectiveStatus === 'idle';
+      const isNextQueue = canBet && (phase === 'flying' || phase === 'crashed');
       btnContent = (
         <button onClick={() => canBet ? placeBet(slotIdx) : undefined} disabled={!canBet} style={{
           width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
           cursor: canBet ? 'pointer' : 'not-allowed',
-          background: canBet
-            ? 'linear-gradient(135deg,#00C853,#009C41)'
-            : roundLive
-              ? 'rgba(255,26,58,0.12)'
-              : 'rgba(20,10,20,0.4)',
+          background: !canBet
+            ? 'rgba(20,10,20,0.4)'
+            : isNextQueue
+              ? 'linear-gradient(135deg,#FF9800,#E65100)'
+              : 'linear-gradient(135deg,#00C853,#009C41)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
         }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: roundLive ? '#FF1A3A' : canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
-            {!state.user ? 'SIGN IN' : roundLive ? 'ROUND LIVE' : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
+          <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
+            {!state.user ? 'SIGN IN' : isNextQueue ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}` : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {roundLive && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,26,58,0.5)', letterSpacing: '1px' }}>wait for next round</span>}
+          {isNextQueue && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>queued for next round</span>}
         </button>
       );
     }
