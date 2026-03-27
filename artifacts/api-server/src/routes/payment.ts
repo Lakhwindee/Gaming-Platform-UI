@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "neonbet-secret-2024";
-const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || "udaan@axisbank";
+const MERCHANT_UPI_ID = process.env.MERCHANT_UPI_ID || "7973248683@pthdfc";
 
 function getUser(authHeader: string | undefined): number | null {
   if (!authHeader?.startsWith("Bearer ")) return null;

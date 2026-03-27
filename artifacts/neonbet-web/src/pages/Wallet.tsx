@@ -538,7 +538,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
               {/* Merchant info */}
               <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: C.textDim }}>
-                Secure UPI payment · judgeproductionmusic@okaxis
+                Secure UPI payment · 7973248683@pthdfc
               </div>
             </>
           )}
