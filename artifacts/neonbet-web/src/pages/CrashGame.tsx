@@ -498,18 +498,29 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const isFlying = phase === 'flying';
     const isNextRound = phase === 'flying' || phase === 'crashed';
 
+    const elapsedMs = WSC.state.startTime > 0 ? Date.now() - WSC.state.startTime : 99999;
+    const canStillCancel = effectiveStatus === 'active' && isFlying && elapsedMs < 3500;
     let btnContent: React.ReactNode;
     if (effectiveStatus === 'active' && isFlying) {
       btnContent = (
-        <button onClick={() => cashOut(slotIdx)} style={{
-          width: '100%', padding: '12px 0', borderRadius: '12px', border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg,#FF8C00,#CC4400)',
-          boxShadow: '0 0 16px rgba(255,107,0,0.5)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
-        }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', letterSpacing: '2px' }}>CASHOUT</span>
-          <span style={{ fontSize: '22px', fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>₹{potentialWin.toLocaleString('en-IN')}</span>
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <button onClick={() => cashOut(slotIdx)} style={{
+            width: '100%', padding: '12px 0', borderRadius: '12px', border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg,#FF8C00,#CC4400)',
+            boxShadow: '0 0 16px rgba(255,107,0,0.5)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
+          }}>
+            <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', letterSpacing: '2px' }}>CASHOUT</span>
+            <span style={{ fontSize: '22px', fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>₹{potentialWin.toLocaleString('en-IN')}</span>
+          </button>
+          {canStillCancel && (
+            <button onClick={() => cancelBet(slotIdx)} style={{
+              width: '100%', padding: '5px 0', borderRadius: '8px', border: '1px solid rgba(255,26,58,0.35)',
+              background: 'rgba(255,26,58,0.06)', cursor: 'pointer',
+              fontSize: '9px', fontWeight: 700, color: '#FF4D4D', letterSpacing: '1.5px',
+            }}>✕  CANCEL BET</button>
+          )}
+        </div>
       );
     } else if (effectiveStatus === 'placed') {
       btnContent = (

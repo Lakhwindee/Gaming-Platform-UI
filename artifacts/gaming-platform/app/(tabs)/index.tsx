@@ -128,8 +128,8 @@ function RocketShape({ phase, flicker = 0, flicker2 = 0 }: { phase: string; flic
       )}
       <Path d={`M -8 ${S * 0.2} L -17 ${S * 0.55} L -8 ${S * 0.42} Z`} fill="#D43050" />
       <Path d={`M 8 ${S * 0.2} L 17 ${S * 0.55} L 8 ${S * 0.42} Z`} fill="#D43050" />
-      <Rect x={-8} y={-S * 0.46} width={16} height={S * 0.92} rx={4} ry={4} fill="url(#rocketBody)" />
-      <Path d={`M 0 ${-S} L 8 ${-S * 0.46} L -8 ${-S * 0.46} Z`} fill="url(#rocketNose)" />
+      <Rect x={-8} y={-S * 0.46} width={16} height={S * 0.92} rx={4} ry={4} fill="#CDD2E0" />
+      <Path d={`M 0 ${-S} L 8 ${-S * 0.46} L -8 ${-S * 0.46} Z`} fill="#EAEDF5" />
       <Rect x={-3.5} y={-S * 0.44} width={7} height={S * 0.26} rx={2} fill="#EE1133" opacity={0.9} />
       <Circle cx={0} cy={-S * 0.10} r={5} fill="rgba(80,160,255,0.22)" stroke="#88CCFF" strokeWidth={1.2} />
       <Circle cx={-1.5} cy={-S * 0.10 - 1.5} r={1.8} fill="rgba(255,255,255,0.55)" />
@@ -541,14 +541,23 @@ export default function GameScreen() {
     const potentialWin = effectiveStatus === "active" ? Math.floor(slot.amount * mult) : 0;
 
     let btnContent: React.ReactNode;
+    const canStillCancel = effectiveStatus === "active" && phase === "flying" && elapsedSec < 3.5 && WSC.state.startTime > 0;
     if (effectiveStatus === "active" && phase === "flying") {
       btnContent = (
-        <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
-          <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
-            <Text style={styles.cashoutLabel}>CASHOUT</Text>
-            <Text style={styles.cashoutAmt}>₹{potentialWin.toLocaleString("en-IN")}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <View style={{ flex: 1, gap: 5 }}>
+          <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85}>
+            <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
+              <Text style={styles.cashoutLabel}>CASHOUT</Text>
+              <Text style={styles.cashoutAmt}>₹{potentialWin.toLocaleString("en-IN")}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          {canStillCancel && (
+            <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.7}
+              style={{ alignItems: "center", paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,26,58,0.35)", backgroundColor: "rgba(255,26,58,0.06)" }}>
+              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#FF4D4D", letterSpacing: 1.5 }}>✕  CANCEL BET</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       );
     } else if (effectiveStatus === "placed") {
       btnContent = (
