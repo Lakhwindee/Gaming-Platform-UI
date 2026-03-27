@@ -29,7 +29,7 @@ const ORIG_Y = CV_H * 0.88;
 const AVATAR_COLORS = ["#E53935","#8E24AA","#1E88E5","#00897B","#F4511E","#6D4C41","#546E7A","#43A047"];
 const AVATAR_EMOJI  = ["🦅","🚀","🎯","💰","🔥","⚡","🌙","🎲"];
 function multColor(m: number): string {
-  if (m >= 10) return "#A500FF";
+  if (m >= 10) return "#FF2EC4";
   if (m >= 2)  return "#5AC8FA";
   return "#F1222A";
 }
@@ -740,8 +740,8 @@ export default function GameScreen() {
                 {history.length === 0 ? (
                   <Text style={{ color: "#555", fontSize: 13, fontFamily: "Inter_400Regular" }}>No history yet</Text>
                 ) : history.map((h, i) => {
-                  const col = h >= 10 ? "#A500FF" : h >= 2 ? "#5AC8FA" : "#F1222A";
-                  const bg  = h >= 10 ? "rgba(165,0,255,0.15)" : h >= 2 ? "rgba(90,200,250,0.15)" : "rgba(241,34,42,0.15)";
+                  const col = h >= 10 ? "#FF2EC4" : h >= 2 ? "#5AC8FA" : "#F1222A";
+                  const bg  = h >= 10 ? "rgba(255,46,196,0.15)" : h >= 2 ? "rgba(90,200,250,0.15)" : "rgba(241,34,42,0.15)";
                   return (
                     <View key={i} style={{ backgroundColor: bg, borderRadius: 10, borderWidth: 1, borderColor: col + "60", paddingHorizontal: 12, paddingVertical: 7, minWidth: 64, alignItems: "center" }}>
                       <Text style={{ fontFamily: "Inter_800ExtraBold", fontSize: 13, color: col }}>{h.toFixed(2)}x</Text>
@@ -763,8 +763,8 @@ export default function GameScreen() {
         <View style={[styles.historyRow, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
           <View style={{ flex: 1, flexDirection: "row", gap: 5, overflow: "hidden" }}>
             {history.slice(0, 6).map((h, i) => {
-              const col = h >= 10 ? "#A500FF" : h >= 2 ? "#5AC8FA" : "#F1222A";
-              const bg  = h >= 10 ? "rgba(165,0,255,0.15)" : h >= 2 ? "rgba(90,200,250,0.15)" : "rgba(241,34,42,0.15)";
+              const col = h >= 10 ? "#FF2EC4" : h >= 2 ? "#5AC8FA" : "#F1222A";
+              const bg  = h >= 10 ? "rgba(255,46,196,0.15)" : h >= 2 ? "rgba(90,200,250,0.15)" : "rgba(241,34,42,0.15)";
               return (
                 <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "55" }]}>
                   <Text style={[styles.histText, { color: col }]}>{h.toFixed(2)}x</Text>
