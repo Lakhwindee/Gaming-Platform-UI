@@ -1057,7 +1057,7 @@ const styles = StyleSheet.create({
   connectionChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: C.bgCard, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6, borderWidth: 1, borderColor: C.border },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   connectionText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted },
-  historyRow: { marginBottom: 10, marginHorizontal: -4 },
+  historyRow: { marginTop: 10, marginBottom: 10, marginHorizontal: -4 },
   histChip: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginRight: 5, borderWidth: 1 },
   histText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   canvas: { width: CV_W, height: CV_H, backgroundColor: "#04000C", borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", marginBottom: 12 },

@@ -1002,7 +1002,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
 
   // Mobile: stack vertically (same as Expo)
   return (
-    <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', padding: '0 16px 24px', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', padding: '10px 16px 24px', boxSizing: 'border-box' }}>
       {historyModal}
       {historyStrip}
       {canvasEl}
