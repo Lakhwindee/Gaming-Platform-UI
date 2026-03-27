@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { WSC, wsSend, Phase, RoundBet, TopBet } from '../lib/wsClient';
-import { startAmbient, stopAmbient, playBlast, playCashout } from '../lib/soundEngine';
+import { startAmbient, stopAmbient, playBlast, playCashout, updateAmbientMult } from '../lib/soundEngine';
 
 // ── Constants (copied from Expo) ──────────────────────────────────────────
 const C = {
@@ -402,6 +402,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       ctx!.save();
       ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
       if (isFlying) {
+        updateAmbientMult(m); // Drone pitch rises with multiplier
         ctx!.font = 'bold 54px Inter,sans-serif';
         ctx!.fillStyle = mColor2;
         ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42);
@@ -527,20 +528,24 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         </button>
       );
     } else {
-      const canBet = !!state.user && effectiveStatus === 'idle';
+      // Only allow betting during waiting phase — block completely during flying/crashed
+      const canBet = !!state.user && effectiveStatus === 'idle' && phase === 'waiting';
+      const roundLive = isNextRound && !!state.user && effectiveStatus === 'idle';
       btnContent = (
-        <button onClick={() => placeBet(slotIdx)} disabled={!canBet} style={{
+        <button onClick={() => canBet ? placeBet(slotIdx) : undefined} disabled={!canBet} style={{
           width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
-          cursor: canBet ? 'pointer' : 'default',
-          background: !canBet
-            ? 'rgba(20,10,20,0.4)'
-            : isNextRound ? 'linear-gradient(135deg,#1565C0,#0D47A1)' : 'linear-gradient(135deg,#00C853,#009C41)',
+          cursor: canBet ? 'pointer' : 'not-allowed',
+          background: canBet
+            ? 'linear-gradient(135deg,#00C853,#009C41)'
+            : roundLive
+              ? 'rgba(255,26,58,0.12)'
+              : 'rgba(20,10,20,0.4)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
         }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
-            {!state.user ? 'SIGN IN' : isNextRound ? `BET NEXT  ₹${slot.amount.toLocaleString('en-IN')}` : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
+          <span style={{ fontSize: '11px', fontWeight: 700, color: roundLive ? '#FF1A3A' : canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
+            {!state.user ? 'SIGN IN' : roundLive ? 'ROUND LIVE' : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {isNextRound && canBet && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', letterSpacing: '1px' }}>next round</span>}
+          {roundLive && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,26,58,0.5)', letterSpacing: '1px' }}>wait for next round</span>}
         </button>
       );
     }

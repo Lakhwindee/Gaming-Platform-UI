@@ -1,14 +1,11 @@
-// Procedural sound engine — piano/guitar style ambient
+// Game sound engine — casino/crash game style
 let ctx: AudioContext | null = null;
-let ambientInterval: ReturnType<typeof setInterval> | null = null;
-let ambientGain: GainNode | null = null;
+let ambientNodes: { osc: OscillatorNode; gain: GainNode; lfo: OscillatorNode } | null = null;
 let _enabled = true;
-let _unlocked = false;
 
 // Unlock AudioContext on first user interaction (browser policy)
 if (typeof document !== 'undefined') {
   const unlock = () => {
-    _unlocked = true;
     if (!ctx) ctx = new AudioContext();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
   };
@@ -25,183 +22,203 @@ function getCtx(): AudioContext {
 
 export function setSoundEnabled(on: boolean) {
   _enabled = on;
-  if (ambientGain) {
-    ambientGain.gain.setTargetAtTime(on ? 0.28 : 0, getCtx().currentTime, 0.3);
+  if (ambientNodes) {
+    ambientNodes.gain.gain.setTargetAtTime(on ? 0.18 : 0, getCtx().currentTime, 0.3);
   }
 }
 export function isSoundEnabled() { return _enabled; }
 
-// Piano note using sine wave with quick attack, slow decay
-function playPianoNote(ac: AudioContext, freq: number, gain: number, startTime: number, duration: number) {
-  const osc = ac.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.value = freq;
+// ── AMBIENT: Tense rising electronic drone ────────────────────────────────────
+// Plays during the flying phase — a pulsing, building casino tension sound
+export function startAmbient() {
+  if (ambientNodes) return;
+  if (!_enabled) return;
+  const ac = getCtx();
+  if (ac.state === 'suspended') { ac.resume().then(() => _startAmbient(ac)).catch(() => {}); return; }
+  _startAmbient(ac);
+}
 
-  // Add a tiny bit of harmonic (triangle) for piano-like tone
+function _startAmbient(ac: AudioContext) {
+  const now = ac.currentTime;
+
+  // Main drone oscillator — sawtooth for electronic feel
+  const osc = ac.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(55, now); // A1 — deep bass
+
+  // LFO for tremolo/pulse effect (fast pulse for tension)
+  const lfo = ac.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 6; // 6Hz pulse
+
+  const lfoGain = ac.createGain();
+  lfoGain.gain.value = 0.07;
+
+  // Lowpass filter to soften the sawtooth
+  const filter = ac.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(400, now);
+  filter.frequency.linearRampToValueAtTime(900, now + 30); // slowly opens up — builds tension
+
+  // Master gain with fade in
+  const masterGain = ac.createGain();
+  masterGain.gain.setValueAtTime(0, now);
+  masterGain.gain.linearRampToValueAtTime(0.18, now + 1.2);
+
+  // Second harmony osc — fifth above (adds richness)
   const osc2 = ac.createOscillator();
   osc2.type = 'triangle';
-  osc2.frequency.value = freq * 2;
+  osc2.frequency.setValueAtTime(82.4, now); // E2 — perfect fifth
 
-  const env = ac.createGain();
-  env.gain.setValueAtTime(0, startTime);
-  env.gain.linearRampToValueAtTime(gain, startTime + 0.01);         // fast attack
-  env.gain.exponentialRampToValueAtTime(gain * 0.6, startTime + 0.08); // slight drop
-  env.gain.exponentialRampToValueAtTime(0.0001, startTime + duration); // long decay
+  const osc2Gain = ac.createGain();
+  osc2Gain.gain.value = 0.4;
 
-  const env2 = ac.createGain(); env2.gain.value = 0.15;
+  lfo.connect(lfoGain);
+  lfoGain.connect(masterGain.gain);
+  osc.connect(filter);
+  filter.connect(masterGain);
+  osc2.connect(osc2Gain);
+  osc2Gain.connect(masterGain);
+  masterGain.connect(ac.destination);
 
-  osc.connect(env); env.connect(ac.destination);
-  osc2.connect(env2); env2.connect(env);
-  osc.start(startTime); osc.stop(startTime + duration);
-  osc2.start(startTime); osc2.stop(startTime + duration);
-}
+  osc.start(now); osc2.start(now); lfo.start(now);
 
-// Am – F – C – G chord progression (piano arpeggio)
-// Frequencies in Hz: A3=220, C4=261.63, E4=329.63, F3=174.61, G3=196, G4=392
-const CHORDS = [
-  [220.00, 261.63, 329.63], // Am  (A3, C4, E4)
-  [174.61, 220.00, 261.63], // F   (F3, A3, C4)
-  [261.63, 329.63, 392.00], // C   (C4, E4, G4)
-  [196.00, 246.94, 293.66], // G   (G3, B3, D4)
-];
-let chordIdx = 0;
-
-function playChord(ac: AudioContext, master: GainNode) {
-  const now = ac.currentTime;
-  const chord = CHORDS[chordIdx % CHORDS.length];
-  chordIdx++;
-
-  // Arpeggio — stagger each note slightly (guitar strum feel)
-  chord.forEach((freq, i) => {
-    const delay = i * 0.06;
-    const osc = ac.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
-
-    const harmonic = ac.createOscillator();
-    harmonic.type = 'triangle';
-    harmonic.frequency.value = freq * 2;
-
-    const env = ac.createGain();
-    env.gain.setValueAtTime(0, now + delay);
-    env.gain.linearRampToValueAtTime(0.35, now + delay + 0.015);
-    env.gain.exponentialRampToValueAtTime(0.12, now + delay + 0.3);
-    env.gain.exponentialRampToValueAtTime(0.0001, now + delay + 1.6);
-
-    const harmGain = ac.createGain(); harmGain.gain.value = 0.18;
-
-    osc.connect(env); env.connect(master);
-    harmonic.connect(harmGain); harmGain.connect(env);
-    osc.start(now + delay); osc.stop(now + delay + 1.8);
-    harmonic.start(now + delay); harmonic.stop(now + delay + 1.8);
-  });
-
-  // Bass note — one octave below root
-  const bassFreq = chord[0] / 2;
-  const bassOsc = ac.createOscillator();
-  bassOsc.type = 'sine';
-  bassOsc.frequency.value = bassFreq;
-  const bassEnv = ac.createGain();
-  bassEnv.gain.setValueAtTime(0, now);
-  bassEnv.gain.linearRampToValueAtTime(0.45, now + 0.02);
-  bassEnv.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
-  bassOsc.connect(bassEnv); bassEnv.connect(master);
-  bassOsc.start(now); bassOsc.stop(now + 1.4);
-}
-
-// ── AMBIENT: Piano/guitar chord loop ─────────────────────────────────────────
-export function startAmbient() {
-  if (ambientInterval) return;
-  if (!_enabled) return;
-
-  const ac = getCtx();
-  const master = ac.createGain();
-  master.gain.setValueAtTime(0, ac.currentTime);
-  master.gain.linearRampToValueAtTime(0.28, ac.currentTime + 1.5);
-  master.connect(ac.destination);
-  ambientGain = master;
-
-  // Play first chord immediately, then repeat every 1.8s
-  playChord(ac, master);
-  ambientInterval = setInterval(() => {
-    if (!ambientGain) return;
-    const a = getCtx();
-    if (a.state === 'suspended') a.resume().catch(() => {});
-    playChord(a, ambientGain);
-  }, 1800);
+  ambientNodes = { osc, gain: masterGain, lfo };
 }
 
 export function stopAmbient() {
-  if (ambientInterval) { clearInterval(ambientInterval); ambientInterval = null; }
-  if (!ambientGain) return;
+  if (!ambientNodes) return;
   const ac = getCtx();
-  ambientGain.gain.setTargetAtTime(0, ac.currentTime, 0.5);
-  const g = ambientGain; ambientGain = null;
-  setTimeout(() => { try { g.disconnect(); } catch {} }, 2500);
-  chordIdx = 0;
+  const now = ac.currentTime;
+  ambientNodes.gain.gain.setTargetAtTime(0, now, 0.15);
+  const nodes = ambientNodes;
+  ambientNodes = null;
+  setTimeout(() => {
+    try { nodes.osc.stop(); nodes.lfo.stop(); nodes.gain.disconnect(); } catch {}
+  }, 800);
 }
 
-// ── BLAST: Sharp impact ───────────────────────────────────────────────────────
+// Update drone pitch as multiplier rises (tension builds)
+export function updateAmbientMult(mult: number) {
+  if (!ambientNodes || !_enabled) return;
+  const ac = getCtx();
+  // Subtly raise base frequency as mult increases (adds tension)
+  const baseFreq = 55 * Math.pow(1.008, Math.max(0, mult - 1) * 10);
+  ambientNodes.osc.frequency.setTargetAtTime(Math.min(baseFreq, 110), ac.currentTime, 0.5);
+}
+
+// ── BLAST: Heavy crash explosion ──────────────────────────────────────────────
 export function playBlast() {
   if (!_enabled) return;
   const ac = getCtx();
-  const doPlay = () => _doBlast(ac);
-  if (ac.state === 'suspended') { ac.resume().then(doPlay).catch(() => {}); return; }
-  doPlay();
+  if (ac.state === 'suspended') { ac.resume().then(() => _doBlast(ac)).catch(() => {}); return; }
+  _doBlast(ac);
 }
 
 function _doBlast(ac: AudioContext) {
   const now = ac.currentTime;
 
-  // Low sub thud
+  // Layer 1: Deep sub boom
   const sub = ac.createOscillator();
   sub.type = 'sine';
-  sub.frequency.setValueAtTime(90, now);
-  sub.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+  sub.frequency.setValueAtTime(80, now);
+  sub.frequency.exponentialRampToValueAtTime(20, now + 0.5);
   const subGain = ac.createGain();
-  subGain.gain.setValueAtTime(1.0, now);
-  subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+  subGain.gain.setValueAtTime(1.4, now);
+  subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
   sub.connect(subGain); subGain.connect(ac.destination);
-  sub.start(now); sub.stop(now + 0.45);
+  sub.start(now); sub.stop(now + 0.65);
 
-  // Sharp crack
-  const crack = ac.createOscillator();
-  crack.type = 'sine';
-  crack.frequency.setValueAtTime(400, now);
-  crack.frequency.exponentialRampToValueAtTime(80, now + 0.08);
-  const crackGain = ac.createGain();
-  crackGain.gain.setValueAtTime(0.7, now);
-  crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-  crack.connect(crackGain); crackGain.connect(ac.destination);
-  crack.start(now); crack.stop(now + 0.12);
+  // Layer 2: Mid-range punch
+  const mid = ac.createOscillator();
+  mid.type = 'square';
+  mid.frequency.setValueAtTime(200, now);
+  mid.frequency.exponentialRampToValueAtTime(60, now + 0.15);
+  const midGain = ac.createGain();
+  midGain.gain.setValueAtTime(0.6, now);
+  midGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  mid.connect(midGain); midGain.connect(ac.destination);
+  mid.start(now); mid.stop(now + 0.2);
 
-  // White noise burst
-  const bufSz = Math.floor(ac.sampleRate * 0.35);
+  // Layer 3: Wide noise burst (explosion texture)
+  const bufSz = Math.floor(ac.sampleRate * 0.5);
   const nb = ac.createBuffer(1, bufSz, ac.sampleRate);
   const d = nb.getChannelData(0);
   for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
   const noise = ac.createBufferSource(); noise.buffer = nb;
-  const nf = ac.createBiquadFilter(); nf.type = 'highpass'; nf.frequency.value = 1200;
+
+  // Low-cut + high-cut for explosion texture
+  const loCut = ac.createBiquadFilter(); loCut.type = 'highpass'; loCut.frequency.value = 80;
+  const hiCut = ac.createBiquadFilter(); hiCut.type = 'lowpass'; hiCut.frequency.value = 3000;
+
   const ng = ac.createGain();
-  ng.gain.setValueAtTime(0.5, now);
-  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-  noise.connect(nf); nf.connect(ng); ng.connect(ac.destination);
-  noise.start(now); noise.stop(now + 0.35);
+  ng.gain.setValueAtTime(0.9, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+  noise.connect(loCut); loCut.connect(hiCut); hiCut.connect(ng); ng.connect(ac.destination);
+  noise.start(now); noise.stop(now + 0.5);
+
+  // Layer 4: High snap (the "crack" of the crash)
+  const snap = ac.createOscillator();
+  snap.type = 'sine';
+  snap.frequency.setValueAtTime(800, now);
+  snap.frequency.exponentialRampToValueAtTime(150, now + 0.06);
+  const snapGain = ac.createGain();
+  snapGain.gain.setValueAtTime(0.8, now);
+  snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+  snap.connect(snapGain); snapGain.connect(ac.destination);
+  snap.start(now); snap.stop(now + 0.08);
 }
 
-// ── CASHOUT: Success chime (piano notes going up) ─────────────────────────────
+// ── CASHOUT: Coin shower win sound ────────────────────────────────────────────
 export function playCashout() {
   if (!_enabled) return;
   const ac = getCtx();
-  const doPlay = () => _doCashout(ac);
-  if (ac.state === 'suspended') { ac.resume().then(doPlay).catch(() => {}); return; }
-  doPlay();
+  if (ac.state === 'suspended') { ac.resume().then(() => _doCashout(ac)).catch(() => {}); return; }
+  _doCashout(ac);
 }
 
 function _doCashout(ac: AudioContext) {
-  // Rising piano arpeggio — C E G C (major chord up)
-  const notes = [261.63, 329.63, 392.00, 523.25];
-  notes.forEach((freq, i) => {
-    playPianoNote(ac, freq, 0.5, ac.currentTime + i * 0.1, 1.2 - i * 0.1);
+  const now = ac.currentTime;
+  // Rising cascade of coin-like tones
+  const freqs = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+  freqs.forEach((freq, i) => {
+    const t = now + i * 0.07;
+    const osc = ac.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+
+    // Add metallic shimmer via slight detune
+    const osc2 = ac.createOscillator();
+    osc2.type = 'triangle';
+    osc2.frequency.value = freq * 1.01; // slight detune for shimmer
+
+    const env = ac.createGain();
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.4, t + 0.015);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+
+    const env2 = ac.createGain();
+    env2.gain.value = 0.25;
+
+    osc.connect(env); env.connect(ac.destination);
+    osc2.connect(env2); env2.connect(env);
+    osc.start(t); osc.stop(t + 0.55);
+    osc2.start(t); osc2.stop(t + 0.55);
+  });
+
+  // Final big chord — triumphant
+  const chord = [523.25, 659.25, 783.99];
+  const chordT = now + freqs.length * 0.07;
+  chord.forEach((freq) => {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, chordT);
+    g.gain.linearRampToValueAtTime(0.3, chordT + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, chordT + 0.8);
+    o.connect(g); g.connect(ac.destination);
+    o.start(chordT); o.stop(chordT + 0.85);
   });
 }
