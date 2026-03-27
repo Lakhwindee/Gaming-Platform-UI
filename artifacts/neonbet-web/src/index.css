@@ -7,25 +7,27 @@
 }
 
 :root {
-  --bg:     #04000C;
-  --bg2:    #0A0018;
-  --bg3:    #100020;
-  --bg4:    #180030;
-  --border: #2A0A20;
-  --border2:#3A1030;
-  --text:   #ffffff;
-  --text2:  #AA88AA;
-  --text3:  #664466;
-  --primary:     #FF3A3A;
-  --primary-dark:#CC1A1A;
-  --neon-red:    #FF3A3A;
+  --bg:     #08020E;
+  --bg2:    #0D0208;
+  --bg3:    #110008;
+  --bg4:    #180010;
+  --bgCard: rgba(180,0,40,0.13);
+  --border: rgba(255,30,60,0.22);
+  --border2: rgba(255,30,60,0.35);
+  --text:   #FFFFFF;
+  --text2:  #E8D0D8;
+  --text3:  #AA7788;
+  --text4:  #664455;
+  --primary:     #CC0022;
+  --primaryBright: #FF1A3A;
+  --neon-red:    #FF1A3A;
   --neon-gold:   #FFD700;
-  --neon-green:  #00CC66;
+  --neon-green:  #00C853;
   --neon-blue:   #4DA6FF;
   --neon-purple: #FF4DFF;
   --radius:    12px;
-  --radius-lg: 18px;
-  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
 }
 
 html, body, #root {
@@ -36,9 +38,9 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
-::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 
 input, button, select, textarea {
@@ -46,68 +48,15 @@ input, button, select, textarea {
   outline: none;
 }
 
-button {
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
+button { cursor: pointer; border: none; background: none; }
 a { text-decoration: none; color: inherit; }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
+input[type=number] { -moz-appearance: textfield; }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes coinFlip {
-  0% { transform: rotateY(0deg); }
-  50% { transform: rotateY(90deg); }
-  100% { transform: rotateY(0deg); }
-}
-
-@keyframes neonPulse {
-  0%, 100% { box-shadow: 0 0 10px var(--neon-blue), 0 0 20px var(--neon-blue)40; }
-  50% { box-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-blue)60; }
-}
-
-@keyframes crashLine {
-  from { width: 0; }
-  to { width: 100%; }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-.animate-slide-in { animation: slideIn 0.4s ease forwards; }
-.animate-fade-in { animation: fadeIn 0.3s ease forwards; }
-.animate-scale-in { animation: scaleIn 0.3s ease forwards; }
-.animate-pulse { animation: pulse 2s infinite; }
-.animate-spin { animation: spin 1s linear infinite; }
-.animate-bounce { animation: bounce 0.6s ease infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes slideIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes scaleIn { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:scale(1)} }
