@@ -255,16 +255,19 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     function draw(now: number) {
       const phase = WSC.state.phase;
       const W = canvas!.width, H = CV_H;
-      if (phase === 'flying') {
-        if (startTimeRef.current === 0) startTimeRef.current = now;
-        elapsedRef.current = (now - startTimeRef.current) / 1000;
+
+      // ── Elapsed — exactly like Expo: (Date.now() - server.startTime) / 1000 ──
+      if (phase === 'flying' && WSC.state.startTime > 0) {
+        elapsedRef.current = (Date.now() - WSC.state.startTime) / 1000;
       } else if (phase === 'waiting') {
-        elapsedRef.current = 0; startTimeRef.current = 0; smoothAngRef.current = -0.22;
-      } else if (phase === 'crashed') {
-        if (crashTimeRef.current === 0) crashTimeRef.current = now;
+        elapsedRef.current = 0; startTimeRef.current = 0; smoothAngRef.current = -Math.PI / 2;
       }
-      if (phase !== 'crashed') crashTimeRef.current = 0;
-      const elapsed = WSC.state.elapsed ?? elapsedRef.current;
+      if (phase === 'crashed') {
+        if (crashTimeRef.current === 0) crashTimeRef.current = now;
+      } else {
+        crashTimeRef.current = 0;
+      }
+      const elapsed = elapsedRef.current;
       const m = calcMult(elapsed);
       const isFlying = phase === 'flying';
       const isCrashed = phase === 'crashed';
