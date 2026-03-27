@@ -466,7 +466,7 @@ export function handleConnection(ws: WebSocket) {
         ws.send(JSON.stringify({ type: 'bet_cancelled', slot: slotIdx + 1, refunded: false }));
         return;
       }
-      if (slot.active && !slot.cashedOut && (ENG.phase === 'waiting' || (ENG.phase === 'flying' && Date.now() - ENG.startTime < 3500))) {
+      if (slot.active && !slot.cashedOut && (ENG.phase === 'waiting' || (ENG.phase === 'flying' && Date.now() - ENG.startTime < 5000))) {
         const amount = slot.amount;
         slot.active = false; slot.betId = null; slot.amount = 0;
         if (state.username) {

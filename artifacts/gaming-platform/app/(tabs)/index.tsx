@@ -374,8 +374,10 @@ export default function GameScreen() {
       const slotIdx = (slotNum - 1) as 0 | 1;
 
       if (msg.type === "bet_ok") {
-        const isQueued = msg.auto === true;
-        updateSlot(slotIdx, { status: isQueued ? "active" : "placed", result: null });
+        // Always 'placed' — waiting→flying transition promotes to 'active'.
+        // Using 'active' on auto:true caused a race condition where the message
+        // arrived while the client was still in the old flying phase.
+        updateSlot(slotIdx, { status: "placed", result: null });
         if (Platform.OS !== "web") Haptics.selectionAsync();
       }
 
@@ -521,9 +523,9 @@ export default function GameScreen() {
   function cancelBet(slotIdx: 0 | 1) {
     const slot = slotRefs.current[slotIdx];
     const canCancel = slot.status === "placed" || slot.status === "queued" ||
-      // Also allow during first 3.5s of flying (server enforces the window)
+      // Also allow during first 5s of flying (server enforces the window)
       (slot.status === "active" && WSC.state.phase === "flying" &&
-        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 3500);
+        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 5000);
     if (!canCancel) return;
     wsSend({ type: "cancel_bet", slot: slotIdx + 1 });
     updateSlot(slotIdx, { status: "idle" });
@@ -558,7 +560,7 @@ export default function GameScreen() {
     const potentialWin = effectiveStatus === "active" ? Math.floor(slot.amount * mult) : 0;
 
     let btnContent: React.ReactNode;
-    const canStillCancel = effectiveStatus === "active" && phase === "flying" && elapsedSec < 3.5 && WSC.state.startTime > 0;
+    const canStillCancel = effectiveStatus === "active" && phase === "flying" && elapsedSec < 5.0 && WSC.state.startTime > 0;
     if (effectiveStatus === "active" && phase === "flying") {
       btnContent = (
         <View style={{ flex: 1, gap: 5 }}>

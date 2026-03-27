@@ -218,9 +218,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         // Mark active bets as lost
         if (slot1Ref.current.status === 'active') setSlot1(s => ({ ...s, status: 'lost', result: { text: 'LOST', win: false } }));
         if (slot2Ref.current.status === 'active') setSlot2(s => ({ ...s, status: 'lost', result: { text: 'LOST', win: false } }));
-        // Placed bets become queued for next
-        if (slot1Ref.current.status === 'placed') setSlot1(s => ({ ...s, status: 'queued' }));
-        if (slot2Ref.current.status === 'placed') setSlot2(s => ({ ...s, status: 'queued' }));
+        // NOTE: 'placed' bets are NOT demoted to 'queued' here.
+        // A 'placed' bet at crash time means bet_ok(auto:true) arrived slightly early
+        // (race condition). It should remain 'placed' so waiting→flying can promote it
+        // to 'active' in the correct new round.
         // 💥 Blast sound + stop ambient
         stopAmbient();
         playBlast();
@@ -244,10 +245,11 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const handler = (msg: Record<string, unknown>) => {
       const s = Number(msg.slot ?? 1);
       if (msg.type === 'bet_ok') {
-        // auto=true → queued bet activated for this round → set active immediately
-        // normal bet_ok → stays 'placed' until waiting→flying transition promotes it
-        const isAuto = msg.auto === true;
-        updateSlot(s === 2 ? 1 : 0, { status: isAuto ? 'active' : 'placed' });
+        // Always set 'placed' — waiting→flying transition promotes to 'active'.
+        // Using 'active' directly caused a race condition where auto:true arrived
+        // while the client was still in the old 'flying' phase, incorrectly showing
+        // CASHOUT + CANCEL BET for a queued bet in the wrong round.
+        updateSlot(s === 2 ? 1 : 0, { status: 'placed' });
       }
       if (msg.type === 'bet_queued') updateSlot(s === 2 ? 1 : 0, { status: 'queued' });
       if (msg.type === 'bet_fail') {
@@ -467,9 +469,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   function cancelBet(slotIdx: 0 | 1) {
     const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
     const canCancel = slot.status === 'placed' || slot.status === 'queued' ||
-      // Also allow during first 3.5s of flying (server enforces the window)
+      // Also allow during first 5s of flying (server enforces the window)
       (slot.status === 'active' && WSC.state.phase === 'flying' &&
-        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 3500);
+        WSC.state.startTime > 0 && Date.now() - WSC.state.startTime < 5000);
     if (!canCancel) return;
     wsSend({ type: 'cancel_bet', slot: slotIdx + 1 });
     updateSlot(slotIdx, { status: 'idle' });
@@ -521,7 +523,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const isNextRound = phase === 'flying' || phase === 'crashed';
 
     const elapsedMs = WSC.state.startTime > 0 ? Date.now() - WSC.state.startTime : 99999;
-    const canStillCancel = effectiveStatus === 'active' && isFlying && elapsedMs < 3500;
+    const canStillCancel = effectiveStatus === 'active' && isFlying && elapsedMs < 5000;
     let btnContent: React.ReactNode;
     if (effectiveStatus === 'active' && isFlying) {
       btnContent = (
