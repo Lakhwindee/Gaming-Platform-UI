@@ -48,7 +48,7 @@ router.post("/auth/register", async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 10);
     const rows = await db.insert(usersTable)
-      .values({ username, email, passwordHash, balance: 10000 })
+      .values({ username, email, passwordHash, balance: 0 })
       .returning();
     const user = rows[0];
     const token = makeToken(user.id, user.username);
