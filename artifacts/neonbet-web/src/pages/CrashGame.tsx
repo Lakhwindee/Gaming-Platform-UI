@@ -263,15 +263,24 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       for (let gx = 0; gx < W; gx += 60) { ctx!.beginPath(); ctx!.moveTo(gx, 0); ctx!.lineTo(gx, H); ctx!.stroke(); }
       for (let gy = 0; gy < H; gy += 50) { ctx!.beginPath(); ctx!.moveTo(0, gy); ctx!.lineTo(W, gy); ctx!.stroke(); }
 
-      // Multiplier axis labels
-      ctx!.fillStyle = 'rgba(255,255,255,0.2)'; ctx!.font = 'bold 10px Inter,sans-serif';
+      // Multiplier axis labels — Aviator matching colors
+      ctx!.font = 'bold 10px Inter,sans-serif';
       ctx!.textAlign = 'left'; ctx!.textBaseline = 'middle';
       const origX = W * 0.09, origY = H * 0.88;
-      [[2,'2x'],[5,'5x'],[10,'10x'],[25,'25x']].forEach(([v, label]) => {
-        const ry = origY - Math.sqrt(((v as number) - 1) / 50) * H * 0.76;
+      // [multiplier value, label, line-color, label-color]
+      const AXIS = [
+        [2,  '2x',  'rgba(255,58,58,0.25)',  'rgba(255,58,58,0.75)' ],
+        [5,  '5x',  'rgba(77,166,255,0.20)', 'rgba(77,166,255,0.75)'],
+        [10, '10x', 'rgba(77,166,255,0.25)', 'rgba(77,166,255,0.85)'],
+        [25, '25x', 'rgba(255,77,255,0.22)', 'rgba(255,77,255,0.80)'],
+      ] as [number, string, string, string][];
+      AXIS.forEach(([v, label, lineCol, textCol]) => {
+        const ry = origY - Math.sqrt((v - 1) / 50) * H * 0.76;
         if (ry > 10) {
+          ctx!.strokeStyle = lineCol; ctx!.lineWidth = 1;
           ctx!.beginPath(); ctx!.moveTo(origX, ry); ctx!.lineTo(W, ry); ctx!.stroke();
-          ctx!.fillText(label as string, 4, ry);
+          ctx!.fillStyle = textCol;
+          ctx!.fillText(label, 4, ry);
         }
       });
 
