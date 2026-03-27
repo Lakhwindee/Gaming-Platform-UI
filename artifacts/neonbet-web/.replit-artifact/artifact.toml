@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/neonbet-web/"
+title = "BLAZE"
+version = "1.0.0"
+id = "artifacts/neonbet-web"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+localPort = 19702
+name = "web"
+paths = ["/neonbet-web/"]
+
+[services.development]
+run = "pnpm --filter @workspace/neonbet-web run dev"
+
+[services.env]
+PORT = "19702"
+BASE_PATH = "/neonbet-web/"
+
+[services.production]
+build = ["pnpm", "--filter", "@workspace/neonbet-web", "run", "build"]
+publicDir = "artifacts/neonbet-web/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"

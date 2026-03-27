@@ -1,306 +1,85 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useGame } from "../context/GameContext";
-import { WSC, wsSend } from "../lib/wsClient";
-import type { RoundBet, TopBet } from "../lib/wsClient";
+import { useEffect, useRef, useState } from 'react';
+import { useGame } from '../context/GameContext';
+import { makeId } from '../lib/utils';
+import { WSC, wsSend, Phase, RoundBet, TopBet } from '../lib/wsClient';
 
-// ── Exact same constants as expo ───────────────────────────────────────────
-const CV_W = 358;
-const CV_H = 260;
-const ORIG_X = CV_W * 0.09;
-const ORIG_Y = CV_H * 0.88;
+const AVATAR_COLORS = ['#E53935','#8E24AA','#1E88E5','#00ACC1','#43A047','#F4511E','#F6BF26','#6D4C41'];
+const AVATAR_EMOJI  = ['🚀','🎯','💎','⚡','🔥','🎮','🏆','🦁'];
 
-const AVATAR_COLORS = ["#E53935","#8E24AA","#1E88E5","#00897B","#F4511E","#6D4C41","#546E7A","#43A047"];
-const AVATAR_EMOJI  = ["🦅","🚀","🎯","💰","🔥","⚡","🌙","🎲"];
+const STARS = Array.from({ length: 180 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: Math.random() * 1.6 + 0.4,
+  speed: 0.4 + Math.random() * 1.4,
+  blink: Math.random() * Math.PI * 2,
+}));
 
-// Expo C colors
-const C = {
-  bg: "#08020E",
-  bgCard: "rgba(180,0,40,0.13)",
-  border: "rgba(255,30,60,0.22)",
-  text: "#FFFFFF",
-  textMuted: "#AA7788",
-  gold: "#FFD700",
-  red: "#FF1A3A",
-  green: "#00C853",
-  greenDim: "#009C41",
-  orange: "#FF6B00",
-};
+function calcMult(t: number) { return Math.max(1, Math.pow(1.0006, t * 1000) * (1 + t * 0.012)); }
 
-function multColor(m: number): string {
-  if (m >= 10) return "#FF4DFF";
-  if (m >= 2)  return "#4DA6FF";
-  return "#FF3A3A";
-}
-
-// Exact same as expo
-function calcMult(elapsed: number): number {
-  return Math.floor(Math.pow(Math.E, 0.077 * elapsed) * 100) / 100;
-}
-
-// Exact same as expo (adapted to use CV_W/CV_H constants)
-function getPos(elapsed: number): { x: number; y: number } {
-  const norm = Math.min(elapsed / 52, 1);
-  const xProg = Math.pow(norm, 3.2);
-  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35);
-  const maxX = CV_W * 0.91 - ORIG_X;
-  const maxY = ORIG_Y - CV_H * 0.05;
+function getPos(t: number, _m: number, W: number, H: number) {
+  const origX = W * 0.07, origY = H * 0.88;
+  const maxX = W * 0.91 - origX;
+  const maxY = origY - H * 0.05;
+  const norm = Math.min(1, t / 52);
+  // Aviator-style: starts VERTICAL (goes up first), curves to HORIZONTAL (right later)
+  const xProg = Math.pow(norm, 3.2);                              // x: slow start, accelerates
+  const yProg = 1 - Math.pow(1 - Math.min(norm * 1.02, 1), 0.35); // y: fast rise, then flattens
   return {
-    x: ORIG_X + maxX * xProg,
-    y: Math.max(CV_H * 0.04, ORIG_Y - maxY * yProg),
+    x: origX + maxX * xProg,
+    y: Math.max(H * 0.04, origY - maxY * yProg),
   };
 }
 
-// Exact same stars as expo
-const STARS = Array.from({ length: 80 }, (_, i) => ({
-  x: (Math.sin(i * 137.5) * 0.5 + 0.5) * CV_W,
-  y: (Math.cos(i * 239.3) * 0.5 + 0.5) * CV_H * 0.9,
-  r: 0.5 + (i % 3) * 0.5,
-}));
-
-// ── BlastShape — exact port of expo BlastShape ─────────────────────────────
-function BlastShape() {
-  return (
-    <>
-      <circle cx={0} cy={0} r={38} fill="rgba(255,80,0,0.10)" />
-      <circle cx={0} cy={0} r={26} fill="rgba(255,120,0,0.18)" />
-      <circle cx={0} cy={0} r={17} fill="rgba(255,200,0,0.28)" />
-      <circle cx={0} cy={0} r={10} fill="#FF6B00" />
-      <circle cx={0} cy={0} r={5} fill="#FFD700" />
-      <circle cx={0} cy={0} r={2} fill="#FFFFFF" />
-      {[0,45,90,135,180,225,270,315].map((deg, i) => {
-        const rad = (deg * Math.PI) / 180;
-        const r1 = 13, r2 = 30 + (i % 3) * 8;
-        return (
-          <path
-            key={deg}
-            d={`M ${Math.cos(rad)*r1} ${Math.sin(rad)*r1} L ${Math.cos(rad)*r2} ${Math.sin(rad)*r2}`}
-            stroke={i % 2 === 0 ? "#FF6B00" : "#FFD700"}
-            strokeWidth={i % 2 === 0 ? 2.5 : 1.5}
-            strokeLinecap="round"
-            opacity={0.85}
-          />
-        );
-      })}
-      {[22,67,112,157,202,247,292,337].map((deg, i) => {
-        const rad = (deg * Math.PI) / 180;
-        const r2 = 18 + (i % 2) * 6;
-        return (
-          <circle
-            key={deg}
-            cx={Math.cos(rad) * r2}
-            cy={Math.sin(rad) * r2}
-            r={1.5 + (i % 3) * 0.8}
-            fill={i % 3 === 0 ? "#FFFFFF" : i % 3 === 1 ? "#FFD700" : "#FF4500"}
-            opacity={0.9}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-// ── RocketShape — exact port of expo RocketShape ───────────────────────────
-function RocketShape({ phase, flicker = 0, flicker2 = 0 }: { phase: string; flicker?: number; flicker2?: number }) {
-  const S = 26;
-  const isFlying = phase === "flying";
-  const isWaiting = phase === "waiting";
-  if (phase === "crashed") return <BlastShape />;
-  return (
-    <>
-      {isFlying && (
-        <>
-          <ellipse cx={0} cy={S * 0.85} rx={8} ry={S * 0.62} fill="url(#flameOuter)" />
-          <ellipse cx={0} cy={S * 0.70} rx={4.5} ry={S * 0.38} fill="url(#flameMid)" />
-          <ellipse cx={0} cy={S * 0.56} rx={2} ry={S * 0.20} fill="url(#flameCore)" />
-        </>
-      )}
-      {isWaiting && (
-        <>
-          <ellipse cx={-9} cy={S * 1.05 + flicker * S * 0.35} rx={4 + flicker2 * 2} ry={2.5 + flicker * 1.5} fill="#FF6B00" opacity={0.18 + flicker2 * 0.14} />
-          <ellipse cx={9} cy={S * 1.05 + flicker2 * S * 0.3} rx={4 + flicker * 2} ry={2 + flicker2 * 1.5} fill="#FFD700" opacity={0.15 + flicker * 0.12} />
-          <ellipse cx={0} cy={S * 0.78 + flicker * S * 0.18} rx={6.5 + flicker2 * 2.5} ry={S * 0.32 + flicker * S * 0.18} fill="url(#flameOuter)" opacity={0.55 + flicker * 0.35} />
-          <ellipse cx={0} cy={S * 0.64 + flicker2 * S * 0.10} rx={3.5 + flicker * 1.5} ry={S * 0.18 + flicker2 * S * 0.10} fill="url(#flameMid)" opacity={0.65 + flicker2 * 0.25} />
-          <ellipse cx={0} cy={S * 0.52} rx={2 + flicker * 1} ry={S * 0.09 + flicker * S * 0.05} fill="url(#flameCore)" opacity={0.8 + flicker2 * 0.2} />
-          <circle cx={-7 + flicker2 * 5} cy={S * 1.0 + flicker * S * 0.25} r={1.4} fill="#FFD700" opacity={flicker2 * 0.85} />
-          <circle cx={8 - flicker * 4} cy={S * 1.15 + flicker2 * S * 0.2} r={1.1} fill="#FF6B00" opacity={flicker * 0.7} />
-          <circle cx={-3} cy={S * 0.88 + flicker2 * S * 0.3} r={1.0} fill="#FFFFFF" opacity={flicker2 * 0.6} />
-          <circle cx={4} cy={S * 0.92 + flicker * S * 0.22} r={1.2} fill="#FFD700" opacity={flicker * 0.65} />
-          <circle cx={-10 + flicker * 3} cy={S * 1.25 + flicker2 * S * 0.15} r={0.9} fill="#FF4500" opacity={flicker2 * 0.5} />
-          <circle cx={10 - flicker2 * 3} cy={S * 1.3 + flicker * S * 0.1} r={0.8} fill="#FFD700" opacity={flicker * 0.55} />
-        </>
-      )}
-      <path d={`M -8 ${S * 0.2} L -17 ${S * 0.55} L -8 ${S * 0.42} Z`} fill="#D43050" />
-      <path d={`M 8 ${S * 0.2} L 17 ${S * 0.55} L 8 ${S * 0.42} Z`} fill="#D43050" />
-      <rect x={-8} y={-S * 0.46} width={16} height={S * 0.92} rx={4} ry={4} fill="url(#rocketBody)" />
-      <path d={`M 0 ${-S} L 8 ${-S * 0.46} L -8 ${-S * 0.46} Z`} fill="url(#rocketNose)" />
-      <rect x={-3.5} y={-S * 0.44} width={7} height={S * 0.26} rx={2} fill="#EE1133" opacity={0.9} />
-      <circle cx={0} cy={-S * 0.10} r={5} fill="rgba(80,160,255,0.22)" stroke="#88CCFF" strokeWidth={1.2} />
-      <circle cx={-1.5} cy={-S * 0.10 - 1.5} r={1.8} fill="rgba(255,255,255,0.55)" />
-      <rect x={-5} y={-S * 0.43} width={2.5} height={S * 0.82} rx={1.2} fill="rgba(255,255,255,0.18)" />
-      <rect x={-6.5} y={S * 0.44} width={13} height={5.5} rx={2} fill="#484E60" />
-    </>
-  );
-}
-
-// ── GameCanvas — exact SVG port of expo GameCanvas ─────────────────────────
-function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
-  phase: string; mult: number; countdown: number; elapsed: number; synced: boolean;
-}) {
-  const [, setTick] = useState(0);
-  const rafRef = useRef<number>(0);
-
-  // Drive re-renders at ~60fps — same as expo's useAnimatedValue loop
-  useEffect(() => {
-    const loop = () => { setTick(n => n + 1); rafRef.current = requestAnimationFrame(loop); };
-    rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  // Compute live elapsed every frame from startTime (smooth 60fps) — same as expo
-  const liveElapsed = (phase === "flying" && WSC.state.startTime > 0)
-    ? (Date.now() - WSC.state.startTime) / 1000
-    : elapsed;
-
-  const pos = (phase === "flying" || phase === "crashed")
-    ? getPos(liveElapsed)
-    : { x: ORIG_X + 10, y: ORIG_Y - 20 };
-
-  let pathD = `M ${ORIG_X} ${ORIG_Y}`;
-  if (phase === "flying" || phase === "crashed") {
-    const steps = 40;
-    for (let i = 1; i <= steps; i++) {
-      const t = liveElapsed * (i / steps);
-      const p = getPos(t);
-      pathD += ` L ${p.x} ${p.y}`;
-    }
+function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, t: number, crashed: boolean, waiting: boolean) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  if (crashed) { ctx.rotate(Math.PI * 0.4); ctx.globalAlpha = 0.35; }
+  if (waiting) {
+    const bob = Math.sin(t * 2.5) * 3;
+    ctx.translate(0, bob);
+    ctx.rotate(Math.sin(t * 1.3) * 0.04);
   }
-
-  const dT = 0.3;
-  const e0 = Math.max(liveElapsed - dT, 0.001);
-  const e1 = liveElapsed + dT;
-  const pA = getPos(e0);
-  const pB = getPos(e1);
-  const angle = Math.atan2(pB.y - pA.y, pB.x - pA.x);
-  const angleDeg = (angle * 180) / Math.PI + 90;
-
-  // Exact same as expo line 165
-  const mColor = phase === "crashed" ? "#FF1A3A" : mult >= 10 ? "#FFD700" : mult >= 3 ? "#FF6B00" : "#FFFFFF";
-
-  // Flicker driven by Date.now() — same as expo
-  const now = Date.now();
-  const flicker  = (Math.sin(now / 80) + 1) / 2;
-  const flicker2 = (Math.sin(now / 55 + 2.1) + 1) / 2;
-
-  return (
-    <div style={{ position: "relative", width: "100%", aspectRatio: `${CV_W}/${CV_H}`, backgroundColor: "rgba(4,0,12,0.9)", borderRadius: 16, border: `1px solid ${C.border}`, overflow: "hidden", marginBottom: 12 }}>
-      {/* SVG canvas — viewBox matches expo CV_W x CV_H */}
-      <svg
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${CV_W} ${CV_H}`}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ display: "block", position: "absolute", inset: 0 }}
-      >
-        <defs>
-          <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor={mColor} stopOpacity={0.15} />
-            <stop offset="100%" stopColor={mColor} stopOpacity={0} />
-          </radialGradient>
-          {/* Background gradient matching expo sky */}
-          <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#08020E" />
-            <stop offset="40%"  stopColor="#0D0208" />
-            <stop offset="75%"  stopColor="#130010" />
-            <stop offset="100%" stopColor="#180018" />
-          </linearGradient>
-          <linearGradient id="rocketBody" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%"   stopColor="#C8CED8" />
-            <stop offset="45%"  stopColor="#F0F2F8" />
-            <stop offset="100%" stopColor="#9098A8" />
-          </linearGradient>
-          <linearGradient id="rocketNose" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#FFFFFF" />
-            <stop offset="100%" stopColor="#B8C0D0" />
-          </linearGradient>
-          <linearGradient id="flameOuter" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#FFD700" stopOpacity="0.9" />
-            <stop offset="45%"  stopColor="#FF6B00" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#FF1A3A" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="flameMid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="50%"  stopColor="#FFD700" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#FF6B00" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="flameCore" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="1" />
-            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Background */}
-        <rect width={CV_W} height={CV_H} fill="url(#bgGrad)" />
-
-        {/* Stars — exact same as expo */}
-        {STARS.map((s, i) => (
-          <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#FFFFFF" opacity={0.4 + (i % 3) * 0.2} />
-        ))}
-
-        {/* Trajectory — exact same stroke widths/colors as expo */}
-        {(phase === "flying" || phase === "crashed") && (
-          <>
-            <path d={pathD} stroke="rgba(255,107,0,0.25)" strokeWidth={8} fill="none" strokeLinecap="round" />
-            <path d={pathD} stroke="rgba(255,107,0,0.5)"  strokeWidth={3} fill="none" strokeLinecap="round" />
-            <path d={pathD} stroke="#FFD700"               strokeWidth={1.5} fill="none" strokeLinecap="round" />
-            <circle cx={pos.x} cy={pos.y} r={18} fill="url(#glow)" />
-          </>
-        )}
-
-        {/* Rocket — G x y rotation originX=0 originY=0 maps to translate+rotate */}
-        <g transform={`translate(${pos.x}, ${pos.y}) rotate(${phase === "waiting" ? 0 : angleDeg})`}>
-          <RocketShape phase={phase} flicker={flicker} flicker2={flicker2} />
-        </g>
-      </svg>
-
-      {/* Overlays — exact same as expo */}
-      {phase === "flying" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <span style={{ fontSize: 54, fontWeight: 700, color: mColor, fontFamily: "Inter,sans-serif", lineHeight: 1 }}>
-            {mult.toFixed(2)}x
-          </span>
-        </div>
-      )}
-      {phase === "waiting" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none", gap: 2 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, letterSpacing: 2, fontFamily: "Inter,sans-serif" }}>NEXT ROUND IN</span>
-          <span style={{ fontSize: 40, fontWeight: 700, color: C.textMuted, fontFamily: "Inter,sans-serif", lineHeight: 1 }}>
-            {countdown}s
-          </span>
-        </div>
-      )}
-      {phase === "crashed" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <span style={{ fontSize: 54, fontWeight: 700, color: "#FF1A3A", fontFamily: "Inter,sans-serif", lineHeight: 1 }}>
-            {mult.toFixed(2)}x
-          </span>
-          <span style={{ fontSize: 20, fontWeight: 700, color: "#FF4500", letterSpacing: 5, marginTop: 4, fontFamily: "Inter,sans-serif" }}>
-            💥  BLAST!
-          </span>
-        </div>
-      )}
-      {!synced && (
-        <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(4,0,12,0.88)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 16 }}>
-          <span style={{ fontSize: 28, marginBottom: 8 }}>🚀</span>
-          <span style={{ color: "#FF3A3A", fontSize: 13, fontWeight: 700, letterSpacing: 2, fontFamily: "Inter,sans-serif" }}>SYNCING...</span>
-          <span style={{ color: "#AA5566", fontSize: 10, marginTop: 4, letterSpacing: 1, fontFamily: "Inter,sans-serif" }}>Connecting to live game</span>
-        </div>
-      )}
-    </div>
-  );
+  const S = 22;
+  if (!crashed) {
+    ctx.shadowColor = '#FF7700'; ctx.shadowBlur = 14;
+    for (let i = 0; i < 3; i++) {
+      const off = (i - 1) * S * 0.22;
+      const fl = ctx.createLinearGradient(-S * 1.1 + off, 0, -S * 1.7 + off, 0);
+      fl.addColorStop(0, i === 1 ? '#FFD700' : '#FF6600');
+      fl.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.fillStyle = fl;
+      ctx.beginPath(); ctx.ellipse(-S * 1.0, off, S * 0.6, S * 0.22, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+  ctx.fillStyle = '#D43050';
+  ctx.beginPath(); ctx.moveTo(-S * 0.25, -S * 0.3); ctx.lineTo(-S * 0.78, -S * 0.65); ctx.lineTo(-S * 0.55, -S * 0.3); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-S * 0.25,  S * 0.3); ctx.lineTo(-S * 0.78,  S * 0.65); ctx.lineTo(-S * 0.55,  S * 0.3); ctx.closePath(); ctx.fill();
+  const bg = ctx.createLinearGradient(0, -S * 0.32, 0, S * 0.32);
+  bg.addColorStop(0, '#C8CED8'); bg.addColorStop(0.45, '#F0F2F8'); bg.addColorStop(1, '#9098A8');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.roundRect(-S * 0.8, -S * 0.3, S * 1.1, S * 0.6, S * 0.14); ctx.fill();
+  ctx.fillStyle = '#EE1133';
+  ctx.beginPath(); ctx.rect(-S * 0.18, -S * 0.3, S * 0.22, S * 0.6); ctx.fill();
+  ctx.fillStyle = '#CC1133';
+  ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.3, S * 0.3); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = 'rgba(255,100,130,0.4)';
+  ctx.beginPath(); ctx.moveTo(S * 0.85, 0); ctx.lineTo(S * 0.3, -S * 0.3); ctx.lineTo(S * 0.62, -S * 0.1); ctx.closePath(); ctx.fill();
+  ctx.shadowColor = '#88CCFF'; ctx.shadowBlur = 8;
+  ctx.fillStyle = 'rgba(80,160,255,0.35)';
+  ctx.beginPath(); ctx.arc(S * 0.18, 0, S * 0.17, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.arc(S * 0.12, -S * 0.06, S * 0.07, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#484E60';
+  ctx.beginPath(); ctx.roundRect(-S * 0.82, -S * 0.18, S * 0.18, S * 0.36, 3); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
-// ── Slot types — exact same as expo ───────────────────────────────────────
-type SlotStatus = "idle" | "placed" | "queued" | "active" | "cashedout" | "lost";
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; r: number; color: string; ray?: boolean; ox?: number; oy?: number; };
+
+type SlotStatus = 'idle' | 'placing' | 'active' | 'queued' | 'cashedout' | 'lost';
 interface SlotState {
   amount: number;
   input: string;
@@ -308,627 +87,626 @@ interface SlotState {
   cashedOutAt: number | null;
   result: { text: string; win: boolean } | null;
 }
-function initSlot(defaultAmt: number): SlotState {
-  return { amount: defaultAmt, input: String(defaultAmt), status: "idle", cashedOutAt: null, result: null };
-}
+const mkSlot = (amt: number): SlotState => ({ amount: amt, input: String(amt), status: 'idle', cashedOutAt: null, result: null });
 
-// ── Main game screen ───────────────────────────────────────────────────────
-export default function CrashGame({ onAuthOpen }: { onAuthOpen?: () => void }) {
-  const { state } = useGame();
-  const user = state.user;
+function multColor(m: number) { return m >= 10 ? '#FF4DFF' : m >= 2 ? '#4DA6FF' : '#FF3A3A'; }
 
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
-  useEffect(() => {
-    const onResize = () => setIsDesktop(window.innerWidth >= 768);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+type BetsTab = 'all' | 'prev' | 'top';
 
+export default function CrashGame({ navigate }: { navigate: (t: string) => void }) {
+  const { state, addHistory, addNotification } = useGame();
   const [, setTick] = useState(0);
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
-  const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
-  const resultTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
+  const [betsTab, setBetsTab] = useState<BetsTab>('all');
 
-  const [cashoutPopup, setCashoutPopup] = useState<{ payout: number; mult: number } | null>(null);
-  const popupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [slot1, setSlot1] = useState<SlotState>(mkSlot(100));
+  const [slot2, setSlot2] = useState<SlotState>(mkSlot(200));
 
-  const updateSlot = useCallback((idx: 0 | 1, patch: Partial<SlotState>) => {
-    setSlots(prev => {
-      const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
-      next[idx] = { ...next[idx], ...patch };
-      slotRefs.current = next;
-      return next;
-    });
-  }, []);
+  const slot1Ref = useRef(slot1);
+  const slot2Ref = useRef(slot2);
+  const addHistRef   = useRef(addHistory);
+  const addNotifRef  = useRef(addNotification);
+  const stateRef     = useRef(state);
+  const prevPhaseRef = useRef<Phase>(WSC.state.phase);
 
-  // WSC listener — same as expo
   useEffect(() => {
-    const wsListener = () => {
-      if (WSC.state.phase === "flying" && WSC.state.startTime > 0) {
-        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
+    slot1Ref.current = slot1;
+    slot2Ref.current = slot2;
+    addHistRef.current = addHistory;
+    addNotifRef.current = addNotification;
+    stateRef.current = state;
+  });
+
+  // Reset slots when new round starts
+  useEffect(() => {
+    const update = () => {
+      const newPhase = WSC.state.phase;
+      const oldPhase = prevPhaseRef.current;
+      if (oldPhase === 'crashed' && newPhase === 'waiting') {
+        setSlot1(s => s.status === 'cashedout' || s.status === 'lost' ? { ...s, status: 'idle', cashedOutAt: null, result: null } : s);
+        setSlot2(s => s.status === 'cashedout' || s.status === 'lost' ? { ...s, status: 'idle', cashedOutAt: null, result: null } : s);
       }
+      prevPhaseRef.current = newPhase;
       setTick(n => n + 1);
     };
-    WSC.listeners.add(wsListener);
-    return () => { WSC.listeners.delete(wsListener); };
+    WSC.listeners.add(update);
+    return () => { WSC.listeners.delete(update); };
   }, []);
 
-  // Smooth elapsed timer — same as expo
-  useEffect(() => {
-    const id = setInterval(() => {
-      if (WSC.state.phase === "flying") {
-        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
-      } else if (WSC.state.phase === "waiting") {
-        setElapsedSec(0);
-      }
-    }, 50);
-    return () => clearInterval(id);
-  }, []);
-
-  // Message handler — same as expo
+  // Handle server messages
   useEffect(() => {
     const handler = (msg: Record<string, unknown>) => {
-      const slotNum = (msg.slot as number | undefined) ?? 1;
-      const slotIdx = (slotNum - 1) as 0 | 1;
+      const s = Number(msg.slot ?? 1);
+      const setSlot = s === 2 ? setSlot2 : setSlot1;
+      const slotRef = s === 2 ? slot2Ref : slot1Ref;
 
-      if (msg.type === "bet_ok") {
-        const isQueued = msg.auto === true;
-        updateSlot(slotIdx, { status: isQueued ? "active" : "placed", result: null });
+      if (msg.type === 'bet_ok') {
+        setSlot(prev => ({ ...prev, status: 'active' }));
       }
-      if (msg.type === "bet_queued") {
-        updateSlot(slotIdx, { status: "queued", result: null });
+      if (msg.type === 'bet_queued') {
+        setSlot(prev => ({ ...prev, status: 'queued' }));
       }
-      if (msg.type === "bet_cancelled") {
-        updateSlot(slotIdx, { status: "idle" });
+      if (msg.type === 'bet_fail') {
+        setSlot(prev => ({ ...prev, status: 'idle', result: { text: String(msg.error ?? 'Bet failed'), win: false } }));
+        addNotifRef.current(`❌ Bet failed: ${msg.error}`, 'loss');
       }
-      if (msg.type === "cashout_ok") {
-        const m = msg.mult as number;
+      if (msg.type === 'cashout_ok') {
+        const mult = msg.mult as number;
         const payout = msg.payout as number;
-        const amt = slotRefs.current[slotIdx].amount;
-        const profit = payout - amt;
-        if (resultTimers.current[slotIdx]) clearTimeout(resultTimers.current[slotIdx]!);
-        updateSlot(slotIdx, {
-          status: "cashedout",
-          cashedOutAt: m,
-          result: { text: `+₹${profit.toLocaleString("en-IN")} @ ${m.toFixed(2)}x`, win: true },
-        });
-        resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
-        if (popupTimer.current) clearTimeout(popupTimer.current);
-        setCashoutPopup({ payout, mult: m });
-        popupTimer.current = setTimeout(() => setCashoutPopup(null), 5000);
+        const wager = slotRef.current.amount;
+        const profit = payout - wager;
+        setSlot(prev => ({ ...prev, status: 'cashedout', cashedOutAt: mult, result: { text: `Cashed out @${mult.toFixed(2)}x! +₹${profit.toLocaleString()}`, win: true } }));
+        addNotifRef.current(`✈️ Cashed out at ${mult.toFixed(2)}x! +₹${profit.toLocaleString()}`, 'win');
+        if (stateRef.current.user)
+          addHistRef.current({ id: makeId(), game: 'crash', wager, multiplier: mult, payout, won: true, timestamp: Date.now() });
       }
-      if (msg.type === "cashout_fail") {
-        updateSlot(slotIdx, { status: "active" });
+      if (msg.type === 'cashout_fail') {
+        setSlot(prev => ({ ...prev, result: { text: String(msg.error ?? 'Cashout failed'), win: false } }));
       }
-      if (msg.type === "bet_crash") {
-        const m = msg.mult as number;
-        const amt = slotRefs.current[slotIdx].amount;
-        if (resultTimers.current[slotIdx]) clearTimeout(resultTimers.current[slotIdx]!);
-        updateSlot(slotIdx, {
-          status: "lost",
-          result: { text: `-₹${amt.toLocaleString("en-IN")} @ ${m.toFixed(2)}x`, win: false },
-        });
-        resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
-      }
-      if (msg.type === "bet_fail") {
-        const errSlot = (((msg.slot as number | undefined) ?? 1) - 1) as 0 | 1;
-        alert(String(msg.error ?? "Bet failed. Please try again."));
-        updateSlot(errSlot, { status: "idle" });
-      }
-      if (msg.type === "state") {
-        const newPhase = (msg as { phase?: string }).phase;
-        if (newPhase === "waiting") {
-          setSlots(prev => {
-            const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
-            for (let i = 0; i < 2; i++) {
-              if (next[i].status === "lost" || next[i].status === "cashedout") {
-                next[i] = { ...next[i], status: "idle", cashedOutAt: null };
-              }
-            }
-            slotRefs.current = next;
-            return next;
-          });
-        }
-        if (newPhase === "flying") {
-          setSlots(prev => {
-            const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
-            for (let i = 0; i < 2; i++) {
-              if (next[i].status === "placed") next[i] = { ...next[i], status: "active" };
-            }
-            slotRefs.current = next;
-            return next;
-          });
-        }
+      if (msg.type === 'bet_crash') {
+        const mult = msg.mult as number;
+        const wager = slotRef.current.amount;
+        setSlot(prev => ({ ...prev, status: 'lost', result: { text: `Flew away @${mult.toFixed(2)}x`, win: false } }));
+        if (stateRef.current.user)
+          addHistRef.current({ id: makeId(), game: 'crash', wager, multiplier: mult, payout: 0, won: false, timestamp: Date.now() });
       }
     };
     WSC.msgListeners.add(handler);
     return () => { WSC.msgListeners.delete(handler); };
-  }, [updateSlot]);
+  }, []);
 
-  const phase     = WSC.state.phase;
-  const mult      = WSC.state.mult;
-  const countdown = WSC.state.countdown;
-  const allBets   = WSC.state.allBets ?? [];
-  const history   = WSC.state.history ?? [];
-  const betCount    = WSC.state.betCount ?? 0;
-  const cashedCount = WSC.state.cashedCount ?? 0;
-  const totalWin    = WSC.state.totalWin ?? 0;
-  const prevRound   = WSC.state.prevRound ?? null;
-  const topBets     = WSC.state.topBets ?? [];
-  const topHistory  = (WSC.state as any).topHistory ?? [];
-  const connected   = WSC.state.connected;
-  const synced      = WSC.state.synced;
+  // Canvas
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const animRef      = useRef(0);
+  const smoothAngRef = useRef(-0.3);
+  const lastElRef    = useRef(0);
+  const crashPosRef  = useRef({ x: 0, y: 0 });
+  const crashTimeRef = useRef(0);
+  const particlesRef = useRef<Particle[]>([]);
+  const cvPrevPhase  = useRef<Phase>(WSC.state.phase);
 
-  const [betsTab, setBetsTab] = useState<"all" | "prev" | "top">("all");
-  const [topSort, setTopSort] = useState<"X" | "Win" | "Rounds">("X");
-  const [topTime, setTopTime] = useState<"Day" | "Month" | "Year">("Month");
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    const W = canvas.width, H = canvas.height;
+    const ORIG_X = W * 0.09, ORIG_Y = H * 0.88;
+    const EXP_COLORS = ['#FF8800', '#FF4400', '#FFCC00', '#FF2200', '#FFE080', '#FFFFFF'];
+    const RAY_COLORS = ['#FFFFFF', '#FFD700', '#FF6B00', '#FF3A3A', '#FFB800', '#FF9500', '#FFEE80', '#FF5500', '#FFD000', '#FFAAAA'];
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const now = Date.now();
+      const t = now / 1000;
+      const { phase, mult: m, startTime } = WSC.state;
+      const isFlying  = phase === 'flying';
+      const isCrashed = phase === 'crashed';
+      const isWaiting = phase === 'waiting';
+
+      const elapsed = isFlying ? (now - startTime) / 1000 : lastElRef.current;
+      if (isFlying) { lastElRef.current = elapsed; crashPosRef.current = getPos(elapsed, m, W, H); }
+      if (isWaiting) { lastElRef.current = 0; smoothAngRef.current = -0.22; }
+
+      if (cvPrevPhase.current === 'flying' && phase === 'crashed') {
+        crashTimeRef.current = now;
+        const cp = crashPosRef.current;
+        for (let i = 0; i < 22; i++) {
+          const ang = Math.random() * Math.PI * 2; const spd = 1.5 + Math.random() * 5;
+          particlesRef.current.push({ x: cp.x, y: cp.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 2, life: 1, r: 1.5 + Math.random() * 2.5, color: EXP_COLORS[Math.floor(Math.random() * EXP_COLORS.length)] });
+        }
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10) * Math.PI * 2; const spd = 3.5 + Math.random() * 3;
+          particlesRef.current.push({ x: cp.x, y: cp.y, ox: cp.x, oy: cp.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 1, r: 0, color: RAY_COLORS[i % RAY_COLORS.length], ray: true });
+        }
+      }
+      if (isWaiting) particlesRef.current = [];
+      cvPrevPhase.current = phase;
+
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, '#04000C'); sky.addColorStop(0.4, '#08000F');
+      sky.addColorStop(0.75, '#0C0015'); sky.addColorStop(1, '#100018');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+      STARS.forEach(s => {
+        ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * s.speed + s.blink));
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath(); ctx.arc(s.x * W, s.y * H * 0.85, s.r, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.globalAlpha = 1;
+
+      const mX = W * 0.88, mY = H * 0.09;
+      ctx.shadowColor = 'rgba(200,220,255,0.35)'; ctx.shadowBlur = 28;
+      ctx.fillStyle = '#F0F0D8';
+      ctx.beginPath(); ctx.arc(mX, mY, 24, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(200,200,190,0.45)';
+      [[mX - 7, mY - 5, 4.5], [mX + 6, mY + 7, 3.5], [mX - 3, mY + 8, 2.5]].forEach(([mx, my, mr]) => {
+        ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.fillStyle = 'rgba(2,8,20,0.38)';
+      ctx.beginPath(); ctx.arc(mX + 7, mY, 22, 0, Math.PI * 2); ctx.fill();
+
+      [[0.12, 0.28, 80, 0.10], [0.46, 0.20, 65, 0.07], [0.78, 0.26, 75, 0.09]].forEach(([rx, ry, rs, ra]) => {
+        ctx.globalAlpha = ra; ctx.fillStyle = '#8AAABB';
+        ctx.beginPath(); ctx.arc(rx * W, ry * H, rs, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(rx * W + 50, ry * H + 8, rs * 0.65, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(rx * W - 45, ry * H + 10, rs * 0.55, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+
+      const cg = ctx.createLinearGradient(0, H * 0.83, 0, H);
+      cg.addColorStop(0, 'rgba(30,70,120,0)'); cg.addColorStop(1, 'rgba(40,80,140,0.28)');
+      ctx.fillStyle = cg; ctx.fillRect(0, H * 0.83, W, H * 0.17);
+      ctx.globalAlpha = 0.45;
+      for (let i = 0; i < 55; i++) {
+        ctx.fillStyle = ['#FFE080', '#FF9040', '#80C8FF', '#FFFFFF'][(i * 7) % 4];
+        ctx.fillRect((i * 137.5) % W, H * 0.87 + (i * 23.7) % (H * 0.11), 1.5, 1.5);
+      }
+      ctx.globalAlpha = 1;
+
+      if (isFlying || isCrashed) {
+        const drawEl = elapsed; const N = 90;
+        ctx.shadowColor = '#FF5500'; ctx.shadowBlur = 20;
+        ctx.strokeStyle = 'rgba(255,80,0,0.3)'; ctx.lineWidth = 10;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
+        ctx.stroke();
+        ctx.shadowBlur = 8; ctx.strokeStyle = 'rgba(255,140,20,0.65)'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
+        ctx.stroke();
+        ctx.shadowBlur = 3; ctx.strokeStyle = '#FFCC44'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ORIG_X, ORIG_Y);
+        for (let i = 1; i <= N; i++) { const ft = drawEl * (i / N); const p = getPos(ft, calcMult(ft), W, H); ctx.lineTo(p.x, p.y); }
+        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FFCC44'; ctx.shadowColor = '#FF8800'; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(ORIG_X, ORIG_Y, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+        const curPt = getPos(drawEl, m, W, H);
+        ctx.strokeStyle = 'rgba(255,255,255,0.09)'; ctx.lineWidth = 1;
+        ctx.setLineDash([4, 8]);
+        ctx.font = 'bold 11px Inter,sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        [2, 5, 10, 25].forEach(mv => {
+          if (m >= mv) {
+            let gt = 0;
+            for (let ss = 0; ss < 400; ss++) { if (calcMult(ss * 0.1) >= mv) { gt = ss * 0.1; break; } }
+            const gp = getPos(gt, mv, W, H);
+            ctx.beginPath(); ctx.moveTo(ORIG_X, gp.y); ctx.lineTo(curPt.x + 8, gp.y); ctx.stroke();
+            ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(`${mv}x`, ORIG_X - 4, gp.y);
+          }
+        });
+        ctx.setLineDash([]);
+      }
+
+      const pos = (isFlying || isCrashed) ? getPos(elapsed, m, W, H) : { x: ORIG_X, y: ORIG_Y };
+      if (!isWaiting) {
+        const dT = 0.25;
+        const pA = getPos(Math.max(elapsed - dT, 0), calcMult(Math.max(elapsed - dT, 0.001)), W, H);
+        const pB = getPos(elapsed + dT, calcMult(elapsed + dT), W, H);
+        const rawAng = Math.atan2(pB.y - pA.y, pB.x - pA.x);
+        smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.08;
+      }
+      let angle = smoothAngRef.current;
+      if (isCrashed) angle += ((now - crashTimeRef.current) / 1000) * 3.5;
+      if (isFlying) {
+        const cG = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 26);
+        cG.addColorStop(0, 'rgba(180,210,255,0.18)'); cG.addColorStop(1, 'rgba(180,210,255,0)');
+        ctx.fillStyle = cG; ctx.beginPath(); ctx.arc(pos.x, pos.y, 26, 0, Math.PI * 2); ctx.fill();
+      }
+      drawRocket(ctx, pos.x, pos.y, isWaiting ? -0.22 : angle, t, isCrashed, isWaiting);
+
+      particlesRef.current = particlesRef.current.filter(p => p.life > 0).map(p => {
+        const shimmer = 0.65 + 0.35 * Math.abs(Math.sin(now / 55 + p.x * 0.05 + p.y * 0.03));
+        if (p.ray) {
+          p.x += p.vx * 0.88; p.y += p.vy * 0.88; p.life -= 0.035;
+          ctx.globalAlpha = p.life * shimmer; ctx.strokeStyle = p.color;
+          ctx.lineWidth = 3 * p.life; ctx.lineCap = 'round';
+          ctx.shadowColor = p.color; ctx.shadowBlur = 12 + 10 * shimmer;
+          ctx.beginPath(); ctx.moveTo(p.ox!, p.oy!); ctx.lineTo(p.x, p.y); ctx.stroke();
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        } else {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.10; p.vx *= 0.97; p.r *= 0.97; p.life -= 0.022;
+          ctx.globalAlpha = p.life * shimmer; ctx.shadowColor = p.color; ctx.shadowBlur = 8 + 8 * shimmer;
+          ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        }
+        return p;
+      });
+
+      // Altitude display
+      if (isFlying || isCrashed) {
+        const col = multColor(m);
+        const label = isCrashed ? 'BLAST!' : `${m.toFixed(2)}x`;
+        ctx.save();
+        ctx.font = `bold ${isCrashed ? 34 : 52}px Inter,sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.shadowColor = col; ctx.shadowBlur = 28;
+        ctx.fillStyle = col;
+        ctx.fillText(label, W / 2, H * 0.42);
+        if (isCrashed) {
+          ctx.font = 'bold 22px Inter,sans-serif';
+          ctx.fillStyle = 'rgba(255,255,255,0.6)';
+          ctx.shadowBlur = 0;
+          ctx.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42 + 42);
+        }
+        ctx.shadowBlur = 0; ctx.restore();
+      } else if (isWaiting) {
+        const cd = WSC.state.countdown;
+        ctx.save();
+        ctx.font = 'bold 18px Inter,sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillText(cd > 0 ? `Starting in ${cd.toFixed(0)}s` : 'Starting...', W / 2, H * 0.42);
+        ctx.restore();
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    }
+    animRef.current = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
 
   function placeBet(slotIdx: 0 | 1) {
-    if (!user) { onAuthOpen?.(); return; }
-    const slot = slots[slotIdx];
-    const isEffectivelyIdle = slot.status === "idle" || slot.status === "cashedout" || slot.status === "lost";
-    if (!isEffectivelyIdle) return;
-    wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
-    updateSlot(slotIdx, {
-      status: (phase === "flying" || phase === "crashed") ? "queued" : "placed",
-      result: null,
-    });
-  }
-
-  function cancelBet(slotIdx: 0 | 1) {
-    const slot = slots[slotIdx];
-    if (slot.status !== "placed" && slot.status !== "queued") return;
-    wsSend({ type: "cancel_bet", slot: slotIdx + 1 });
-    updateSlot(slotIdx, { status: "idle" });
+    if (!state.user) { navigate('profile'); return; }
+    const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
+    if (slot.status !== 'idle') return;
+    const setSlot = slotIdx === 0 ? setSlot1 : setSlot2;
+    setSlot(s => ({ ...s, status: 'placing' }));
+    wsSend({ type: 'place_bet', slot: slotIdx + 1, amount: slot.amount });
   }
 
   function cashOut(slotIdx: 0 | 1) {
-    const slot = slots[slotIdx];
-    if (slot.status !== "active" || phase !== "flying") return;
-    wsSend({ type: "cashout", slot: slotIdx + 1 });
+    const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
+    if (slot.status !== 'active') return;
+    wsSend({ type: 'cashout', slot: slotIdx + 1 });
+  }
+
+  function cancelBet(slotIdx: 0 | 1) {
+    const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
+    if (slot.status !== 'queued') return;
+    const setSlot = slotIdx === 0 ? setSlot1 : setSlot2;
+    setSlot(s => ({ ...s, status: 'idle' }));
+    wsSend({ type: 'cancel_bet', slot: slotIdx + 1 });
   }
 
   function setSlotAmount(slotIdx: 0 | 1, val: number) {
-    const amt = Math.max(10, val);
-    updateSlot(slotIdx, { amount: amt, input: String(amt) });
+    const setSlot = slotIdx === 0 ? setSlot1 : setSlot2;
+    const v = Math.max(10, Math.min(100000, val));
+    setSlot(s => ({ ...s, amount: v, input: String(v) }));
   }
 
-  // ── Bet panel — exact port of expo renderBetPanel ──────────────────────
-  function renderBetPanel(slotIdx: 0 | 1) {
-    const slot = slots[slotIdx];
-    const label = slotIdx === 0 ? "BET 1" : "BET 2";
-    const effectiveStatus: SlotStatus = (slot.status === "cashedout" || slot.status === "lost") ? "idle" : slot.status;
-    const canEdit = effectiveStatus === "idle";
-    const potentialWin = effectiveStatus === "active" ? Math.floor(slot.amount * mult) : 0;
+  const phase = WSC.state.phase;
+  const mult  = WSC.state.mult;
+  const history = WSC.state.history;
+  const allBets = WSC.state.allBets ?? [];
+  const betCount = WSC.state.betCount ?? 0;
+  const cashedCount = WSC.state.cashedCount ?? 0;
+  const totalWin = WSC.state.totalWin ?? 0;
+  const prevRound = WSC.state.prevRound ?? null;
+  const topBets = WSC.state.topBets ?? [];
 
-    let btnContent: React.ReactNode;
-    if (effectiveStatus === "active" && phase === "flying") {
-      btnContent = (
-        <button onClick={() => cashOut(slotIdx)} style={{ flex: 1, width: "100%", background: "linear-gradient(to bottom, #FF8C00, #CC4400)", border: "none", borderRadius: 12, padding: "14px 0", cursor: "pointer", boxShadow: "0 0 16px rgba(255,107,0,0.8)" }}>
-          <div style={{ color: "#FFF", fontSize: 11, fontWeight: 700, letterSpacing: 0.8 }}>CASHOUT  ₹{potentialWin.toLocaleString("en-IN")}</div>
-          <div style={{ color: "#FFF", fontSize: 16, fontWeight: 700, marginTop: 1 }}>{mult.toFixed(2)}x</div>
+  function renderBetPanel(slotIdx: 0 | 1) {
+    const slot = slotIdx === 0 ? slot1 : slot2;
+    const label = slotIdx === 0 ? 'BET 1' : 'BET 2';
+    const canEdit = slot.status === 'idle';
+    const isFlying = phase === 'flying' || phase === 'crashed';
+
+    let mainBtn: React.ReactNode;
+    if (slot.status === 'active') {
+      mainBtn = (
+        <button onClick={() => cashOut(slotIdx)} style={{
+          width: '100%', padding: '13px', borderRadius: '12px', border: 'none', cursor: 'pointer',
+          background: 'linear-gradient(135deg,#FF3A3A,#CC0000)',
+          color: '#fff', fontWeight: 900, fontSize: '14px', letterSpacing: '0.5px',
+        }}>
+          CASHOUT @ {mult.toFixed(2)}x
         </button>
       );
-    } else if (effectiveStatus === "placed") {
-      btnContent = (
-        <button onClick={() => cancelBet(slotIdx)} style={{ width: "100%", background: "rgba(0,200,83,0.07)", border: "1.5px solid rgba(0,200,83,0.4)", borderRadius: 12, padding: "10px 0", cursor: "pointer" }}>
-          <div style={{ color: "#00C853", fontSize: 9, fontWeight: 700, letterSpacing: 1.5, marginBottom: 3 }}>BET PLACED ✓</div>
-          <div style={{ color: "#FFF", fontSize: 16, fontWeight: 700, marginBottom: 3 }}>₹{slot.amount.toLocaleString("en-IN")}</div>
-          <div style={{ color: "rgba(255,26,58,0.7)", fontSize: 8, fontWeight: 500, letterSpacing: 1.2 }}>TAP TO CANCEL</div>
+    } else if (slot.status === 'queued') {
+      mainBtn = (
+        <button onClick={() => cancelBet(slotIdx)} style={{
+          width: '100%', padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,200,0,0.4)', cursor: 'pointer',
+          background: 'rgba(255,200,0,0.08)',
+          color: '#FFD700', fontWeight: 800, fontSize: '14px',
+        }}>
+          ⏳ QUEUED — Cancel
         </button>
       );
-    } else if (effectiveStatus === "queued") {
-      btnContent = (
-        <button onClick={() => cancelBet(slotIdx)} style={{ width: "100%", background: "rgba(255,152,0,0.07)", border: "1.5px solid rgba(255,152,0,0.45)", borderRadius: 12, padding: "10px 0", cursor: "pointer" }}>
-          <div style={{ color: "#FF9800", fontSize: 9, fontWeight: 700, letterSpacing: 1.5, marginBottom: 3 }}>NEXT ROUND ✓</div>
-          <div style={{ color: "#FFF", fontSize: 16, fontWeight: 700, marginBottom: 3 }}>₹{slot.amount.toLocaleString("en-IN")}</div>
-          <div style={{ color: "rgba(255,26,58,0.7)", fontSize: 8, fontWeight: 500, letterSpacing: 1.2 }}>TAP TO CANCEL</div>
+    } else if (slot.status === 'cashedout') {
+      mainBtn = (
+        <button disabled style={{
+          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
+          background: 'rgba(0,180,80,0.1)', color: '#00C853', fontWeight: 800, fontSize: '14px',
+        }}>
+          EXITED @ {slot.cashedOutAt?.toFixed(2)}x ✓
+        </button>
+      );
+    } else if (slot.status === 'lost') {
+      mainBtn = (
+        <button disabled style={{
+          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
+          background: 'rgba(255,58,58,0.08)', color: '#FF5555', fontWeight: 800, fontSize: '14px',
+        }}>
+          FLEW AWAY 💥
         </button>
       );
     } else {
-      const canBet = !!user && effectiveStatus === "idle";
-      const isNextRound = phase === "flying" || phase === "crashed";
-      const btnBg = canBet
-        ? (isNextRound ? "linear-gradient(to bottom, #1565C0, #0D47A1)" : "linear-gradient(to bottom, #00C853, #009C41)")
-        : "linear-gradient(to bottom, rgba(20,20,30,0.4), rgba(10,10,20,0.4))";
-      btnContent = (
-        <button onClick={() => placeBet(slotIdx)} disabled={!canBet} style={{ width: "100%", background: btnBg, border: "none", borderRadius: 12, padding: "14px 0", cursor: canBet ? "pointer" : "default", opacity: canBet ? 1 : 0.7 }}>
-          <div style={{ color: canBet ? "#FFF" : "#556", fontSize: 11, fontWeight: 700, letterSpacing: 0.8 }}>
-            {!user ? "SIGN IN" : isNextRound ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}` : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
-          </div>
-          {isNextRound && canBet && <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 9, fontWeight: 500, marginTop: 2, letterSpacing: 1 }}>next round</div>}
+      const canBet = !!state.user && slot.status === 'idle';
+      mainBtn = (
+        <button onClick={() => placeBet(slotIdx)} disabled={!canBet} style={{
+          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
+          cursor: canBet ? 'pointer' : 'default',
+          background: canBet
+            ? (isFlying ? 'linear-gradient(135deg,#1565C0,#0D47A1)' : 'linear-gradient(135deg,#00C853,#009C41)')
+            : 'rgba(40,40,60,0.4)',
+          color: canBet ? '#fff' : '#556', fontWeight: 900, fontSize: '14px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+        }}>
+          <span>{!state.user ? 'LOGIN TO BET' : isFlying ? `BET NEXT  ₹${slot.amount.toLocaleString('en-IN')}` : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}</span>
+          {isFlying && canBet && <span style={{ fontSize: '10px', fontWeight: 600, opacity: 0.8 }}>next round</span>}
         </button>
       );
     }
 
     return (
-      <div key={slotIdx} style={{ flex: 1, backgroundColor: C.bgCard, borderRadius: 16, border: `1px solid ${C.border}`, padding: 11 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2 }}>{label}</span>
+      <div style={{
+        background: 'rgba(180,0,40,0.08)', border: '1px solid rgba(255,58,58,0.15)',
+        borderRadius: '14px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.8px' }}>{label}</span>
           {slot.result && (
-            <span style={{ borderRadius: 8, padding: "3px 7px", backgroundColor: slot.result.win ? "rgba(0,200,83,0.15)" : "rgba(255,26,58,0.15)", color: slot.result.win ? "#00C853" : "#FF1A3A", fontSize: 10, fontWeight: 700 }}>
-              {slot.result.text}
-            </span>
+            <span style={{
+              fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+              background: slot.result.win ? 'rgba(0,200,83,0.15)' : 'rgba(255,26,58,0.15)',
+              color: slot.result.win ? '#00C853' : '#FF5555',
+            }}>{slot.result.text}</span>
           )}
         </div>
 
-        {/* Amount row */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <button onClick={() => setSlotAmount(slotIdx, slot.amount - 50)} disabled={!canEdit} style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,26,58,0.12)", border: `1px solid ${C.border}`, color: C.text, fontSize: 20, fontWeight: 700, cursor: canEdit ? "pointer" : "default", opacity: canEdit ? 1 : 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-          <div style={{ flex: 1, display: "flex", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: 10, border: `1px solid ${C.border}`, padding: "7px 9px" }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginRight: 2 }}>₹</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={() => setSlotAmount(slotIdx, slot.amount - 50)} disabled={!canEdit} style={{
+            width: '32px', height: '34px', borderRadius: '9px', border: 'none', cursor: canEdit ? 'pointer' : 'default',
+            background: 'rgba(255,58,58,0.18)', color: '#FF3A3A', fontSize: '20px', fontWeight: 900,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: canEdit ? 1 : 0.4, flexShrink: 0,
+          }}>−</button>
+          <div style={{
+            flex: 1, minWidth: 0, background: 'rgba(10,5,20,0.6)', borderRadius: '10px',
+            border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center',
+            padding: '0 6px', height: '34px', overflow: 'hidden',
+          }}>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginRight: '2px', flexShrink: 0 }}>₹</span>
             <input
-              type="number"
-              value={slot.input}
-              disabled={!canEdit}
-              onChange={e => updateSlot(slotIdx, { input: e.target.value })}
+              type="number" value={slot.input} disabled={!canEdit}
+              onChange={e => { const setSlot = slotIdx === 0 ? setSlot1 : setSlot2; setSlot(s => ({ ...s, input: e.target.value })); }}
               onBlur={() => {
-                const v = parseInt(slot.input, 10);
-                if (!isNaN(v) && v >= 10) updateSlot(slotIdx, { amount: v, input: String(v) });
-                else updateSlot(slotIdx, { input: String(slot.amount) });
+                const v = parseInt(slotIdx === 0 ? slot1.input : slot2.input, 10);
+                if (!isNaN(v) && v >= 10) setSlotAmount(slotIdx, v);
+                else { const setSlot = slotIdx === 0 ? setSlot1 : setSlot2; setSlot(s => ({ ...s, input: String(s.amount) })); }
               }}
-              style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontWeight: 700, color: C.text, width: "100%" }}
+              style={{
+                flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: '#fff',
+                fontSize: '14px', fontWeight: 800, outline: 'none', opacity: canEdit ? 1 : 0.5,
+              }}
             />
           </div>
-          <button onClick={() => setSlotAmount(slotIdx, slot.amount + 50)} disabled={!canEdit} style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: "rgba(255,26,58,0.12)", border: `1px solid ${C.border}`, color: C.text, fontSize: 20, fontWeight: 700, cursor: canEdit ? "pointer" : "default", opacity: canEdit ? 1 : 0.35, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          <button onClick={() => setSlotAmount(slotIdx, slot.amount + 50)} disabled={!canEdit} style={{
+            width: '32px', height: '34px', borderRadius: '9px', border: 'none', cursor: canEdit ? 'pointer' : 'default',
+            background: 'rgba(255,58,58,0.18)', color: '#FF3A3A', fontSize: '20px', fontWeight: 900,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: canEdit ? 1 : 0.4, flexShrink: 0,
+          }}>+</button>
         </div>
 
-        {/* Preset amounts */}
-        <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {[100, 250, 500, 1000].map(v => (
-            <button key={v} onClick={() => setSlotAmount(slotIdx, v)} disabled={!canEdit} style={{ flex: 1, padding: "6px 0", borderRadius: 8, backgroundColor: slot.amount === v ? "rgba(255,26,58,0.18)" : "rgba(0,0,0,0.3)", border: `1px solid ${slot.amount === v ? C.red : C.border}`, color: slot.amount === v ? C.red : C.textMuted, fontSize: 10, fontWeight: 600, cursor: canEdit ? "pointer" : "default", opacity: canEdit ? 1 : 0.35 }}>
-              ₹{v >= 1000 ? "1K" : v}
-            </button>
+            <button key={v} onClick={() => setSlotAmount(slotIdx, v)} disabled={!canEdit} style={{
+              flex: 1, padding: '6px 0', borderRadius: '8px', border: '1px solid',
+              fontSize: '11px', fontWeight: 800, cursor: canEdit ? 'pointer' : 'default',
+              background: slot.amount === v ? 'rgba(255,58,58,0.22)' : 'transparent',
+              borderColor: slot.amount === v ? 'rgba(255,58,58,0.6)' : 'rgba(255,255,255,0.12)',
+              color: slot.amount === v ? '#FF3A3A' : 'rgba(255,255,255,0.5)',
+              opacity: canEdit ? 1 : 0.5,
+            }}>{v >= 1000 ? '₹1K' : `₹${v}`}</button>
           ))}
         </div>
 
-        {btnContent}
+        {mainBtn}
       </div>
     );
   }
 
-  // ── Top section helper ───────────────────────────────────────────────────
-  const ROUNDS_DATA = [
-    { user: "5***8", avatar: 3, rounds: 1842, wins: 1124 },
-    { user: "2***1", avatar: 6, rounds: 1567, wins: 892 },
-    { user: "7***4", avatar: 1, rounds: 1344, wins: 755 },
-    { user: "3***9", avatar: 5, rounds: 1122, wins: 612 },
-    { user: "9***2", avatar: 0, rounds: 987,  wins: 487 },
-    { user: "4***7", avatar: 2, rounds: 856,  wins: 398 },
-    { user: "8***5", avatar: 4, rounds: 742,  wins: 301 },
-    { user: "1***6", avatar: 7, rounds: 621,  wins: 244 },
-  ];
+  function renderBetsRow(b: RoundBet, i: number) {
+    return (
+      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+          background: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length],
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px',
+        }}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</div>
+        <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>{b.user}</span>
+        <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.55)', textAlign: 'right' }}>₹{b.amount.toLocaleString('en-IN')}</span>
+        <span style={{ flex: 0.9, fontSize: '13px', fontWeight: 700, textAlign: 'center', color: b.cashout ? multColor(b.cashout) : '#555' }}>
+          {b.cashout ? `${b.cashout.toFixed(2)}x` : '—'}
+        </span>
+        <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 700, textAlign: 'right', color: b.winAmount > 0 ? '#00C853' : '#444' }}>
+          {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString('en-IN')}` : '0.00'}
+        </span>
+      </div>
+    );
+  }
 
-  const fmtDate = (iso: string) => {
-    const d = new Date(iso);
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yy = String(d.getFullYear()).slice(-2);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mi = String(d.getMinutes()).padStart(2, "0");
-    return `${dd}.${mm}.${yy} ${hh}:${mi}`;
-  };
-  const fmtMult = (m: number) => m >= 1000 ? m.toLocaleString("en-US", { maximumFractionDigits: 2 }) + "x" : m.toFixed(2) + "x";
+  const cashPct = betCount > 0 ? Math.min(100, (cashedCount / betCount) * 100) : 0;
 
-  // ── Styles (matching expo) ───────────────────────────────────────────────
-  const S = {
-    avatarCircle: { width: 32, height: 32, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 } as React.CSSProperties,
-    avatarText: { fontSize: 15 } as React.CSSProperties,
-    betsColText: { fontSize: 10, fontWeight: 600, color: C.textMuted, letterSpacing: 0.5 } as React.CSSProperties,
-    betRow2: { display: "flex", alignItems: "center", gap: 6, paddingVertical: 5, borderBottom: `1px solid rgba(255,30,60,0.06)`, padding: "5px 0" } as React.CSSProperties,
-    betUser2: { fontSize: 12, fontWeight: 500, color: C.textMuted } as React.CSSProperties,
-    betAmt2: { fontSize: 12, fontWeight: 600, color: C.text, textAlign: "right" as const } as React.CSSProperties,
-    betMult: { fontSize: 11, fontWeight: 700, textAlign: "center" as const } as React.CSSProperties,
-    betWin: { fontSize: 12, fontWeight: 600, textAlign: "right" as const } as React.CSSProperties,
-    topTableHeaderTxt: { fontSize: 10, fontWeight: 600, color: C.textMuted, letterSpacing: 0.5 } as React.CSSProperties,
-    topTableDate: { fontSize: 10, color: C.textMuted } as React.CSSProperties,
-    topTableMult: { fontSize: 11, fontWeight: 700, color: C.gold } as React.CSSProperties,
-    topTableUser: { fontSize: 12, fontWeight: 600, color: C.text } as React.CSSProperties,
-    topShieldBadge: { backgroundColor: "rgba(0,200,83,0.15)", borderRadius: 6, padding: "2px 5px" } as React.CSSProperties,
-    topShieldTxt: { color: "#00C853", fontSize: 9, fontWeight: 700 } as React.CSSProperties,
-    emptyMsg: { color: C.textMuted, fontSize: 12, textAlign: "center" as const, padding: "16px 0" } as React.CSSProperties,
-  };
-
-  // ── Shared JSX pieces ─────────────────────────────────────────────────────
-  const historyChips = (
-    <div style={{ display: "flex", overflowX: "auto", gap: 5, marginBottom: 10, scrollbarWidth: "none" as any }}>
+  const historyStrip = (
+    <div style={{ overflowX: 'auto', display: 'flex', gap: '6px', padding: '10px 12px', scrollbarWidth: 'none' as const }}>
       {history.map((h, i) => {
-        const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
-        const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
+        const col = multColor(h);
+        const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,58,58,0.13)';
         return (
-          <div key={i} style={{ flexShrink: 0, borderRadius: 8, padding: "4px 9px", backgroundColor: bg, border: `1px solid ${col}55` }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: col }}>{h.toFixed(2)}x</span>
+          <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '20px', padding: '4px 10px', fontSize: '12px', fontWeight: 800, color: col }}>
+            {h.toFixed(2)}x
           </div>
         );
       })}
     </div>
   );
 
-  // ── PLACEHOLDER so code compiles; full betsPanel below ────────────────────
-  const betsPanel = (
-    <div style={{ backgroundColor: C.bgCard, borderRadius: 16, border: `1px solid ${C.border}`, padding: 14 }}>
-              {/* Tab bar */}
-              <div style={{ display: "flex", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 20, padding: 3, marginBottom: 14 }}>
-                {(["all", "prev", "top"] as const).map(tab => (
-                  <button key={tab} onClick={() => setBetsTab(tab)} style={{ flex: 1, padding: "7px 0", borderRadius: 16, backgroundColor: betsTab === tab ? "rgba(255,255,255,0.12)" : "transparent", border: "none", cursor: "pointer", color: betsTab === tab ? C.text : C.textMuted, fontSize: 12, fontWeight: 600 }}>
-                    {tab === "all" ? "All Bets" : tab === "prev" ? "Previous" : "Top"}
-                  </button>
-                ))}
+  const betsSection = (
+      <div style={{ margin: '0 12px', background: 'rgba(10,5,20,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          {(['all', 'prev', 'top'] as BetsTab[]).map(tab => (
+            <button key={tab} onClick={() => setBetsTab(tab)} style={{
+              flex: 1, padding: '12px 0', border: 'none', cursor: 'pointer',
+              background: betsTab === tab ? 'rgba(255,58,58,0.12)' : 'transparent',
+              color: betsTab === tab ? '#FF3A3A' : 'rgba(255,255,255,0.4)',
+              fontWeight: 800, fontSize: '13px', letterSpacing: '0.3px',
+              borderBottom: betsTab === tab ? '2px solid #FF3A3A' : '2px solid transparent',
+            }}>
+              {tab === 'all' ? 'All Bets' : tab === 'prev' ? 'Previous' : 'Top'}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: '12px' }}>
+          {/* All Bets */}
+          {betsTab === 'all' && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {[0,1,2].map(i => (
+                    <div key={i} style={{
+                      width: '28px', height: '28px', borderRadius: '50%', marginLeft: i > 0 ? '-10px' : 0,
+                      background: AVATAR_COLORS[i], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px',
+                    }}>{AVATAR_EMOJI[i]}</div>
+                  ))}
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginLeft: '4px' }}>{cashedCount}/{betCount} Bets</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '15px', fontWeight: 900, color: '#fff' }}>₹{totalWin >= 1000 ? (totalWin/1000).toFixed(2)+'K' : totalWin.toFixed(2)}</div>
+                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Total win INR</div>
+                </div>
               </div>
+              <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', marginBottom: '10px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${cashPct}%`, background: '#FF3A3A', borderRadius: '2px', transition: 'width 0.4s' }} />
+              </div>
+              <div style={{ display: 'flex', padding: '0 0 6px' }}>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>Player</span>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Bet INR</span>
+                <span style={{ flex: 0.9, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'center' }}>X</span>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Win INR</span>
+              </div>
+              {allBets.slice(0, 20).map((b, i) => renderBetsRow(b, i))}
+              {allBets.length === 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>Waiting for bets...</div>}
+            </>
+          )}
 
-              {/* ── ALL BETS ── */}
-              {betsTab === "all" && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {[0, 1, 2].map(i => (
-                        <div key={i} style={{ ...S.avatarCircle, backgroundColor: AVATAR_COLORS[i % AVATAR_COLORS.length], marginLeft: i > 0 ? -10 : 0 }}>
-                          <span style={S.avatarText}>{AVATAR_EMOJI[i % AVATAR_EMOJI.length]}</span>
-                        </div>
-                      ))}
-                      <span style={{ fontSize: 12, fontWeight: 500, color: C.textMuted, marginLeft: 8 }}>{cashedCount}/{betCount} Bets</span>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>₹{totalWin >= 1000 ? (totalWin / 1000).toFixed(2) + "K" : totalWin.toFixed(2)}</div>
-                      <div style={{ fontSize: 10, fontWeight: 500, color: C.textMuted }}>Total win INR</div>
-                    </div>
-                  </div>
-                  {/* Progress bar */}
-                  <div style={{ height: 3, backgroundColor: "rgba(255,26,58,0.12)", borderRadius: 2, marginBottom: 10, overflow: "hidden" }}>
-                    <div style={{ height: "100%", backgroundColor: C.red, borderRadius: 2, width: betCount > 0 ? `${Math.min(100, (cashedCount / betCount) * 100)}%` : "0%" }} />
-                  </div>
-                  {/* Column header */}
-                  <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                    <span style={{ ...S.betsColText, flex: 1.8 }}>Player</span>
-                    <span style={{ ...S.betsColText, flex: 1.5, textAlign: "right" }}>Bet INR</span>
-                    <span style={{ ...S.betsColText, flex: 0.9, textAlign: "center" }}>X</span>
-                    <span style={{ ...S.betsColText, flex: 1.5, textAlign: "right" }}>Win INR</span>
-                  </div>
-                  {allBets.slice(0, 18).map((b, i) => (
-                    <div key={i} style={S.betRow2}>
-                      <div style={{ ...S.avatarCircle, backgroundColor: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length] }}>
-                        <span style={S.avatarText}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</span>
-                      </div>
-                      <span style={{ ...S.betUser2, flex: 1.4 }}>{b.user}</span>
-                      <span style={{ ...S.betAmt2, flex: 1.5 }}>₹{b.amount.toLocaleString("en-IN")}</span>
-                      <span style={{ ...S.betMult, flex: 0.9, color: b.status === "cashed" ? multColor(b.cashout ?? 0) : b.status === "lost" ? "#555" : "#888" }}>
-                        {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
-                      </span>
-                      <span style={{ ...S.betWin, flex: 1.5, color: b.winAmount > 0 ? "#00C853" : "#555" }}>
-                        {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString("en-IN")}` : "0.00"}
-                      </span>
-                    </div>
-                  ))}
+          {/* Previous Round */}
+          {betsTab === 'prev' && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>Round Result</span>
+                <span style={{ fontSize: '22px', fontWeight: 900, color: prevRound ? multColor(prevRound.result) : '#555' }}>
+                  {prevRound ? `${prevRound.result.toFixed(2)}x` : '—'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', padding: '0 0 6px' }}>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>Player</span>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Bet INR</span>
+                <span style={{ flex: 0.9, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'center' }}>X</span>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Win INR</span>
+              </div>
+              {(prevRound?.bets ?? []).slice(0, 20).map((b, i) => renderBetsRow(b, i))}
+              {!prevRound && <div style={{ textAlign: 'center', padding: '24px', color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>No previous round data</div>}
+            </>
+          )}
+
+          {/* Top Bets */}
+          {betsTab === 'top' && (
+            <>
+              <div style={{ display: 'flex', padding: '0 0 8px' }}>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>Player</span>
+                <span style={{ flex: 1.2, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Bet</span>
+                <span style={{ flex: 0.9, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'center' }}>X</span>
+                <span style={{ flex: 1.5, fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, textAlign: 'right' }}>Win INR</span>
+              </div>
+              {topBets.slice(0, 20).map((b: TopBet, i: number) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{
+                    width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0,
+                    background: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length],
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px',
+                  }}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</div>
+                  <span style={{ flex: 1.2, fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.75)' }}>{b.user}</span>
+                  <span style={{ flex: 1.2, fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.45)', textAlign: 'right' }}>₹{b.amount.toLocaleString('en-IN')}</span>
+                  <span style={{ flex: 0.9, fontSize: '13px', fontWeight: 800, textAlign: 'center', color: multColor(b.mult) }}>{b.mult.toFixed(2)}x</span>
+                  <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 800, textAlign: 'right', color: '#00C853' }}>₹{b.win.toLocaleString('en-IN')}</span>
                 </div>
-              )}
-
-              {/* ── PREVIOUS ── */}
-              {betsTab === "prev" && (
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, fontWeight: 500, color: C.textMuted }}>Round Result</span>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: prevRound ? multColor(prevRound.result) : "#888" }}>
-                      {prevRound ? `${prevRound.result.toFixed(2)}x` : "—"}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                    <span style={{ ...S.betsColText, flex: 1.8 }}>Player</span>
-                    <span style={{ ...S.betsColText, flex: 1.5, textAlign: "right" }}>Bet INR</span>
-                    <span style={{ ...S.betsColText, flex: 0.9, textAlign: "center" }}>X</span>
-                    <span style={{ ...S.betsColText, flex: 1.5, textAlign: "right" }}>Win INR</span>
-                  </div>
-                  {(prevRound?.bets ?? []).slice(0, 18).map((b, i) => (
-                    <div key={i} style={S.betRow2}>
-                      <div style={{ ...S.avatarCircle, backgroundColor: AVATAR_COLORS[b.avatar % AVATAR_COLORS.length] }}>
-                        <span style={S.avatarText}>{AVATAR_EMOJI[b.avatar % AVATAR_EMOJI.length]}</span>
-                      </div>
-                      <span style={{ ...S.betUser2, flex: 1.4 }}>{b.user}</span>
-                      <span style={{ ...S.betAmt2, flex: 1.5 }}>₹{b.amount.toLocaleString("en-IN")}</span>
-                      <span style={{ ...S.betMult, flex: 0.9, color: b.cashout ? multColor(b.cashout) : "#555" }}>
-                        {b.cashout ? `${b.cashout.toFixed(2)}x` : "—"}
-                      </span>
-                      <span style={{ ...S.betWin, flex: 1.5, color: b.winAmount > 0 ? "#00C853" : "#555" }}>
-                        {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString("en-IN")}` : "0.00"}
-                      </span>
-                    </div>
-                  ))}
-                  {!prevRound && <p style={S.emptyMsg}>No previous round data yet</p>}
-                </div>
-              )}
-
-              {/* ── TOP ── */}
-              {betsTab === "top" && (
-                <div>
-                  {/* Sort row */}
-                  <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
-                    {(["X", "Win", "Rounds"] as const).map(f => (
-                      <button key={f} onClick={() => setTopSort(f)} style={{ flex: 1, padding: "5px 0", borderRadius: 8, backgroundColor: topSort === f ? "rgba(255,255,255,0.12)" : "transparent", border: `1px solid ${topSort === f ? C.border : "transparent"}`, color: topSort === f ? C.text : C.textMuted, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{f}</button>
-                    ))}
-                  </div>
-                  {/* Time row */}
-                  <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-                    {(["Day", "Month", "Year"] as const).map(f => (
-                      <button key={f} onClick={() => setTopTime(f)} style={{ flex: 1, padding: "5px 0", borderRadius: 8, backgroundColor: topTime === f ? "rgba(255,255,255,0.12)" : "transparent", border: `1px solid ${topTime === f ? C.border : "transparent"}`, color: topTime === f ? C.text : C.textMuted, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{f}</button>
-                    ))}
-                  </div>
-
-                  {/* X sub-tab */}
-                  {topSort === "X" && (() => {
-                    const cutoff = topTime === "Day" ? 86400000 : topTime === "Month" ? 30 * 86400000 : 365 * 86400000;
-                    const rows = topHistory.filter((h: any) => Date.now() - new Date(h.date).getTime() < cutoff);
-                    return (
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={S.topTableHeaderTxt}>Date & Time</span>
-                          <span style={S.topTableHeaderTxt}>X</span>
-                        </div>
-                        {rows.map((h: any, i: number) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid rgba(255,30,60,0.06)` }}>
-                            <span style={S.topTableDate}>{fmtDate(h.date)}</span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span style={S.topTableMult}>{fmtMult(h.mult)}</span>
-                              <div style={S.topShieldBadge}><span style={S.topShieldTxt}>✓</span></div>
-                            </div>
-                          </div>
-                        ))}
-                        {rows.length === 0 && <p style={S.emptyMsg}>No records for this period</p>}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Win sub-tab */}
-                  {topSort === "Win" && (() => {
-                    const cutoff = topTime === "Day" ? 86400000 : topTime === "Month" ? 30 * 86400000 : 365 * 86400000;
-                    const rows = topBets.filter(t => Date.now() - new Date(t.date).getTime() < cutoff);
-                    return (
-                      <div>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={S.topTableHeaderTxt}>Player</span>
-                          <span style={S.topTableHeaderTxt}>Win INR</span>
-                        </div>
-                        {rows.map((t, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid rgba(255,30,60,0.06)` }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <div style={{ ...S.avatarCircle, backgroundColor: AVATAR_COLORS[t.avatar % AVATAR_COLORS.length], width: 28, height: 28 }}>
-                                <span style={{ fontSize: 12 }}>{AVATAR_EMOJI[t.avatar % AVATAR_EMOJI.length]}</span>
-                              </div>
-                              <div>
-                                <div style={S.topTableUser}>{t.user}</div>
-                                <div style={{ fontSize: 10, color: multColor(t.mult) }}>{t.mult.toFixed(2)}x</div>
-                              </div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span style={{ color: "#00C853", fontSize: 13, fontWeight: 600 }}>₹{t.win.toLocaleString("en-IN")}</span>
-                              <div style={S.topShieldBadge}><span style={S.topShieldTxt}>✓</span></div>
-                            </div>
-                          </div>
-                        ))}
-                        {rows.length === 0 && <p style={S.emptyMsg}>No records for this period</p>}
-                      </div>
-                    );
-                  })()}
-
-                  {/* Rounds sub-tab */}
-                  {topSort === "Rounds" && (
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                        <span style={S.topTableHeaderTxt}>Player</span>
-                        <span style={S.topTableHeaderTxt}>Rounds</span>
-                      </div>
-                      {ROUNDS_DATA.map((r, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid rgba(255,30,60,0.06)` }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ ...S.avatarCircle, backgroundColor: AVATAR_COLORS[r.avatar % AVATAR_COLORS.length], width: 28, height: 28 }}>
-                              <span style={{ fontSize: 12 }}>{AVATAR_EMOJI[r.avatar % AVATAR_EMOJI.length]}</span>
-                            </div>
-                            <span style={S.topTableUser}>{r.user}</span>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{r.rounds.toLocaleString()}</div>
-                              <div style={{ fontSize: 10, color: C.textMuted, textAlign: "right" }}>{r.wins} wins</div>
-                            </div>
-                            <div style={S.topShieldBadge}><span style={S.topShieldTxt}>✓</span></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-    </div>
-  );
-
-  // ── Shared header content ─────────────────────────────────────────────────
-  const headerContent = (
-    <>
-      <div style={{ backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 10px", border: `1px solid ${C.border}` }}>
-        <div style={{ fontSize: 9, fontWeight: 600, color: C.textMuted, letterSpacing: 1.5 }}>BALANCE</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: C.gold }}>₹{(user?.balance ?? 0).toLocaleString("en-IN")}</div>
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 700, color: C.red, letterSpacing: 4 }}>BLAZE</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {!user && (
-          <button onClick={onAuthOpen} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 9, padding: "7px 14px", fontWeight: 700, fontSize: 12, cursor: "pointer", letterSpacing: 0.5 }}>Login</button>
-        )}
-        <div style={{ display: "flex", alignItems: "center", gap: 5, backgroundColor: C.bgCard, borderRadius: 10, padding: "6px 9px", border: `1px solid ${C.border}` }}>
-          <div style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: connected ? "#00E676" : "#FF1A3A" }} />
-          <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted }}>{connected ? "LIVE" : "OFFLINE"}</span>
+              ))}
+              {topBets.length === 0 && <div style={{ textAlign: 'center', padding: '24px', color: 'rgba(255,255,255,0.25)', fontSize: '13px' }}>No top bets yet</div>}
+            </>
+          )}
         </div>
       </div>
-    </>
   );
 
-  // ── Cashout toast ─────────────────────────────────────────────────────────
-  const toast = cashoutPopup && (
-    <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", backgroundColor: "rgba(10,5,20,0.96)", border: `1px solid rgba(0,200,83,0.3)`, borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, zIndex: 1000, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }}>
-      <span style={{ fontSize: 22 }}>🚀</span>
-      <div>
-        <div style={{ color: C.text, fontSize: 12, fontWeight: 700 }}>{cashoutPopup.mult.toFixed(2)}x  ·  WIN</div>
-        <div style={{ color: "#00C853", fontSize: 16, fontWeight: 700 }}>+₹{cashoutPopup.payout.toLocaleString("en-IN")}</div>
-      </div>
-      <div style={{ backgroundColor: "rgba(0,200,83,0.15)", borderRadius: 6, padding: "2px 6px" }}>
-        <span style={{ color: "#00C853", fontSize: 11, fontWeight: 700 }}>✓</span>
-      </div>
+  const canvasEl = (
+    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
+      <canvas ref={canvasRef} width={480} height={260} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   );
 
-  // ── MOBILE layout (< 768px) — exact expo look ────────────────────────────
-  if (!isDesktop) {
+  if (isMobile) {
     return (
-      <div style={{ flex: 1, backgroundColor: C.bg, minHeight: "100vh", fontFamily: "Inter,sans-serif", position: "relative" }}>
-        <div style={{ maxWidth: 480, margin: "0 auto" }}>
-          <div style={{ paddingBottom: 24 }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 16px 10px" }}>
-              {headerContent}
-            </div>
-            <div style={{ padding: "0 16px" }}>
-              {historyChips}
-              <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                {renderBetPanel(0)}
-                {renderBetPanel(1)}
-              </div>
-              {betsPanel}
-            </div>
-          </div>
+      <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', paddingBottom: '20px', boxSizing: 'border-box' }}>
+        {historyStrip}
+        <div style={{ margin: '0 12px' }}>{canvasEl}</div>
+        <div style={{ display: 'flex', gap: '8px', padding: '12px', boxSizing: 'border-box' }}>
+          <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
+          <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
         </div>
-        {toast}
+        <div style={{ padding: '0 12px' }}>{betsSection}</div>
       </div>
     );
   }
 
-  // ── DESKTOP layout (≥ 768px) — 2-column wide layout ─────────────────────
+  // ── Desktop layout (Aviator-style wide) ──
   return (
-    <div style={{ flex: 1, backgroundColor: C.bg, minHeight: "100vh", fontFamily: "Inter,sans-serif", position: "relative" }}>
-      {/* Desktop header */}
-      <div style={{ backgroundColor: C.bgCard, borderBottom: `1px solid ${C.border}`, padding: "12px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 10 }}>
-        {headerContent}
-      </div>
+    <div style={{ width: '100%', padding: '0 20px 20px', boxSizing: 'border-box' }}>
+      {historyStrip}
+      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
 
-      {/* Main 2-column layout */}
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 24px 24px", display: "flex", gap: 20, alignItems: "flex-start" }}>
-
-        {/* LEFT COLUMN — game area (62%) */}
-        <div style={{ flex: "0 0 62%", minWidth: 0 }}>
-          {historyChips}
-          <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
-          {/* Bet panels side by side */}
-          <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
-            {renderBetPanel(0)}
-            {renderBetPanel(1)}
-          </div>
+        {/* Left: Canvas + Bets Table */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {canvasEl}
+          {betsSection}
         </div>
 
-        {/* RIGHT COLUMN — bets (38%) */}
-        <div style={{ flex: "0 0 38%", minWidth: 0, position: "sticky", top: 80, maxHeight: "calc(100vh - 100px)", overflowY: "auto" }}>
-          {betsPanel}
+        {/* Right: Bet Panels stacked */}
+        <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {renderBetPanel(0)}
+          {renderBetPanel(1)}
         </div>
       </div>
-
-      {toast}
     </div>
   );
 }

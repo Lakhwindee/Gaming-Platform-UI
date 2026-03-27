@@ -14,7 +14,6 @@
     "typescript": "~5.9.2"
   },
   "dependencies": {
-    "@replit/revenuecat-sdk": "^4.1.0",
     "react-native-purchases": "^9.12.0",
     "replit-revenuecat-v2": "^2.0.2"
   }

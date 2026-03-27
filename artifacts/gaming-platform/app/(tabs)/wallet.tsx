@@ -321,7 +321,7 @@ export default function WalletScreen() {
           {(["deposit", "withdraw", "history"] as const).map(t => (
             <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === "deposit" ? "UPI" : t === "withdraw" ? "Withdraw" : "History"}
+                {t === "deposit" ? "Deposit" : t === "withdraw" ? "Withdraw" : "History"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -794,14 +794,4 @@ const styles = StyleSheet.create({
   txRight: { alignItems: "flex-end" },
   txAmount: { fontSize: 14, fontFamily: "Inter_700Bold" },
   txDate: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textDim, marginTop: 2 },
-  coinPkg: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "rgba(0,0,0,0.35)", borderRadius: 16, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.08)", padding: 16, marginBottom: 10, position: "relative" },
-  coinPkgPopular: { borderColor: C.gold, backgroundColor: "rgba(255,215,0,0.06)" },
-  coinPopularBadge: { position: "absolute", top: -10, right: 12, backgroundColor: C.gold, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  coinPopularText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#000", letterSpacing: 1 },
-  coinPkgLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
-  coinPkgIcon: { fontSize: 30 },
-  coinPkgName: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 2 },
-  coinPkgDesc: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted },
-  coinPkgRight: { alignItems: "flex-end" },
-  coinPkgPrice: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.gold },
 });

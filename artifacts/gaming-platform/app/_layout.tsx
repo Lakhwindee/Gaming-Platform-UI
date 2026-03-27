@@ -13,10 +13,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { initializeRevenueCat, SubscriptionProvider } from "@/lib/revenuecat";
 
 SplashScreen.preventAutoHideAsync();
-initializeRevenueCat();
 const queryClient = new QueryClient();
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -27,8 +25,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.loading) return;
     const inAuth = segments[0] === "(auth)";
-    // Only redirect logged-in users away from auth screens; never force login
-    if (state.user && inAuth) {
+    if (!state.user && !inAuth) {
+      router.replace("/(auth)/login");
+    } else if (state.user && inAuth) {
       router.replace("/(tabs)");
     }
   }, [state.user, state.loading, segments]);
@@ -61,13 +60,11 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <SubscriptionProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <AuthGate>
-                  <RootLayoutNav />
-                </AuthGate>
-              </GestureHandlerRootView>
-            </SubscriptionProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <AuthGate>
+                <RootLayoutNav />
+              </AuthGate>
+            </GestureHandlerRootView>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>
