@@ -230,7 +230,32 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const s = Number(msg.slot ?? 1);
       if (msg.type === 'bet_ok') updateSlot(s === 2 ? 1 : 0, { status: 'active' });
       if (msg.type === 'bet_queued') updateSlot(s === 2 ? 1 : 0, { status: 'queued' });
-      if (msg.type === 'bet_fail') updateSlot(s === 2 ? 1 : 0, { status: 'idle', result: { text: String(msg.error ?? 'Failed'), win: false } });
+      if (msg.type === 'bet_fail') {
+        const idx = s === 2 ? 1 : 0;
+        const errMsg = String(msg.error ?? 'Failed');
+        const isOccupied = errMsg.toLowerCase().includes('already has a bet') || errMsg.toLowerCase().includes('already active');
+        if (isOccupied) {
+          // Server still has a live bet on this slot — restore so cancel button shows
+          const ph = WSC.state.phase;
+          const restored = ph === 'flying' ? 'active' : ph === 'crashed' ? 'queued' : 'placed';
+          updateSlot(idx, { status: restored as SlotState['status'] });
+        } else {
+          updateSlot(idx, { status: 'idle', result: { text: errMsg, win: false } });
+        }
+      }
+      // Restore bet state after WS reconnect
+      if (msg.type === 'bet_state') {
+        const bSlots = (msg as any).slots as Array<{ slot: number; active: boolean; queued: boolean; queuedAmount: number; amount: number }>;
+        const ph = (msg as any).phase as string;
+        bSlots.forEach((sl) => {
+          const idx = (sl.slot - 1) as 0 | 1;
+          if (sl.active) {
+            updateSlot(idx, { status: ph === 'flying' ? 'active' : 'placed', amount: sl.amount });
+          } else if (sl.queued) {
+            updateSlot(idx, { status: 'queued', amount: sl.queuedAmount });
+          }
+        });
+      }
       if (msg.type === 'bet_cancelled') updateSlot(s === 2 ? 1 : 0, { status: 'idle', result: null });
       if (msg.type === 'bet_cancel_fail') {
         // Revert to placed/active so user sees their bet is still live

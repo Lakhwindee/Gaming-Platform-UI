@@ -415,8 +415,31 @@ export default function GameScreen() {
 
       if (msg.type === "bet_fail") {
         const errSlot = ((msg.slot as number | undefined) ?? 1) - 1 as 0 | 1;
-        Alert.alert("Bet Failed", String(msg.error ?? "Please try again"));
-        updateSlot(errSlot, { status: "idle" });
+        const errMsg = String(msg.error ?? "Please try again");
+        const isOccupied = errMsg.toLowerCase().includes("already has a bet") || errMsg.toLowerCase().includes("already active");
+        if (isOccupied) {
+          // Server still has a bet — restore correct state so cancel button shows
+          const ph = WSC.state.phase;
+          const restored: SlotState["status"] = ph === "flying" ? "active" : ph === "crashed" ? "queued" : "placed";
+          updateSlot(errSlot, { status: restored });
+        } else {
+          Alert.alert("Bet Failed", errMsg);
+          updateSlot(errSlot, { status: "idle" });
+        }
+      }
+
+      // Restore bet state after WS reconnect
+      if (msg.type === "bet_state") {
+        const slots = (msg as any).slots as Array<{ slot: number; active: boolean; queued: boolean; queuedAmount: number; amount: number }>;
+        const ph = (msg as any).phase as string;
+        slots.forEach((sl) => {
+          const idx = (sl.slot - 1) as 0 | 1;
+          if (sl.active) {
+            updateSlot(idx, { status: ph === "flying" ? "active" : "placed", amount: sl.amount });
+          } else if (sl.queued) {
+            updateSlot(idx, { status: "queued", amount: sl.queuedAmount });
+          }
+        });
       }
 
       if (msg.type === "state") {

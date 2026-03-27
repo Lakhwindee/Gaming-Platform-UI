@@ -385,6 +385,16 @@ export function handleConnection(ws: WebSocket) {
         state.userId = payload.userId;
         state.username = payload.username;
         ws.send(JSON.stringify({ type: 'auth_ok', userId: payload.userId, username: payload.username }));
+        // Send current bet state so client can restore after reconnect
+        const betState = state.slots.map((sl, i) => ({
+          slot: i + 1,
+          active: sl.active,
+          queued: !!sl.queued,
+          queuedAmount: sl.queued?.amount ?? 0,
+          amount: sl.amount,
+          autoCashout: sl.autoCashout ?? 0,
+        }));
+        ws.send(JSON.stringify({ type: 'bet_state', slots: betState, phase: ENG.phase }));
       } catch {
         ws.send(JSON.stringify({ type: 'auth_fail', error: 'Invalid token' }));
       }
