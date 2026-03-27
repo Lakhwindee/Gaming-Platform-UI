@@ -59,52 +59,80 @@ type BetsTab = 'all' | 'prev' | 'top';
 type TopSort = 'X' | 'Win' | 'Rounds';
 type TopTime = 'Day' | 'Month' | 'Year';
 
-// ── Rocket drawing (copied from Expo's drawRocket) ────────────────────────
-function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, t: number, crashed: boolean, waiting: boolean) {
+// ── Rocket — vertical orientation matching Expo SVG exactly ──────────────
+function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number, flying: boolean, waiting: boolean, t: number) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(angle);
-  if (crashed) { ctx.rotate(Math.PI * 0.4); ctx.globalAlpha = 0.35; }
-  if (waiting) {
-    const bob = Math.sin(t * 2.5) * 3;
-    ctx.translate(0, bob);
-    ctx.rotate(Math.sin(t * 1.3) * 0.04);
-  }
+  ctx.rotate(angle + Math.PI / 2); // +90° so nose-up rocket follows path, same as Expo's angleDeg = angle*180/PI + 90
+
   const S = 26;
-  if (!crashed) {
-    ctx.shadowColor = '#FF7700'; ctx.shadowBlur = 14;
-    for (let i = 0; i < 3; i++) {
-      const off = (i - 1) * S * 0.22;
-      const fl = ctx.createLinearGradient(-S * 1.1 + off, 0, -S * 1.7 + off, 0);
-      fl.addColorStop(0, i === 1 ? '#FFD700' : '#FF6600');
-      fl.addColorStop(1, 'rgba(255,60,0,0)');
-      ctx.fillStyle = fl;
-      ctx.beginPath(); ctx.ellipse(-S * 1.0, off, S * 0.6, S * 0.22, 0, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.shadowBlur = 0;
+
+  // Flame — below body (positive y)
+  if (flying) {
+    const flOuter = ctx.createLinearGradient(0, 0, 0, S * 1.5);
+    flOuter.addColorStop(0, 'rgba(255,215,0,0.9)');
+    flOuter.addColorStop(0.45, 'rgba(255,107,0,0.7)');
+    flOuter.addColorStop(1, 'rgba(255,26,58,0)');
+    ctx.fillStyle = flOuter;
+    ctx.beginPath(); ctx.ellipse(0, S * 0.85, 8, S * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+
+    const flMid = ctx.createLinearGradient(0, 0, 0, S * 1.1);
+    flMid.addColorStop(0, 'rgba(255,255,255,0.95)');
+    flMid.addColorStop(0.5, 'rgba(255,215,0,0.8)');
+    flMid.addColorStop(1, 'rgba(255,107,0,0)');
+    ctx.fillStyle = flMid;
+    ctx.beginPath(); ctx.ellipse(0, S * 0.70, 4.5, S * 0.38, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.beginPath(); ctx.ellipse(0, S * 0.56, 2, S * 0.20, 0, 0, Math.PI * 2); ctx.fill();
   }
+
+  if (waiting) {
+    const bob = Math.sin(t * 2.5) * 0.3;
+    const flW = ctx.createLinearGradient(0, 0, 0, S * 1.1);
+    flW.addColorStop(0, `rgba(255,215,0,${0.55 + bob * 0.35})`);
+    flW.addColorStop(0.45, `rgba(255,107,0,${0.35 + bob * 0.25})`);
+    flW.addColorStop(1, 'rgba(255,26,58,0)');
+    ctx.fillStyle = flW;
+    ctx.beginPath(); ctx.ellipse(0, S * 0.78, 6.5, S * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Fins
   ctx.fillStyle = '#D43050';
-  ctx.beginPath(); ctx.moveTo(-S*0.25,-S*0.3); ctx.lineTo(-S*0.78,-S*0.65); ctx.lineTo(-S*0.55,-S*0.3); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-S*0.25, S*0.3); ctx.lineTo(-S*0.78, S*0.65); ctx.lineTo(-S*0.55, S*0.3); ctx.closePath(); ctx.fill();
-  const bg = ctx.createLinearGradient(0, -S*0.32, 0, S*0.32);
-  bg.addColorStop(0, '#C8CED8'); bg.addColorStop(0.45, '#F0F2F8'); bg.addColorStop(1, '#9098A8');
-  ctx.fillStyle = bg;
-  ctx.beginPath(); ctx.roundRect(-S*0.8, -S*0.3, S*1.1, S*0.6, S*0.14); ctx.fill();
-  ctx.fillStyle = '#EE1133';
-  ctx.beginPath(); ctx.rect(-S*0.18, -S*0.3, S*0.22, S*0.6); ctx.fill();
-  ctx.fillStyle = '#CC1133';
-  ctx.beginPath(); ctx.moveTo(S*0.85, 0); ctx.lineTo(S*0.3, -S*0.3); ctx.lineTo(S*0.3, S*0.3); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(255,100,130,0.4)';
-  ctx.beginPath(); ctx.moveTo(S*0.85, 0); ctx.lineTo(S*0.3, -S*0.3); ctx.lineTo(S*0.62, -S*0.1); ctx.closePath(); ctx.fill();
-  ctx.shadowColor = '#88CCFF'; ctx.shadowBlur = 8;
-  ctx.fillStyle = 'rgba(80,160,255,0.35)';
-  ctx.beginPath(); ctx.arc(S*0.18, 0, S*0.17, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-8, S * 0.20); ctx.lineTo(-17, S * 0.55); ctx.lineTo(-8, S * 0.42); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(8,  S * 0.20); ctx.lineTo(17,  S * 0.55); ctx.lineTo(8,  S * 0.42); ctx.closePath(); ctx.fill();
+
+  // Body
+  const bodyGrad = ctx.createLinearGradient(-8, 0, 8, 0);
+  bodyGrad.addColorStop(0, '#C8CED8'); bodyGrad.addColorStop(0.45, '#F0F2F8'); bodyGrad.addColorStop(1, '#9098A8');
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath(); ctx.roundRect(-8, -S * 0.46, 16, S * 0.92, 4); ctx.fill();
+
+  // Red stripe
+  ctx.fillStyle = 'rgba(238,17,51,0.9)';
+  ctx.beginPath(); ctx.roundRect(-3.5, -S * 0.44, 7, S * 0.26, 2); ctx.fill();
+
+  // Window
+  ctx.fillStyle = 'rgba(80,160,255,0.22)';
+  ctx.strokeStyle = '#88CCFF'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.arc(0, -S * 0.10, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.beginPath(); ctx.arc(S*0.12, -S*0.06, S*0.07, 0, Math.PI*2); ctx.fill();
-  ctx.shadowBlur = 0;
+  ctx.beginPath(); ctx.arc(-1.5, -S * 0.10 - 1.5, 1.8, 0, Math.PI * 2); ctx.fill();
+
+  // Body highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.roundRect(-5, -S * 0.43, 2.5, S * 0.82, 1.2); ctx.fill();
+
+  // Nose — pointing UP (negative y)
+  const noseGrad = ctx.createLinearGradient(0, -S, 0, -S * 0.46);
+  noseGrad.addColorStop(0, '#FFFFFF'); noseGrad.addColorStop(1, '#B8C0D0');
+  ctx.fillStyle = noseGrad;
+  ctx.beginPath(); ctx.moveTo(0, -S); ctx.lineTo(8, -S * 0.46); ctx.lineTo(-8, -S * 0.46); ctx.closePath(); ctx.fill();
+
+  // Engine nozzle
   ctx.fillStyle = '#484E60';
-  ctx.beginPath(); ctx.roundRect(-S*0.82, -S*0.18, S*0.18, S*0.36, 3); ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.roundRect(-6.5, S * 0.44, 13, 5.5, 2); ctx.fill();
+
   ctx.restore();
 }
 
@@ -258,88 +286,88 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       }
       ctx!.globalAlpha = 1;
 
-      // Grid lines
+      // Subtle grid — same as Expo background
       ctx!.strokeStyle = 'rgba(255,255,255,0.04)'; ctx!.lineWidth = 1;
       for (let gx = 0; gx < W; gx += 60) { ctx!.beginPath(); ctx!.moveTo(gx, 0); ctx!.lineTo(gx, H); ctx!.stroke(); }
       for (let gy = 0; gy < H; gy += 50) { ctx!.beginPath(); ctx!.moveTo(0, gy); ctx!.lineTo(W, gy); ctx!.stroke(); }
 
-      // Multiplier axis labels — Aviator matching colors
-      ctx!.font = 'bold 10px Inter,sans-serif';
-      ctx!.textAlign = 'left'; ctx!.textBaseline = 'middle';
+      // Positions — exact Expo logic
       const origX = W * 0.09, origY = H * 0.88;
-      // [multiplier value, label, line-color, label-color]
-      const AXIS = [
-        [2,  '2x',  'rgba(255,58,58,0.25)',  'rgba(255,58,58,0.75)' ],
-        [5,  '5x',  'rgba(77,166,255,0.20)', 'rgba(77,166,255,0.75)'],
-        [10, '10x', 'rgba(77,166,255,0.25)', 'rgba(77,166,255,0.85)'],
-        [25, '25x', 'rgba(255,77,255,0.22)', 'rgba(255,77,255,0.80)'],
-      ] as [number, string, string, string][];
-      AXIS.forEach(([v, label, lineCol, textCol]) => {
-        const ry = origY - Math.sqrt((v - 1) / 50) * H * 0.76;
-        if (ry > 10) {
-          ctx!.strokeStyle = lineCol; ctx!.lineWidth = 1;
-          ctx!.beginPath(); ctx!.moveTo(origX, ry); ctx!.lineTo(W, ry); ctx!.stroke();
-          ctx!.fillStyle = textCol;
-          ctx!.fillText(label, 4, ry);
-        }
-      });
+      const pos = (isFlying || isCrashed)
+        ? getPos(elapsed, W)
+        : { x: origX + 10, y: origY - 20 }; // waiting: same as Expo {ORIG_X+10, ORIG_Y-20}
 
-      const pos = isWaiting
-        ? { x: origX, y: origY }
-        : isCrashed
-          ? getPos(elapsed, W)
-          : getPos(elapsed, W);
-
-      // Flight path
+      // Flight path — triple layer exactly like Expo
       if ((isFlying || isCrashed) && elapsed > 0) {
-        const grad = ctx!.createLinearGradient(origX, origY, pos.x, pos.y);
-        grad.addColorStop(0, 'rgba(255,100,0,0)');
-        grad.addColorStop(1, isCrashed ? 'rgba(255,50,50,0.6)' : 'rgba(255,180,0,0.5)');
-        ctx!.strokeStyle = grad; ctx!.lineWidth = 2.5; ctx!.lineCap = 'round';
-        ctx!.beginPath(); ctx!.moveTo(origX, origY); ctx!.lineTo(pos.x, pos.y); ctx!.stroke();
+        // Build stepped path
+        let pathPoints: {x:number,y:number}[] = [];
+        const steps = 40;
+        for (let i = 0; i <= steps; i++) {
+          const et = elapsed * (i / steps);
+          pathPoints.push(getPos(et, W));
+        }
+        const drawPath = () => {
+          ctx!.beginPath(); ctx!.moveTo(origX, origY);
+          for (const p of pathPoints) ctx!.lineTo(p.x, p.y);
+        };
+        ctx!.lineCap = 'round';
+        // Layer 1: glow shadow
+        ctx!.strokeStyle = 'rgba(255,107,0,0.25)'; ctx!.lineWidth = 8;
+        drawPath(); ctx!.stroke();
+        // Layer 2: medium
+        ctx!.strokeStyle = 'rgba(255,107,0,0.5)'; ctx!.lineWidth = 3;
+        drawPath(); ctx!.stroke();
+        // Layer 3: bright gold
+        ctx!.strokeStyle = '#FFD700'; ctx!.lineWidth = 1.5;
+        drawPath(); ctx!.stroke();
+        // Glow circle at tip — exact Expo RadialGradient
+        const glowInner = isCrashed ? 'rgba(255,26,58,0.15)' : m >= 10 ? 'rgba(255,215,0,0.15)' : m >= 3 ? 'rgba(255,107,0,0.15)' : 'rgba(255,255,255,0.15)';
+        const grd = ctx!.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, 18);
+        grd.addColorStop(0, glowInner); grd.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx!.fillStyle = grd;
+        ctx!.beginPath(); ctx!.arc(pos.x, pos.y, 18, 0, Math.PI * 2); ctx!.fill();
       }
 
-      // Angle
-      if (!isWaiting) {
-        const dT = 0.25;
-        const pA = getPos(Math.max(elapsed - dT, 0), W);
-        const pB = getPos(elapsed + dT, W);
-        const rawAng = Math.atan2(pB.y - pA.y, pB.x - pA.x);
-        smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.08;
-      }
-      let angle = smoothAngRef.current;
-      if (isCrashed) angle += ((now - crashTimeRef.current) / 1000) * 3.5;
+      // Rocket angle — exact Expo: atan2(dy,dx) then +PI/2 in drawRocket
+      const dT = 0.3;
+      const e0 = Math.max(elapsed - dT, 0.001);
+      const e1 = elapsed + dT;
+      const pA = (isFlying || isCrashed) ? getPos(e0, W) : { x: origX, y: origY - 30 };
+      const pB = (isFlying || isCrashed) ? getPos(e1, W) : { x: origX + 1, y: origY - 31 };
+      const rawAng = Math.atan2(pB.y - pA.y, pB.x - pA.x);
+      smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.12;
 
       if (isCrashed) {
         drawBlast(ctx!, pos.x, pos.y);
       } else {
-        drawRocket(ctx!, pos.x, pos.y, isWaiting ? -0.22 : angle, t, false, isWaiting);
+        drawRocket(ctx!, pos.x, pos.y, smoothAngRef.current, isFlying, isWaiting, t);
       }
 
-      // Multiplier overlay
-      if (isFlying || isCrashed) {
-        const col = multColor(m);
-        ctx!.save();
-        ctx!.font = `bold ${isCrashed ? 34 : 54}px Inter,sans-serif`;
-        ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
-        ctx!.shadowColor = col; ctx!.shadowBlur = 28;
-        ctx!.fillStyle = col;
-        ctx!.fillText(isCrashed ? 'BLAST!' : `${m.toFixed(2)}x`, W / 2, H * 0.42);
-        if (isCrashed) {
-          ctx!.font = 'bold 20px Inter,sans-serif';
-          ctx!.fillStyle = C.textMuted; ctx!.shadowBlur = 0;
-          ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42 + 44);
-        }
-        ctx!.restore();
+      // Multiplier overlay — exact Expo text positioning
+      const mColor2 = isCrashed ? '#FF1A3A' : m >= 10 ? '#FFD700' : m >= 3 ? '#FF6B00' : '#FFFFFF';
+      ctx!.save();
+      ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
+      if (isFlying) {
+        ctx!.font = 'bold 54px Inter,sans-serif';
+        ctx!.fillStyle = mColor2;
+        ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42);
+      } else if (isCrashed) {
+        ctx!.font = 'bold 54px Inter,sans-serif';
+        ctx!.fillStyle = '#FF1A3A';
+        ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.38);
+        ctx!.font = 'bold 20px Inter,sans-serif';
+        ctx!.fillStyle = '#FF4500'; ctx!.letterSpacing = '5px';
+        ctx!.fillText('💥  BLAST!', W / 2, H * 0.38 + 48);
       } else if (isWaiting) {
         const cd = WSC.state.countdown;
-        ctx!.save();
-        ctx!.font = 'bold 16px Inter,sans-serif';
-        ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
-        ctx!.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx!.fillText(cd > 0 ? `Starting in ${cd.toFixed(0)}s` : 'Starting...', W / 2, H * 0.42);
-        ctx!.restore();
+        ctx!.font = 'bold 10px Inter,sans-serif';
+        ctx!.fillStyle = C.textMuted; ctx!.letterSpacing = '2px';
+        ctx!.fillText('NEXT ROUND IN', W / 2, H * 0.38);
+        ctx!.font = 'bold 40px Inter,sans-serif';
+        ctx!.fillStyle = C.textMuted; ctx!.letterSpacing = '0px';
+        ctx!.fillText(cd > 0 ? `${Math.ceil(cd)}s` : '...', W / 2, H * 0.38 + 40);
       }
+      ctx!.restore();
 
       animRef.current = requestAnimationFrame(draw);
     }
