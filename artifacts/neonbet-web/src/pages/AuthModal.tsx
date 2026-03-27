@@ -71,7 +71,7 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           </div>
           <div style={{ color: 'var(--text3)', fontSize: '12px', marginTop: '2px', letterSpacing: '1px' }}>by Star Games</div>
           <div style={{ color: 'var(--text2)', fontSize: '13px', marginTop: '6px' }}>
-            {tab === 'register' ? 'Create account · Get ₹10,000 free!' : 'Welcome back!'}
+            {tab === 'register' ? 'Create account' : 'Welcome back!'}
           </div>
         </div>
 
@@ -146,10 +146,6 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
             {loading ? '⏳ Please wait…' : tab === 'register' ? '🚀 Create Account & Play!' : '🔥 Sign In'}
           </button>
         </form>
-
-        <p style={{ textAlign: 'center', color: 'var(--text3)', fontSize: '12px', marginTop: '20px' }}>
-          For entertainment only · Play responsibly
-        </p>
 
         <button onClick={onClose} style={{
           position: 'absolute', top: '16px', right: '20px',

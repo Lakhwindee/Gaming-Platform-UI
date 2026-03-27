@@ -131,11 +131,6 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            {tab === "register" && (
-              <Text style={styles.bonus}>
-                New players get ₹10,000 welcome bonus!
-              </Text>
-            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
