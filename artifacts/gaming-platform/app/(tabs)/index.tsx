@@ -14,7 +14,7 @@ import {
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGrad, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-import { WSC, wsSend, wsSendReliable } from "@/lib/wsClient";
+import { WSC, wsSend, wsSendReliable, getServerElapsed } from "@/lib/wsClient";
 
 const { width: SW } = Dimensions.get("window");
 const IS_DESKTOP_WEB = Platform.OS === "web" && SW > 700;
@@ -349,8 +349,8 @@ export default function GameScreen() {
 
   useEffect(() => {
     const wsListener = () => {
-      if (WSC.state.phase === "flying" && WSC.state.startTime > 0) {
-        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
+      if (WSC.state.phase === "flying") {
+        setElapsedSec(getServerElapsed());
       }
       setTick(n => n + 1);
     };
@@ -361,7 +361,7 @@ export default function GameScreen() {
   useEffect(() => {
     const id = setInterval(() => {
       if (WSC.state.phase === "flying") {
-        setElapsedSec((Date.now() - WSC.state.startTime) / 1000);
+        setElapsedSec(getServerElapsed());
       } else if (WSC.state.phase === "waiting") {
         setElapsedSec(0);
       }

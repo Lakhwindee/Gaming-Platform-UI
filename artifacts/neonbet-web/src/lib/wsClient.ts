@@ -53,7 +53,16 @@ export const WSC = {
   token: null as string | null,
   reconnectTimer: null as ReturnType<typeof setTimeout> | null,
   initialized: false,
+  // Server-sync: authoritative elapsed ms at last state update + local time when received
+  _serverElapsedMs: 0,
+  _localReceiveTime: 0,
 };
+
+/** Returns server-synced elapsed seconds — same on all devices regardless of local clock */
+export function getServerElapsed(): number {
+  if (WSC.state.phase !== 'flying') return 0;
+  return (WSC._serverElapsedMs + (Date.now() - WSC._localReceiveTime)) / 1000;
+}
 
 function notify() { WSC.listeners.forEach(fn => fn()); }
 
@@ -79,6 +88,8 @@ export function connectWS(token: string | null) {
     let msg: Record<string, unknown>;
     try { msg = JSON.parse(e.data as string); } catch { return; }
     if (msg.type === 'state') {
+      WSC._localReceiveTime = Date.now();
+      WSC._serverElapsedMs = (msg.elapsedMs as number) ?? 0;
       WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true };
       notify();
     }

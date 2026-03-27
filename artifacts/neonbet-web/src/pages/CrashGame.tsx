@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { WSC, wsSend, wsSendReliable, Phase, RoundBet, TopBet } from '../lib/wsClient';
+import { WSC, wsSend, wsSendReliable, getServerElapsed, Phase, RoundBet, TopBet } from '../lib/wsClient';
 import { startAmbient, stopAmbient, playBlast, playCashout, updateAmbientMult } from '../lib/soundEngine';
 
 // ── Constants (copied from Expo) ──────────────────────────────────────────
@@ -335,9 +335,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const phase = WSC.state.phase;
       const W = (canvas!.clientWidth || 480), H = CV_H;
 
-      // ── Elapsed — exactly like Expo: (Date.now() - server.startTime) / 1000 ──
-      if (phase === 'flying' && WSC.state.startTime > 0) {
-        elapsedRef.current = (Date.now() - WSC.state.startTime) / 1000;
+      // ── Elapsed — server-synced, same on all devices ──
+      if (phase === 'flying') {
+        elapsedRef.current = getServerElapsed();
       } else if (phase === 'waiting') {
         elapsedRef.current = 0; startTimeRef.current = 0; smoothAngRef.current = -Math.PI / 2;
       }

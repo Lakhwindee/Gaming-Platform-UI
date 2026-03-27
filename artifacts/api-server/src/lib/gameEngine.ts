@@ -152,6 +152,7 @@ const clients = new Map<WebSocket, ClientState>();
 function statePayload() {
   const totalWin = ENG.allBets.reduce((s, b) => s + b.winAmount, 0);
   const cashedCount = ENG.allBets.filter(b => b.status === 'cashed').length;
+  const now = Date.now();
   return {
     type: 'state',
     phase: ENG.phase,
@@ -159,6 +160,8 @@ function statePayload() {
     countdown: ENG.countdown,
     roundId: ENG.roundId,
     startTime: ENG.startTime,
+    serverTime: now,
+    elapsedMs: ENG.phase === 'flying' && ENG.startTime > 0 ? now - ENG.startTime : 0,
     history: ENG.history,
     allBets: ENG.allBets,
     betCount: ENG.allBets.length,
