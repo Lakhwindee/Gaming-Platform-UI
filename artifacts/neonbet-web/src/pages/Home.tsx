@@ -9,14 +9,7 @@ const BANNERS = [
 ];
 
 const FAST_GAMES = [
-  { id: 'crash',    name: 'Crash',     icon: '✈️', color: '#00d4ff', tag: 'HOT', players: 1248 },
-  { id: 'mines',    name: 'Mines',     icon: '💣', color: '#ff3b5c', tag: 'NEW', players: 892 },
-  { id: 'plinko',   name: 'Plinko',    icon: '🎯', color: '#a855f7', tag: 'HOT', players: 654 },
-  { id: 'tower',    name: 'Tower',     icon: '🗼', color: '#ffd700', tag: '',    players: 412 },
-  { id: 'hilo',     name: 'Hi-Lo',     icon: '🃏', color: '#00ff88', tag: '',    players: 389 },
-  { id: 'slots',    name: 'Slots',     icon: '🎰', color: '#ff2d9b', tag: '',    players: 1842 },
-  { id: 'dice',     name: 'Dice',      icon: '🎲', color: '#a855f7', tag: '',    players: 521 },
-  { id: 'coinflip', name: 'Coin Flip', icon: '🪙', color: '#ffd700', tag: '',    players: 347 },
+  { id: 'crash', name: 'Crash', icon: '✈️', color: '#00d4ff', tag: 'HOT', players: 1248 },
 ];
 
 const RECENT_WINS = [
@@ -40,7 +33,7 @@ export default function Home() {
 
   useEffect(() => {
     const names = ['CryptoKing', 'NeonBlade', 'StarDust', 'ShadowWolf', 'IronFist', 'PixelHunter', 'VortexX', 'NightOwl', 'BlazeRun', 'GhostRider'];
-    const games = ['Crash', 'Mines', 'Plinko', 'Slots', 'Hi-Lo', 'Dice', 'Coin Flip', 'Tower'];
+    const games = ['Crash'];
     const mults = ['2.5x', '5.2x', '12x', '8.1x', '1.95x', '24.5x', '3.2x', '45x', '16x'];
     const t = setInterval(() => {
       const mult = mults[Math.floor(Math.random() * mults.length)];
@@ -96,7 +89,7 @@ export default function Home() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '28px' }}>
         {[
           { label: 'Players Online',  value: '14,832', icon: '🟢', color: 'var(--neon-green)' },
-          { label: 'Games Available', value: '8',      icon: '🎮', color: 'var(--neon-blue)' },
+          { label: 'Games Available', value: '1',      icon: '🎮', color: 'var(--neon-blue)' },
           { label: 'Paid Out Today',  value: '₹8.4M',  icon: '💰', color: 'var(--neon-gold)' },
           { label: 'Biggest Win',     value: '856x',   icon: '🏆', color: 'var(--neon-purple)' },
         ].map(s => (
@@ -117,11 +110,8 @@ export default function Home() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px' }}>
         <div>
           {/* Fast Games */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h2 style={{ fontWeight: 800, fontSize: '20px' }}>⚡ Fast Games</h2>
-            <button onClick={() => navigate('fastgames')} style={{ background: 'none', border: 'none', color: 'var(--neon-blue)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>View All →</button>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px' }}>
+          <h2 style={{ fontWeight: 800, fontSize: '20px', marginBottom: '14px' }}>⚡ Play Crash</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
             {FAST_GAMES.map(g => (
               <div key={g.id} onClick={() => playGame(g.id)} style={{
                 background: `linear-gradient(135deg, ${g.color}15, var(--bg3))`,

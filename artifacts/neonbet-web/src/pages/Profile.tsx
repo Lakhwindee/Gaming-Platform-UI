@@ -115,8 +115,6 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
             <h3 style={{ fontWeight: 700, fontSize: '14px', marginBottom: '4px' }}>Quick Play</h3>
             {[
               { id: 'crash', label: '📈 Play Crash', color: 'var(--neon-blue)' },
-              { id: 'dice', label: '🎲 Play Dice', color: 'var(--neon-purple)' },
-              { id: 'coinflip', label: '🪙 Play Coin Flip', color: 'var(--neon-gold)' },
             ].map(g => (
               <button key={g.id} onClick={() => playGame(g.id)} style={{
                 background: 'var(--bg3)', border: `1px solid ${g.color}30`,
