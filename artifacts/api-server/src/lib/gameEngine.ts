@@ -292,15 +292,34 @@ async function startCountdown() {
 
 // ── Smart crash: crash early when real users bet big ────────────────────────
 function adjustCrashForRealBets(): void {
+  // Count connected real users (authenticated) and their active bets
   let totalReal = 0;
+  let connectedUsers = 0;
   for (const [, c] of clients) {
+    if (c.userId) connectedUsers++;
     for (const slot of c.slots) {
       if (slot.active) totalReal += slot.amount;
     }
   }
-  if (totalReal <= 0) return;
 
   const r = Math.random();
+
+  // ── Case 1: No real bets placed (users watching/on profile, not betting)
+  // Rocket flies HIGH to create FOMO and attract bets next round
+  if (totalReal === 0) {
+    if (connectedUsers === 0) return; // nobody online, normal random
+    // Boost crash point: 70% chance of a big round (5x–200x)
+    if (r < 0.70) {
+      const tier = Math.random();
+      if (tier < 0.35)      ENG.crashPoint = parseFloat((5  + Math.random() * 15).toFixed(2));  // 5–20x
+      else if (tier < 0.65) ENG.crashPoint = parseFloat((20 + Math.random() * 30).toFixed(2));  // 20–50x
+      else if (tier < 0.85) ENG.crashPoint = parseFloat((50 + Math.random() * 50).toFixed(2));  // 50–100x
+      else                  ENG.crashPoint = parseFloat((100 + Math.random() * 100).toFixed(2)); // 100–200x
+    }
+    return;
+  }
+
+  // ── Case 2: Real bets placed — crash based on how much is at stake
   let newCrash: number | null = null;
 
   if (totalReal >= 10000) {
