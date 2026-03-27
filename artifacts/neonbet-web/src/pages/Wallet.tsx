@@ -28,14 +28,40 @@ const C = {
   textDim: '#664455',
 };
 
-function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+function buildUpiParams(amount: number, merchantUpi: string, txnRef: string): string {
   const name = encodeURIComponent('Blaze');
   const note = encodeURIComponent('Blaze Deposit ' + txnRef);
-  const base = 'pa=' + merchantUpi + '&pn=' + name + '&am=' + amount + '&cu=INR&tn=' + note;
-  if (method === 'gpay')    return 'tez://upi/pay?' + base;
-  if (method === 'phonepe') return 'phonepe://pay?transactionId=' + txnRef + '&' + base;
-  if (method === 'paytm')   return 'paytmmp://upi/pay?' + base;
-  return 'upi://pay?' + base;
+  return 'pa=' + merchantUpi + '&pn=' + name + '&am=' + amount + '&cu=INR&tn=' + note + '&tr=' + txnRef;
+}
+
+function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+  const p = buildUpiParams(amount, merchantUpi, txnRef);
+  if (method === 'gpay')    return 'tez://upi/pay?' + p;
+  if (method === 'phonepe') return 'phonepe://pay?' + p;
+  if (method === 'paytm')   return 'paytmmp://upi/pay?' + p;
+  return 'upi://pay?' + p;
+}
+
+// Android intent URLs — more reliable on Android Chrome
+function buildIntentUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+  const p = buildUpiParams(amount, merchantUpi, txnRef);
+  if (method === 'gpay')
+    return 'intent://upi/pay?' + p + '#Intent;scheme=tez;package=com.google.android.apps.nbu.paisa.user;end';
+  if (method === 'phonepe')
+    return 'intent://pay?' + p + '#Intent;scheme=phonepe;package=com.phonepe.app;end';
+  if (method === 'paytm')
+    return 'intent://pay?' + p + '#Intent;scheme=paytmmp;package=net.one97.paytm;end';
+  return 'upi://pay?' + p;
+}
+
+function tryOpenUpi(url: string): void {
+  // Use a hidden <a> with the deep-link so popup blockers don't interfere
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 500);
 }
 
 function MethodIcon({ id, size = 28 }: { id: PayMethod; size?: number }) {
@@ -82,8 +108,8 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
 
-  const upiWindowRef = useRef<Window | null>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const visChangeRef = useRef<(() => void) | null>(null);
 
   const finalAmount = (() => {
     if (customAmt.trim()) {
@@ -112,8 +138,37 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
     if (tab === 'history') loadTx();
   }, [tab, loadTx]);
 
-  function stopPoll() {
+  // Cleanup on unmount
+  useEffect(() => () => { stopListeners(); }, []); // eslint-disable-line
+
+  function stopListeners() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (visChangeRef.current) {
+      document.removeEventListener('visibilitychange', visChangeRef.current);
+      visChangeRef.current = null;
+    }
+  }
+
+  function openUpiApp(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): boolean {
+    // Try specific app intent URL first (Android Chrome), then deep link
+    const intentUrl  = buildIntentUrl(method, amount, merchantUpi, txnRef);
+    const deepUrl    = buildUpiUrl(method, amount, merchantUpi, txnRef);
+    const genericUrl = 'upi://pay?' + buildUpiParams(amount, merchantUpi, txnRef);
+
+    // On Android, intent:// URLs are most reliable; on iOS use deep link
+    const isAndroid = /android/i.test(navigator.userAgent);
+    const primary   = isAndroid && method !== 'upi' ? intentUrl : deepUrl;
+    const fallback  = isAndroid ? deepUrl : genericUrl;
+
+    tryOpenUpi(primary);
+    // If primary likely failed (no specific app), try generic after 1.5s
+    setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        tryOpenUpi(fallback);
+      }
+    }, 1500);
+
+    return true;
   }
 
   async function handleDeposit() {
@@ -132,32 +187,29 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
       setAutoFailMsg('');
       setPayState('waiting');
 
-      const specificUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
-      const genericUrl  = 'upi://pay?pa=' + txn.merchantUpi +
-        '&pn=' + encodeURIComponent('Blaze') +
-        '&am=' + finalAmount +
-        '&cu=INR&tn=' + encodeURIComponent('Blaze Deposit ' + txn.txnRef);
+      // Open UPI app
+      openUpiApp(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
 
-      try {
-        upiWindowRef.current = window.open(specificUrl, '_blank');
-        if (!upiWindowRef.current) throw new Error('blocked');
-      } catch {
-        try {
-          upiWindowRef.current = window.open(genericUrl, '_blank');
-          if (!upiWindowRef.current) setNoAppFound(true);
-        } catch {
-          setNoAppFound(true);
-        }
-      }
+      // When user returns to browser (visibilitychange) → show confirm screen
+      stopListeners();
+      let gone = false;
+      const onVisible = () => {
+        if (!gone) return; // user hasn't left yet
+        stopListeners();
+        setPayState('confirming');
+      };
+      const onHide = () => { gone = true; };
+      visChangeRef.current = () => {
+        if (document.visibilityState === 'hidden') onHide();
+        else onVisible();
+      };
+      document.addEventListener('visibilitychange', visChangeRef.current);
 
-      // Poll for visibility change (user may return to tab after paying)
-      stopPoll();
-      pollRef.current = setInterval(() => {
-        if (document.visibilityState === 'visible' && upiWindowRef.current?.closed) {
-          stopPoll();
-          setPayState('confirming');
-        }
-      }, 1000);
+      // Fallback: after 30s show "I've PAID" button anyway
+      pollRef.current = setTimeout(() => {
+        stopListeners();
+        setNoAppFound(true);
+      }, 30000) as unknown as ReturnType<typeof setInterval>;
 
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Failed. Please try again.');
@@ -194,7 +246,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   }
 
   function handleCancelPayment() {
-    stopPoll();
+    stopListeners();
     setPayState('idle');
     setPendingTxn(null);
     setUtrInput('');

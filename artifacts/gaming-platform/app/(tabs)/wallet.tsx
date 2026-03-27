@@ -23,14 +23,18 @@ const PAY_METHODS: { id: PayMethod; label: string; color: string; bg: string }[]
   { id: "upi",     label: "Other UPI", color: "#FF6B00", bg: "rgba(255,107,0,0.15)" },
 ];
 
-function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+function buildUpiParams(amount: number, merchantUpi: string, txnRef: string): string {
   const name = encodeURIComponent("Blaze");
   const note = encodeURIComponent("Blaze Deposit " + txnRef);
-  const base = "pa=" + merchantUpi + "&pn=" + name + "&am=" + amount + "&cu=INR&tn=" + note;
-  if (method === "gpay")    return "tez://upi/pay?" + base;
-  if (method === "phonepe") return "phonepe://pay?transactionId=" + txnRef + "&" + base;
-  if (method === "paytm")   return "paytmmp://upi/pay?" + base;
-  return "upi://pay?" + base;
+  return "pa=" + merchantUpi + "&pn=" + name + "&am=" + amount + "&cu=INR&tn=" + note + "&tr=" + txnRef;
+}
+
+function buildUpiUrl(method: PayMethod, amount: number, merchantUpi: string, txnRef: string): string {
+  const p = buildUpiParams(amount, merchantUpi, txnRef);
+  if (method === "gpay")    return "tez://upi/pay?" + p;
+  if (method === "phonepe") return "phonepe://pay?" + p;
+  if (method === "paytm")   return "paytmmp://upi/pay?" + p;
+  return "upi://pay?" + p;
 }
 
 function GPay({ size = 28 }: { size?: number }) {
@@ -179,15 +183,19 @@ export default function WalletScreen() {
       setPayState("waiting");
 
       const specificUrl = buildUpiUrl(selectedMethod, finalAmount, txn.merchantUpi, txn.txnRef);
-      const genericUrl  = "upi://pay?pa=" + txn.merchantUpi +
-        "&pn=" + encodeURIComponent("Blaze") +
-        "&am=" + finalAmount +
-        "&cu=INR&tn=" + encodeURIComponent("Blaze Deposit " + txn.txnRef);
+      const genericUrl  = "upi://pay?" + buildUpiParams(finalAmount, txn.merchantUpi, txn.txnRef);
 
       let opened = false;
       try {
-        await Linking.openURL(specificUrl);
-        opened = true;
+        const canOpen = await Linking.canOpenURL(specificUrl);
+        if (canOpen) {
+          await Linking.openURL(specificUrl);
+          opened = true;
+        } else {
+          // Specific app not installed — try generic UPI
+          await Linking.openURL(genericUrl);
+          opened = true;
+        }
       } catch {
         try {
           await Linking.openURL(genericUrl);
