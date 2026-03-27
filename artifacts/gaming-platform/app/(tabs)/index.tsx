@@ -17,8 +17,12 @@ import { useAuth } from "@/context/AuthContext";
 import { WSC, wsSend } from "@/lib/wsClient";
 
 const { width: SW } = Dimensions.get("window");
-const CV_W = SW - 32;
-const CV_H = 260;
+const IS_DESKTOP_WEB = Platform.OS === "web" && SW > 700;
+// On desktop web: canvas fills ~68% of a max-1280 container; on mobile: full width minus padding
+const DESKTOP_CONTENT_W = Math.min(SW, 1280);
+const DESKTOP_CANVAS_W  = Math.floor(DESKTOP_CONTENT_W * 0.68) - 16;
+const CV_W = IS_DESKTOP_WEB ? DESKTOP_CANVAS_W : SW - 32;
+const CV_H = IS_DESKTOP_WEB ? 310 : 260;
 const ORIG_X = CV_W * 0.09;
 const ORIG_Y = CV_H * 0.88;
 
@@ -36,9 +40,7 @@ function calcMult(elapsed: number): number {
 function getPos(elapsed: number): { x: number; y: number } {
   const MAX_T = 40;
   const t = Math.min(elapsed / MAX_T, 1);
-  // x accelerates (like Aviator: starts slow, curves right)
   const x = ORIG_X + t * t * (CV_W * 0.88 - ORIG_X);
-  // y decelerates (fast rise early, slows as it goes right)
   const y = ORIG_Y - Math.sqrt(t) * (CV_H * 0.76);
   return { x, y: Math.max(y, 22) };
 }
@@ -167,9 +169,13 @@ function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
   const mColor = phase === "crashed" ? "#FF1A3A" : mult >= 10 ? "#FFD700" : mult >= 3 ? "#FF6B00" : "#FFFFFF";
 
   return (
-    <View style={styles.canvas}>
-      <Svg width={CV_W} height={CV_H}>
+    <View style={[styles.canvas, IS_DESKTOP_WEB && { width: "100%" }]}>
+      <Svg width={IS_DESKTOP_WEB ? "100%" : CV_W} height={CV_H} viewBox={`0 0 ${CV_W} ${CV_H}`}>
         <Defs>
+          <SvgLinearGrad id="canvasBg" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor="#0A0120" />
+            <Stop offset="100%" stopColor="#04000C" />
+          </SvgLinearGrad>
           <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
             <Stop offset="0%" stopColor={mColor} stopOpacity={0.15} />
             <Stop offset="100%" stopColor={mColor} stopOpacity={0} />
@@ -198,6 +204,8 @@ function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </SvgLinearGrad>
         </Defs>
+        {/* Canvas background gradient — matches website exactly */}
+        <Rect x={0} y={0} width={CV_W} height={CV_H} fill="url(#canvasBg)" />
         {STARS.map((s, i) => (
           <Circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#FFFFFF" opacity={0.4 + (i % 3) * 0.2} />
         ))}
@@ -693,7 +701,7 @@ export default function GameScreen() {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: 16 }}>
+      <View style={IS_DESKTOP_WEB ? { paddingHorizontal: 16, maxWidth: 1280, alignSelf: "center", width: "100%" } : { paddingHorizontal: 16 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyRow} contentContainerStyle={{ paddingHorizontal: 0 }}>
           {history.map((h, i) => {
             const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
@@ -706,12 +714,28 @@ export default function GameScreen() {
           })}
         </ScrollView>
 
-        <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
-
-        <View style={styles.dualPanel}>
-          {renderBetPanel(0)}
-          {renderBetPanel(1)}
-        </View>
+        {/* Desktop: canvas left + panels right. Mobile: stacked */}
+        {IS_DESKTOP_WEB ? (
+          <View style={{ flexDirection: "row", gap: 12, alignItems: "flex-start" }}>
+            {/* LEFT: canvas */}
+            <View style={{ flex: 1 }}>
+              <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
+            </View>
+            {/* RIGHT: BET panels stacked */}
+            <View style={{ width: 272, gap: 10 }}>
+              {renderBetPanel(0)}
+              {renderBetPanel(1)}
+            </View>
+          </View>
+        ) : (
+          <>
+            <GameCanvas phase={phase} mult={mult} countdown={countdown} elapsed={elapsedSec} synced={synced} />
+            <View style={styles.dualPanel}>
+              {renderBetPanel(0)}
+              {renderBetPanel(1)}
+            </View>
+          </>
+        )}
 
         {/* ── Tabbed bets panel ── */}
         <View style={styles.betsPanel}>
@@ -971,7 +995,7 @@ const styles = StyleSheet.create({
   historyRow: { marginBottom: 10, marginHorizontal: -4 },
   histChip: { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 4, marginRight: 5, borderWidth: 1 },
   histText: { fontSize: 11, fontFamily: "Inter_700Bold" },
-  canvas: { width: CV_W, height: CV_H, backgroundColor: "rgba(4,0,12,0.9)", borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", marginBottom: 12 },
+  canvas: { width: CV_W, height: CV_H, backgroundColor: "#04000C", borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", marginBottom: 12 },
   multOverlay: { alignItems: "center", justifyContent: "center" },
   multText: { fontSize: 54, fontFamily: "Inter_700Bold" },
   countLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 2 },
