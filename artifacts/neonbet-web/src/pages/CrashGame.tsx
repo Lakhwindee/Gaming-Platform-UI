@@ -182,6 +182,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const slot2Ref = useRef(slot2);
   const stateRef = useRef(state);
   const prevPhaseRef = useRef<Phase>(WSC.state.phase);
+  // Two-step confirm for queued bets (prevents accidental bets during flying)
+  const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
+  const confirmTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
   useEffect(() => { slot1Ref.current = slot1; slot2Ref.current = slot2; stateRef.current = state; });
 
@@ -563,23 +566,58 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       );
     } else {
       // Allow betting in any phase — flying/crashed bets get queued for next round
+      // But require 2-step confirm during flying/crashed to prevent accidental bets
       const canBet = !!state.user && effectiveStatus === 'idle';
       const isNextQueue = canBet && (phase === 'flying' || phase === 'crashed');
+      const awaitingConfirm = pendingConfirm[slotIdx];
+
+      function handleBetClick() {
+        if (!canBet) return;
+        if (!isNextQueue) { placeBet(slotIdx); return; }
+        if (!awaitingConfirm) {
+          // First click: show confirm state, auto-reset after 3s
+          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          next[slotIdx] = true;
+          setPendingConfirm(next);
+          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
+          confirmTimers.current[slotIdx] = setTimeout(() => {
+            setPendingConfirm(p => { const n: [boolean, boolean] = [p[0], p[1]]; n[slotIdx] = false; return n; });
+          }, 3000);
+        } else {
+          // Second click: actually place bet
+          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
+          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          next[slotIdx] = false;
+          setPendingConfirm(next);
+          placeBet(slotIdx);
+        }
+      }
+
       btnContent = (
-        <button onClick={() => canBet ? placeBet(slotIdx) : undefined} disabled={!canBet} style={{
+        <button onClick={handleBetClick} disabled={!canBet} style={{
           width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
           cursor: canBet ? 'pointer' : 'not-allowed',
           background: !canBet
             ? 'rgba(20,10,20,0.4)'
-            : isNextQueue
-              ? 'linear-gradient(135deg,#FF9800,#E65100)'
-              : 'linear-gradient(135deg,#00C853,#009C41)',
+            : awaitingConfirm
+              ? 'linear-gradient(135deg,#FF6D00,#E65100)'
+              : isNextQueue
+                ? 'linear-gradient(135deg,#FF9800,#E65100)'
+                : 'linear-gradient(135deg,#00C853,#009C41)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+          transition: 'background 0.2s',
         }}>
           <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : C.textDim, letterSpacing: '0.8px' }}>
-            {!state.user ? 'SIGN IN' : isNextQueue ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}` : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
+            {!state.user
+              ? 'SIGN IN'
+              : awaitingConfirm
+                ? '✓  CONFIRM NEXT ROUND?'
+                : isNextQueue
+                  ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}`
+                  : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {isNextQueue && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>queued for next round</span>}
+          {isNextQueue && !awaitingConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>tap to queue for next round</span>}
+          {awaitingConfirm && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', letterSpacing: '1px' }}>tap again to confirm • auto-cancel 3s</span>}
         </button>
       );
     }

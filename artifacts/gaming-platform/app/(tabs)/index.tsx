@@ -281,6 +281,9 @@ export default function GameScreen() {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const [soundOn, setSoundOn] = useState(true);
+  // Two-step confirm for queued bets (prevents accidental bets during flying)
+  const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
+  const confirmTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
   const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const resultTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
@@ -595,17 +598,56 @@ export default function GameScreen() {
       );
     } else {
       const canBet = !!authState.user && effectiveStatus === "idle";
-      const isNextRound = phase === "flying" || phase === "crashed";
+      const isNextQueue = phase === "flying" || phase === "crashed";
+      const awaitingConfirm = pendingConfirm[slotIdx];
+
+      function handleBetPress() {
+        if (!canBet) return;
+        if (!isNextQueue) { placeBet(slotIdx); return; }
+        if (!awaitingConfirm) {
+          // First tap: show confirm state, auto-reset after 3s
+          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          next[slotIdx] = true;
+          setPendingConfirm(next);
+          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
+          confirmTimers.current[slotIdx] = setTimeout(() => {
+            setPendingConfirm(p => { const n: [boolean, boolean] = [p[0], p[1]]; n[slotIdx] = false; return n; });
+          }, 3000);
+        } else {
+          // Second tap: actually place bet
+          if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
+          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          next[slotIdx] = false;
+          setPendingConfirm(next);
+          placeBet(slotIdx);
+        }
+      }
+
       btnContent = (
-        <TouchableOpacity onPress={() => placeBet(slotIdx)} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
+        <TouchableOpacity onPress={handleBetPress} disabled={!canBet} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient
-            colors={canBet ? (isNextRound ? ["#1565C0", "#0D47A1"] : ["#00C853", "#009C41"]) : ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]}
+            colors={
+              !canBet
+                ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
+                : awaitingConfirm
+                  ? ["#FF6D00", "#E65100"]
+                  : isNextQueue
+                    ? ["#FF9800", "#E65100"]
+                    : ["#00C853", "#009C41"]
+            }
             style={styles.mainBtn}
           >
             <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
-              {!authState.user ? "SIGN IN" : isNextRound ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}` : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
+              {!authState.user
+                ? "SIGN IN"
+                : awaitingConfirm
+                  ? "✓  CONFIRM NEXT ROUND?"
+                  : isNextQueue
+                    ? `NEXT  ₹${slot.amount.toLocaleString("en-IN")}`
+                    : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
             </Text>
-            {isNextRound && canBet && <Text style={styles.mainBtnSub2}>next round</Text>}
+            {isNextQueue && !awaitingConfirm && canBet && <Text style={styles.mainBtnSub2}>tap to queue for next round</Text>}
+            {awaitingConfirm && <Text style={styles.mainBtnSub2}>tap again • auto-cancel 3s</Text>}
           </LinearGradient>
         </TouchableOpacity>
       );
