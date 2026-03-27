@@ -598,41 +598,37 @@ export default function GameScreen() {
         </View>
       );
     } else {
-      // Flying phase: completely disabled — no bet, no confirm (Aviator-style)
+      // Aviator-style: flying/crashed → bet queues for NEXT round (no confirm, direct queue)
       const isFlying = phase === "flying";
       const isCrashed = phase === "crashed";
-      const canBet = !!authState.user && effectiveStatus === "idle" && !isFlying;
+      const isNextRound = isFlying || isCrashed;
+      const canBet = !!authState.user && effectiveStatus === "idle";
 
       btnContent = (
         <TouchableOpacity
           onPress={() => canBet ? placeBet(slotIdx) : undefined}
           disabled={!canBet}
-          activeOpacity={isFlying ? 1 : 0.85}
+          activeOpacity={0.85}
           style={{ flex: 1 }}
         >
           <LinearGradient
             colors={
-              isFlying
-                ? ["rgba(255,26,58,0.10)", "rgba(180,10,30,0.10)"]
-                : isCrashed
+              !canBet
+                ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
+                : isNextRound
                   ? ["#FF9800", "#E65100"]
-                  : !authState.user
-                    ? ["rgba(20,20,30,0.4)", "rgba(10,10,20,0.4)"]
-                    : ["#00C853", "#009C41"]
+                  : ["#00C853", "#009C41"]
             }
-            style={[styles.mainBtn, isFlying && { borderWidth: 1, borderColor: "rgba(255,26,58,0.25)" }]}
+            style={styles.mainBtn}
           >
-            <Text style={[styles.mainBtnText, (isFlying || !authState.user) && { color: isFlying ? "#FF4D4D" : "#556" }]}>
-              {isFlying
-                ? "ROUND LIVE"
-                : !authState.user
-                  ? "SIGN IN"
-                  : isCrashed
-                    ? `NEXT  ₹${slot.amount.toLocaleString("en-IN")}`
-                    : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
+            <Text style={[styles.mainBtnText, !canBet && { color: "#556" }]}>
+              {!authState.user
+                ? "SIGN IN"
+                : isNextRound
+                  ? `BET NEXT  ₹${slot.amount.toLocaleString("en-IN")}`
+                  : `BET  ₹${slot.amount.toLocaleString("en-IN")}`}
             </Text>
-            {isFlying && <Text style={[styles.mainBtnSub2, { color: "rgba(255,77,77,0.5)" }]}>wait for next round</Text>}
-            {isCrashed && canBet && <Text style={styles.mainBtnSub2}>queued for next round</Text>}
+            {isNextRound && canBet && <Text style={styles.mainBtnSub2}>for next round</Text>}
           </LinearGradient>
         </TouchableOpacity>
       );

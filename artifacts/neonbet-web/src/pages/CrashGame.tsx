@@ -568,10 +568,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         </button>
       );
     } else {
-      // Flying phase: completely disabled — Aviator-style (no bet, no confirm)
-      const isFlying = phase === 'flying';
-      const isCrashed = phase === 'crashed';
-      const canBet = !!state.user && effectiveStatus === 'idle' && !isFlying;
+      // Aviator-style: flying/crashed → bet queues for NEXT round (no confirm, direct queue)
+      const isNextRound = phase === 'flying' || phase === 'crashed';
+      const canBet = !!state.user && effectiveStatus === 'idle';
 
       btnContent = (
         <button
@@ -579,30 +578,24 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           disabled={!canBet}
           style={{
             width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none',
-            cursor: canBet ? 'pointer' : 'default',
-            background: isFlying
-              ? 'rgba(255,26,58,0.08)'
-              : isCrashed
+            cursor: canBet ? 'pointer' : 'not-allowed',
+            background: !canBet
+              ? 'rgba(20,10,20,0.4)'
+              : isNextRound
                 ? 'linear-gradient(135deg,#FF9800,#E65100)'
-                : !state.user
-                  ? 'rgba(20,10,20,0.4)'
-                  : 'linear-gradient(135deg,#00C853,#009C41)',
-            border: isFlying ? '1px solid rgba(255,26,58,0.2)' : 'none',
+                : 'linear-gradient(135deg,#00C853,#009C41)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
             transition: 'background 0.2s',
           }}
         >
-          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px', color: isFlying ? '#FF4D4D' : canBet ? '#fff' : C.textDim }}>
-            {isFlying
-              ? 'ROUND LIVE'
-              : !state.user
-                ? 'SIGN IN'
-                : isCrashed
-                  ? `NEXT  ₹${slot.amount.toLocaleString('en-IN')}`
-                  : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px', color: canBet ? '#fff' : C.textDim }}>
+            {!state.user
+              ? 'SIGN IN'
+              : isNextRound
+                ? `BET NEXT  ₹${slot.amount.toLocaleString('en-IN')}`
+                : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}
           </span>
-          {isFlying && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,77,77,0.5)', letterSpacing: '1px' }}>wait for next round</span>}
-          {isCrashed && canBet && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.6)', letterSpacing: '1px' }}>queued for next round</span>}
+          {isNextRound && canBet && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.7)', letterSpacing: '1px' }}>for next round</span>}
         </button>
       );
     }
