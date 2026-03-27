@@ -259,9 +259,23 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Hi-DPI setup: scale canvas buffer by devicePixelRatio so it's crisp
+    const setupHiDpi = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const displayW = canvas.clientWidth || 480;
+      const displayH = CV_H;
+      canvas.width = Math.round(displayW * dpr);
+      canvas.height = Math.round(displayH * dpr);
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    };
+    setupHiDpi();
+    const ro = new ResizeObserver(() => { setupHiDpi(); });
+    ro.observe(canvas);
+
     function draw(now: number) {
       const phase = WSC.state.phase;
-      const W = canvas!.width, H = CV_H;
+      const W = (canvas!.clientWidth || 480), H = CV_H;
 
       // ── Elapsed — exactly like Expo: (Date.now() - server.startTime) / 1000 ──
       if (phase === 'flying' && WSC.state.startTime > 0) {
@@ -382,7 +396,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       animRef.current = requestAnimationFrame(draw);
     }
     animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
+    return () => { cancelAnimationFrame(animRef.current); ro.disconnect(); };
   }, []);
 
   // ── Actions ─────────────────────────────────────────────────────────────

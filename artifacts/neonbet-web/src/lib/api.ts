@@ -11,6 +11,17 @@ export interface ApiUser {
   vipLevel: string;
 }
 
+export interface ApiGameHistory {
+  betId: number;
+  roundId: number | null;
+  amount: number;
+  payout: number | null;
+  cashedOutAt: string | null;
+  status: string;
+  placedAt: string;
+  crashPoint: string | null;
+}
+
 async function req<T>(method: string, path: string, body?: object, token?: string | null): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -33,4 +44,10 @@ export const api = {
 
   me: (token: string) =>
     req<ApiUser>('GET', '/auth/me', undefined, token),
+
+  getGameHistory: (token: string) =>
+    req<ApiGameHistory[]>('GET', '/game/history', undefined, token),
+
+  changePassword: (token: string, currentPassword: string, newPassword: string) =>
+    req<{ message: string }>('POST', '/auth/change-password', { currentPassword, newPassword }, token),
 };

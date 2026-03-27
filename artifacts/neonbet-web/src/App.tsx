@@ -162,7 +162,7 @@ function AppContent() {
       <main style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {tab === 'game'    && <CrashGame navigate={setTab as (t: string) => void} />}
         {tab === 'wallet'  && <div style={{ padding: '20px', color: '#fff' }}>Wallet — use bottom nav</div>}
-        {tab === 'profile' && <Profile />}
+        {tab === 'profile' && <Profile onAuthOpen={() => setAuthOpen(true)} />}
       </main>
       <BottomNav tab={tab} setTab={setTab} onWalletOpen={handleWalletOpen} />
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
