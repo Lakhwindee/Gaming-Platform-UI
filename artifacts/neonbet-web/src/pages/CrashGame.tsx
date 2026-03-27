@@ -185,6 +185,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   // Two-step confirm for queued bets (prevents accidental bets during flying)
   const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
   const pendingConfirmRef = useRef<[boolean, boolean]>([false, false]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const confirmTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
   useEffect(() => { slot1Ref.current = slot1; slot2Ref.current = slot2; stateRef.current = state; });
@@ -879,19 +880,77 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   );
 
   // ── History strip ─────────────────────────────────────────────────────────
+  function histChip(h: number, i: number) {
+    const col = h >= 10 ? '#FF4DFF' : h >= 2 ? '#4DA6FF' : '#FF3A3A';
+    const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,58,58,0.13)';
+    return (
+      <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '8px', padding: '4px 9px', fontSize: '11px', fontWeight: 700, color: col }}>
+        {h.toFixed(2)}x
+      </div>
+    );
+  }
+
   const historyStrip = (
-    <div style={{ overflowX: 'auto', display: 'flex', gap: '5px', marginBottom: '10px', scrollbarWidth: 'none' as const }}>
-      {history.map((h, i) => {
-        const col = h >= 10 ? '#FF4DFF' : h >= 2 ? '#4DA6FF' : '#FF3A3A';
-        const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,58,58,0.13)';
-        return (
-          <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '8px', padding: '4px 9px', fontSize: '11px', fontWeight: 700, color: col }}>
-            {h.toFixed(2)}x
-          </div>
-        );
-      })}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '10px' }}>
+      {/* Last 6 rounds visible */}
+      <div style={{ flex: 1, display: 'flex', gap: '5px', overflow: 'hidden' }}>
+        {[...history].slice(0, 6).map((h, i) => histChip(h, i))}
+      </div>
+      {/* ⋯ button */}
+      {history.length > 0 && (
+        <button onClick={() => setHistoryOpen(true)} style={{
+          flexShrink: 0, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '8px', padding: '4px 10px', fontSize: '15px', color: '#aaa',
+          cursor: 'pointer', letterSpacing: '2px', fontWeight: 900, lineHeight: 1,
+        }}>···</button>
+      )}
     </div>
   );
+
+  // ── History modal ──────────────────────────────────────────────────────────
+  const historyModal = historyOpen ? (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 2000,
+      background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={() => setHistoryOpen(false)}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: '#12001E', border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: '20px', width: '340px', maxWidth: '92vw',
+        maxHeight: '75vh', display: 'flex', flexDirection: 'column',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.9)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <span style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '1px', color: '#fff' }}>ROUND HISTORY</span>
+          <button onClick={() => setHistoryOpen(false)} style={{ background: 'none', border: 'none', color: '#888', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        {/* Grid of chips */}
+        <div style={{ overflowY: 'auto', padding: '16px', display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-start' }}>
+          {history.length === 0 ? (
+            <span style={{ color: '#666', fontSize: '13px' }}>No history yet</span>
+          ) : history.map((h, i) => {
+            const col = h >= 10 ? '#FF4DFF' : h >= 2 ? '#4DA6FF' : '#FF3A3A';
+            const bg  = h >= 10 ? 'rgba(255,77,255,0.15)' : h >= 2 ? 'rgba(77,166,255,0.15)' : 'rgba(255,58,58,0.15)';
+            return (
+              <div key={i} style={{
+                background: bg, border: `1px solid ${col}60`,
+                borderRadius: '10px', padding: '7px 12px',
+                fontSize: '13px', fontWeight: 800, color: col,
+                minWidth: '64px', textAlign: 'center',
+              }}>
+                {h.toFixed(2)}x
+              </div>
+            );
+          })}
+        </div>
+        {/* Footer */}
+        <div style={{ padding: '10px 20px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
+          <span style={{ color: '#555', fontSize: '11px' }}>{history.length} rounds shown</span>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   // ── Canvas element ────────────────────────────────────────────────────────
   const canvasEl = (
@@ -920,13 +979,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     // Desktop: canvas left (65%), bet panels right (35%)
     return (
       <div style={{ width: '100%', padding: '0 20px 20px', boxSizing: 'border-box' }}>
+        {historyModal}
         {/* History full-width */}
-        <div style={{ padding: '10px 0', overflowX: 'auto', display: 'flex', gap: '5px', scrollbarWidth: 'none' as const }}>
-          {history.map((h, i) => {
-            const col = h >= 10 ? '#FF4DFF' : h >= 2 ? '#4DA6FF' : '#FF3A3A';
-            const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,58,58,0.13)';
-            return <div key={i} style={{ flexShrink:0, background:bg, border:`1px solid ${col}55`, borderRadius:'8px', padding:'4px 9px', fontSize:'11px', fontWeight:700, color:col }}>{h.toFixed(2)}x</div>;
-          })}
+        <div style={{ padding: '10px 0' }}>
+          {historyStrip}
         </div>
         <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
           {/* Left: Canvas + bets */}
@@ -947,6 +1003,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   // Mobile: stack vertically (same as Expo)
   return (
     <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', padding: '0 16px 24px', boxSizing: 'border-box' }}>
+      {historyModal}
       {historyStrip}
       {canvasEl}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>

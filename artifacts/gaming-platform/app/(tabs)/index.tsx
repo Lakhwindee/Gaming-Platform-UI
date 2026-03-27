@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert, Animated, Dimensions, Platform, ScrollView, StyleSheet,
+  Alert, Animated, Dimensions, Modal, Platform, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -281,6 +281,7 @@ export default function GameScreen() {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const [soundOn, setSoundOn] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   // Two-step confirm for queued bets — ref keeps value fresh for React Compiler memoized closures
   const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
   const pendingConfirmRef = useRef<[boolean, boolean]>([false, false]);
@@ -722,18 +723,61 @@ export default function GameScreen() {
         </View>
       </View>
 
-      <View style={IS_DESKTOP_WEB ? { paddingHorizontal: 16, maxWidth: 1280, alignSelf: "center", width: "100%" } : { paddingHorizontal: 16 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyRow} contentContainerStyle={{ paddingHorizontal: 0 }}>
-          {history.map((h, i) => {
-            const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
-            const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
-            return (
-              <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "55" }]}>
-                <Text style={[styles.histText, { color: col }]}>{h.toFixed(2)}x</Text>
+      {/* ── History Modal ── */}
+      <Modal visible={historyOpen} transparent animationType="fade" onRequestClose={() => setHistoryOpen(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center" }} activeOpacity={1} onPress={() => setHistoryOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={{ backgroundColor: "#12001E", borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", width: 320, maxWidth: "90%", maxHeight: 480, shadowColor: "#000", shadowRadius: 40, shadowOpacity: 0.9, shadowOffset: { width: 0, height: 0 } }}>
+              {/* Header */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 18, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.08)" }}>
+                <Text style={{ fontFamily: "Inter_800ExtraBold", fontSize: 14, letterSpacing: 1.5, color: "#fff" }}>ROUND HISTORY</Text>
+                <TouchableOpacity onPress={() => setHistoryOpen(false)}>
+                  <Text style={{ color: "#888", fontSize: 22, lineHeight: 22 }}>×</Text>
+                </TouchableOpacity>
               </View>
-            );
-          })}
-        </ScrollView>
+              {/* Grid */}
+              <ScrollView contentContainerStyle={{ padding: 14, flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {history.length === 0 ? (
+                  <Text style={{ color: "#555", fontSize: 13, fontFamily: "Inter_400Regular" }}>No history yet</Text>
+                ) : history.map((h, i) => {
+                  const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
+                  const bg  = h >= 10 ? "rgba(255,77,255,0.15)" : h >= 2 ? "rgba(77,166,255,0.15)" : "rgba(255,58,58,0.15)";
+                  return (
+                    <View key={i} style={{ backgroundColor: bg, borderRadius: 10, borderWidth: 1, borderColor: col + "60", paddingHorizontal: 12, paddingVertical: 7, minWidth: 64, alignItems: "center" }}>
+                      <Text style={{ fontFamily: "Inter_800ExtraBold", fontSize: 13, color: col }}>{h.toFixed(2)}x</Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+              {/* Footer */}
+              <View style={{ paddingVertical: 10, paddingHorizontal: 18, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", alignItems: "center" }}>
+                <Text style={{ color: "#555", fontSize: 11, fontFamily: "Inter_400Regular" }}>{history.length} rounds shown</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <View style={IS_DESKTOP_WEB ? { paddingHorizontal: 16, maxWidth: 1280, alignSelf: "center", width: "100%" } : { paddingHorizontal: 16 }}>
+        {/* History: last 6 chips + ⋯ button */}
+        <View style={[styles.historyRow, { flexDirection: "row", alignItems: "center", gap: 5 }]}>
+          <View style={{ flex: 1, flexDirection: "row", gap: 5, overflow: "hidden" }}>
+            {history.slice(0, 6).map((h, i) => {
+              const col = h >= 10 ? "#FF4DFF" : h >= 2 ? "#4DA6FF" : "#FF3A3A";
+              const bg  = h >= 10 ? "rgba(255,77,255,0.13)" : h >= 2 ? "rgba(77,166,255,0.13)" : "rgba(255,58,58,0.13)";
+              return (
+                <View key={i} style={[styles.histChip, { backgroundColor: bg, borderColor: col + "55" }]}>
+                  <Text style={[styles.histText, { color: col }]}>{h.toFixed(2)}x</Text>
+                </View>
+              );
+            })}
+          </View>
+          {history.length > 0 && (
+            <TouchableOpacity onPress={() => setHistoryOpen(true)} style={{ backgroundColor: "rgba(255,255,255,0.07)", borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: 8, paddingHorizontal: 11, paddingVertical: 5 }}>
+              <Text style={{ color: "#aaa", fontSize: 16, fontFamily: "Inter_800ExtraBold", letterSpacing: 3, lineHeight: 18 }}>···</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Desktop: canvas left + panels right. Mobile: stacked */}
         {IS_DESKTOP_WEB ? (
