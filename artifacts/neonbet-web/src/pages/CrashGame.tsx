@@ -669,44 +669,25 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       </div>
   );
 
-  const canvasEl = (
-    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
-      <canvas ref={canvasRef} width={480} height={260} style={{ width: '100%', height: 'auto', display: 'block' }} />
-    </div>
-  );
-
-  if (isMobile) {
-    return (
-      <div style={{ width: '100%', maxWidth: '520px', margin: '0 auto', paddingBottom: '20px', boxSizing: 'border-box' }}>
-        {historyStrip}
-        <div style={{ margin: '0 12px' }}>{canvasEl}</div>
-        <div style={{ display: 'flex', gap: '8px', padding: '12px', boxSizing: 'border-box' }}>
-          <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
-          <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
-        </div>
-        <div style={{ padding: '0 12px' }}>{betsSection}</div>
-      </div>
-    );
-  }
-
-  // ── Desktop layout (Aviator-style wide) ──
+  // ── Single unified Aviator-style layout ──
   return (
-    <div style={{ width: '100%', padding: '0 20px 20px', boxSizing: 'border-box' }}>
+    <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto', paddingBottom: '24px', boxSizing: 'border-box' }}>
+      {/* History chips */}
       {historyStrip}
-      <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
 
-        {/* Left: Canvas + Bets Table */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {canvasEl}
-          {betsSection}
-        </div>
-
-        {/* Right: Bet Panels stacked */}
-        <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {renderBetPanel(0)}
-          {renderBetPanel(1)}
-        </div>
+      {/* Canvas – full width, tall like Aviator */}
+      <div style={{ margin: '0 12px', position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
+        <canvas ref={canvasRef} width={800} height={420} style={{ width: '100%', height: 'auto', display: 'block' }} />
       </div>
+
+      {/* Bet panels – BET 1 | BET 2 side by side always */}
+      <div style={{ display: 'flex', gap: '10px', padding: '12px', boxSizing: 'border-box' }}>
+        <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
+        <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
+      </div>
+
+      {/* Bets table */}
+      <div style={{ padding: '0 12px' }}>{betsSection}</div>
     </div>
   );
 }
