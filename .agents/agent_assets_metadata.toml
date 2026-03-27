@@ -24,3 +24,9 @@ id = "r-f6hU2V5o4FvdcVaNaoc"
 uri = "file://attached_assets/generated_videos/blaze_crash_game_ad.mp4"
 type = "video"
 title = "BLAZE — Instagram Ad Video (6 sec, 1080p 9:16)"
+
+[[outputs]]
+id = "5LXMUwM1cqLL0B7occKp5"
+uri = "file://attached_assets/generated_videos/blaze_pro_ad_v2.mp4"
+type = "video"
+title = "BLAZE — Pro Ad Video (8 sec, 1080p 9:16)"
