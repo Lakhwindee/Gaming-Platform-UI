@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { WSC, wsSend, Phase, RoundBet, TopBet } from '../lib/wsClient';
+import { WSC, wsSend, wsSendReliable, Phase, RoundBet, TopBet } from '../lib/wsClient';
 import { startAmbient, stopAmbient, playBlast, playCashout, updateAmbientMult } from '../lib/soundEngine';
 
 // ── Constants (copied from Expo) ──────────────────────────────────────────
@@ -184,6 +184,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const prevPhaseRef = useRef<Phase>(WSC.state.phase);
   // Two-step confirm for queued bets (prevents accidental bets during flying)
   const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
+  const pendingConfirmRef = useRef<[boolean, boolean]>([false, false]);
   const confirmTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
   useEffect(() => { slot1Ref.current = slot1; slot2Ref.current = slot2; stateRef.current = state; });
@@ -475,7 +476,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   function cashOut(slotIdx: 0 | 1) {
     const slot = slotIdx === 0 ? slot1Ref.current : slot2Ref.current;
     if (slot.status !== 'active') return;
-    wsSend({ type: 'cashout', slot: slotIdx + 1 });
+    // Retry once if WS not ready (e.g. momentary reconnect)
+    const sent = wsSendReliable({ type: 'cashout', slot: slotIdx + 1 });
+    if (!sent) setTimeout(() => wsSendReliable({ type: 'cashout', slot: slotIdx + 1 }), 80);
   }
   function setSlotAmount(slotIdx: 0 | 1, val: number) {
     const v = Math.max(10, Math.min(100000, val));
@@ -569,26 +572,33 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       // But require 2-step confirm during flying/crashed to prevent accidental bets
       const canBet = !!state.user && effectiveStatus === 'idle';
       const isNextQueue = canBet && (phase === 'flying' || phase === 'crashed');
+      // Use state for rendering, ref for handler (prevents stale closures)
       const awaitingConfirm = pendingConfirm[slotIdx];
 
       function handleBetClick() {
         if (!canBet) return;
         if (!isNextQueue) { placeBet(slotIdx); return; }
-        if (!awaitingConfirm) {
+        const currentlyPending = pendingConfirmRef.current[slotIdx];
+        if (!currentlyPending) {
           // First click: show confirm state, auto-reset after 3s
-          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
           next[slotIdx] = true;
-          setPendingConfirm(next);
+          pendingConfirmRef.current = next;
+          setPendingConfirm([...next] as [boolean, boolean]);
           if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
           confirmTimers.current[slotIdx] = setTimeout(() => {
-            setPendingConfirm(p => { const n: [boolean, boolean] = [p[0], p[1]]; n[slotIdx] = false; return n; });
+            const reset: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
+            reset[slotIdx] = false;
+            pendingConfirmRef.current = reset;
+            setPendingConfirm([...reset] as [boolean, boolean]);
           }, 3000);
         } else {
           // Second click: actually place bet
           if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
           next[slotIdx] = false;
-          setPendingConfirm(next);
+          pendingConfirmRef.current = next;
+          setPendingConfirm([...next] as [boolean, boolean]);
           placeBet(slotIdx);
         }
       }

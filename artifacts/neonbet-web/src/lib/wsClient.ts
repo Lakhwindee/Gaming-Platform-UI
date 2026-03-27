@@ -98,6 +98,15 @@ export function wsSend(msg: object) {
   if (WSC.socket?.readyState === WebSocket.OPEN) WSC.socket.send(JSON.stringify(msg));
 }
 
+/** Returns true if message was sent, false if socket wasn't ready. */
+export function wsSendReliable(msg: object): boolean {
+  if (WSC.socket?.readyState === WebSocket.OPEN) {
+    WSC.socket.send(JSON.stringify(msg));
+    return true;
+  }
+  return false;
+}
+
 export function disconnectWS() {
   if (WSC.socket) { WSC.socket.onclose = null; WSC.socket.close(); WSC.socket = null; }
   if (WSC.reconnectTimer) { clearTimeout(WSC.reconnectTimer); WSC.reconnectTimer = null; }

@@ -14,7 +14,7 @@ import {
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGrad, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
-import { WSC, wsSend } from "@/lib/wsClient";
+import { WSC, wsSend, wsSendReliable } from "@/lib/wsClient";
 
 const { width: SW } = Dimensions.get("window");
 const IS_DESKTOP_WEB = Platform.OS === "web" && SW > 700;
@@ -281,8 +281,9 @@ export default function GameScreen() {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const [soundOn, setSoundOn] = useState(true);
-  // Two-step confirm for queued bets (prevents accidental bets during flying)
+  // Two-step confirm for queued bets — ref keeps value fresh for React Compiler memoized closures
   const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
+  const pendingConfirmRef = useRef<[boolean, boolean]>([false, false]);
   const confirmTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
 
   const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
@@ -525,11 +526,11 @@ export default function GameScreen() {
   }
 
   function cashOut(slotIdx: 0 | 1) {
-    // Always use slotRefs.current (synchronously updated) — never stale closure slots[]
     const slot = slotRefs.current[slotIdx];
-    // Always use WSC.state.phase — never stale closure phase variable
-    if (slot.status !== "active" || WSC.state.phase !== "flying") return;
-    wsSend({ type: "cashout", slot: slotIdx + 1 });
+    if (slot.status !== "active") return;
+    // Send immediately; if WS not ready, retry once after 80ms
+    const sent = wsSendReliable({ type: "cashout", slot: slotIdx + 1 });
+    if (!sent) setTimeout(() => wsSendReliable({ type: "cashout", slot: slotIdx + 1 }), 80);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }
 
@@ -599,26 +600,34 @@ export default function GameScreen() {
     } else {
       const canBet = !!authState.user && effectiveStatus === "idle";
       const isNextQueue = phase === "flying" || phase === "crashed";
+      // Use state for rendering, ref for handler (avoids stale closure with React Compiler)
       const awaitingConfirm = pendingConfirm[slotIdx];
 
       function handleBetPress() {
         if (!canBet) return;
         if (!isNextQueue) { placeBet(slotIdx); return; }
-        if (!awaitingConfirm) {
+        // Always read from ref — avoids stale closure under React Compiler memoization
+        const currentlyPending = pendingConfirmRef.current[slotIdx];
+        if (!currentlyPending) {
           // First tap: show confirm state, auto-reset after 3s
-          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
           next[slotIdx] = true;
-          setPendingConfirm(next);
+          pendingConfirmRef.current = next;
+          setPendingConfirm([...next] as [boolean, boolean]);
           if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
           confirmTimers.current[slotIdx] = setTimeout(() => {
-            setPendingConfirm(p => { const n: [boolean, boolean] = [p[0], p[1]]; n[slotIdx] = false; return n; });
+            const reset: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
+            reset[slotIdx] = false;
+            pendingConfirmRef.current = reset;
+            setPendingConfirm([...reset] as [boolean, boolean]);
           }, 3000);
         } else {
           // Second tap: actually place bet
           if (confirmTimers.current[slotIdx]) clearTimeout(confirmTimers.current[slotIdx]!);
-          const next: [boolean, boolean] = [pendingConfirm[0], pendingConfirm[1]];
+          const next: [boolean, boolean] = [...pendingConfirmRef.current] as [boolean, boolean];
           next[slotIdx] = false;
-          setPendingConfirm(next);
+          pendingConfirmRef.current = next;
+          setPendingConfirm([...next] as [boolean, boolean]);
           placeBet(slotIdx);
         }
       }
