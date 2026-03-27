@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { WSC, wsSend, Phase, RoundBet, TopBet } from '../lib/wsClient';
+import { startAmbient, stopAmbient, playBlast, playCashout } from '../lib/soundEngine';
 
 // ── Constants (copied from Expo) ──────────────────────────────────────────
 const C = {
@@ -205,11 +206,16 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         // Placed bets become queued for next
         if (slot1Ref.current.status === 'placed') setSlot1(s => ({ ...s, status: 'queued' }));
         if (slot2Ref.current.status === 'placed') setSlot2(s => ({ ...s, status: 'queued' }));
+        // 💥 Blast sound + stop ambient
+        stopAmbient();
+        playBlast();
       }
       if (newPhase === 'flying') {
         // Placed/queued become active
         if (slot1Ref.current.status === 'placed' || slot1Ref.current.status === 'queued') setSlot1(s => ({ ...s, status: 'active' }));
         if (slot2Ref.current.status === 'placed' || slot2Ref.current.status === 'queued') setSlot2(s => ({ ...s, status: 'active' }));
+        // 🎵 Start ambient music when rocket flies
+        startAmbient();
       }
       prevPhaseRef.current = newPhase;
       setTick(n => n + 1);
@@ -232,6 +238,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           status: 'cashedout', cashedOutAt: m,
           result: { text: `+₹${payout.toLocaleString('en-IN')} @ ${m.toFixed(2)}x`, win: true },
         });
+        playCashout(); // 🎵 Win chime
       }
     };
     WSC.msgListeners.add(handler);

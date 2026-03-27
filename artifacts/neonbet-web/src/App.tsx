@@ -5,6 +5,7 @@ import AuthModal from './pages/AuthModal';
 import WalletModal from './pages/WalletModal';
 import CrashGame from './pages/CrashGame';
 import { WSC } from './lib/wsClient';
+import { setSoundEnabled } from './lib/soundEngine';
 import './index.css';
 
 const C = {
@@ -23,11 +24,23 @@ type Tab = 'game' | 'wallet' | 'profile';
 function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { state, toggleWallet } = useGame();
   const [, setTick] = useState(0);
+  const [soundOn, setSoundOn] = useState(() => {
+    try { return localStorage.getItem('blazeSound') !== 'off'; } catch { return true; }
+  });
+
   useEffect(() => {
     const update = () => setTick(n => n + 1);
     WSC.listeners.add(update);
     return () => { WSC.listeners.delete(update); };
   }, []);
+
+  function toggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    try { localStorage.setItem('blazeSound', next ? 'on' : 'off'); } catch {}
+  }
+
   const connected = WSC.state.connected;
 
   const chip: React.CSSProperties = {
@@ -65,8 +78,29 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
       {/* Center — BLAZE */}
       <span style={{ fontSize: '18px', fontWeight: 700, color: C.red, letterSpacing: '4px' }}>BLAZE</span>
 
-      {/* Right — LIVE chip */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {/* Right — LIVE + Sound toggle */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px' }}>
+        {/* Sound toggle */}
+        <button
+          onClick={toggleSound}
+          title={soundOn ? 'Mute sounds' : 'Enable sounds'}
+          style={{
+            background: soundOn ? 'rgba(255,26,58,0.15)' : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${soundOn ? 'rgba(255,26,58,0.4)' : 'rgba(255,255,255,0.15)'}`,
+            borderRadius: '10px',
+            padding: '5px 8px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}>
+          <span style={{ fontSize: '14px' }}>{soundOn ? '🔊' : '🔇'}</span>
+          <span style={{ fontSize: '9px', fontWeight: 600, color: soundOn ? C.red : C.textMuted, letterSpacing: '0.5px' }}>
+            {soundOn ? 'ON' : 'OFF'}
+          </span>
+        </button>
+
+        {/* LIVE indicator */}
         <div style={{ ...chip, cursor: 'default', display: 'flex', alignItems: 'center', gap: '5px', textAlign: 'left' }}>
           <div style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? '#00E676' : '#FF1A3A', flexShrink: 0 }} />
           <span style={{ fontSize: '10px', fontWeight: 600, color: C.textMuted }}>

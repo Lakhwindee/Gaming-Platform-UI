@@ -6,6 +6,11 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  loadSounds, startAmbient, stopAmbient, playBlast, playCashout,
+  setSoundEnabled,
+} from "@/lib/soundEngine";
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGrad, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 import C from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
@@ -267,6 +272,7 @@ export default function GameScreen() {
   const [, setTick] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [slots, setSlots] = useState<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
+  const [soundOn, setSoundOn] = useState(true);
 
   const slotRefs = useRef<[SlotState, SlotState]>([initSlot(100), initSlot(200)]);
   const resultTimers = useRef<[ReturnType<typeof setTimeout> | null, ReturnType<typeof setTimeout> | null]>([null, null]);
@@ -274,6 +280,38 @@ export default function GameScreen() {
   const [cashoutPopup, setCashoutPopup] = useState<{ payout: number; mult: number; slot: number } | null>(null);
   const popupAnim = useRef(new Animated.Value(0)).current;
   const popupDismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Sound: load on mount, restore preference ──────────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem("blazeSound").then(val => {
+      const on = val !== "off";
+      setSoundOn(on);
+      setSoundEnabled(on);
+    });
+    loadSounds();
+  }, []);
+
+  // ── Sound: phase-based triggers ────────────────────────────────────────
+  const prevPhaseForSound = useRef<string>("");
+  useEffect(() => {
+    const listener = () => {
+      const ph = WSC.state.phase;
+      if (ph !== prevPhaseForSound.current) {
+        if (ph === "flying") startAmbient();
+        if (ph === "crashed") { stopAmbient(); playBlast(); }
+        prevPhaseForSound.current = ph;
+      }
+    };
+    WSC.listeners.add(listener);
+    return () => { WSC.listeners.delete(listener); };
+  }, []);
+
+  function toggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    AsyncStorage.setItem("blazeSound", next ? "on" : "off");
+  }
 
   const showCashoutPopup = useCallback((payout: number, mult: number, slot: number) => {
     if (popupDismissTimer.current) clearTimeout(popupDismissTimer.current);
@@ -350,6 +388,7 @@ export default function GameScreen() {
         });
         resultTimers.current[slotIdx] = setTimeout(() => updateSlot(slotIdx, { result: null }), 5000);
         showCashoutPopup(payout, m, slotNum);
+        playCashout(); // 🎵 Win chime
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
 
@@ -590,9 +629,26 @@ export default function GameScreen() {
         <View style={styles.appLabel}>
           <Text style={styles.appLabelText}>BLAZE</Text>
         </View>
-        <View style={styles.connectionChip}>
-          <View style={[styles.dot, { backgroundColor: connected ? "#00E676" : "#FF1A3A" }]} />
-          <Text style={styles.connectionText}>{connected ? "LIVE" : "OFFLINE"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          {/* Sound toggle */}
+          <TouchableOpacity
+            onPress={toggleSound}
+            style={{
+              flexDirection: "row", alignItems: "center", gap: 3,
+              backgroundColor: soundOn ? "rgba(255,26,58,0.15)" : "rgba(255,255,255,0.06)",
+              borderWidth: 1, borderColor: soundOn ? "rgba(255,26,58,0.4)" : "rgba(255,255,255,0.15)",
+              borderRadius: 10, paddingHorizontal: 7, paddingVertical: 5,
+            }}>
+            <Text style={{ fontSize: 13 }}>{soundOn ? "🔊" : "🔇"}</Text>
+            <Text style={{ fontSize: 8, fontWeight: "700", color: soundOn ? "#FF1A3A" : "#AA7788", letterSpacing: 0.5 }}>
+              {soundOn ? "ON" : "OFF"}
+            </Text>
+          </TouchableOpacity>
+          {/* LIVE */}
+          <View style={styles.connectionChip}>
+            <View style={[styles.dot, { backgroundColor: connected ? "#00E676" : "#FF1A3A" }]} />
+            <Text style={styles.connectionText}>{connected ? "LIVE" : "OFFLINE"}</Text>
+          </View>
         </View>
       </View>
 
