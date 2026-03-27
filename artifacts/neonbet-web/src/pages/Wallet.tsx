@@ -536,10 +536,6 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
                 {loading ? '⏳ Processing…' : `DEPOSIT ₹${finalAmount.toLocaleString('en-IN')}${bonus > 0 ? ` + ₹${bonus.toLocaleString('en-IN')} Bonus` : ''}`}
               </button>
 
-              {/* Merchant info */}
-              <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: C.textDim }}>
-                Secure UPI payment · 7973248683@pthdfc
-              </div>
             </>
           )}
         </div>
