@@ -27,8 +27,8 @@ const AVATAR_COLORS = ['#E53935','#8E24AA','#1E88E5','#00897B','#F4511E','#6D4C4
 const AVATAR_EMOJI  = ['🦅','🚀','🎯','💰','🔥','⚡','🌙','🎲'];
 
 function multColor(m: number): string {
-  if (m >= 10) return '#7B2FFF';
-  if (m >= 2)  return '#54B3FF';
+  if (m >= 10) return '#A500FF';
+  if (m >= 2)  return '#5AC8FA';
   return '#F1222A';
 }
 
@@ -876,8 +876,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
 
   // ── History strip ─────────────────────────────────────────────────────────
   function histChip(h: number, i: number) {
-    const col = h >= 10 ? '#7B2FFF' : h >= 2 ? '#54B3FF' : '#F1222A';
-    const bg  = h >= 10 ? 'rgba(123,47,255,0.15)' : h >= 2 ? 'rgba(84,179,255,0.15)' : 'rgba(241,34,42,0.15)';
+    const col = h >= 10 ? '#A500FF' : h >= 2 ? '#5AC8FA' : '#F1222A';
+    const bg  = h >= 10 ? 'rgba(165,0,255,0.15)' : h >= 2 ? 'rgba(90,200,250,0.15)' : 'rgba(241,34,42,0.15)';
     return (
       <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '8px', padding: '4px 9px', fontSize: '11px', fontWeight: 700, color: col }}>
         {h.toFixed(2)}x
@@ -925,8 +925,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           {history.length === 0 ? (
             <span style={{ color: '#666', fontSize: '13px' }}>No history yet</span>
           ) : history.map((h, i) => {
-            const col = h >= 10 ? '#7B2FFF' : h >= 2 ? '#54B3FF' : '#F1222A';
-            const bg  = h >= 10 ? 'rgba(123,47,255,0.15)' : h >= 2 ? 'rgba(84,179,255,0.15)' : 'rgba(241,34,42,0.15)';
+            const col = h >= 10 ? '#A500FF' : h >= 2 ? '#5AC8FA' : '#F1222A';
+            const bg  = h >= 10 ? 'rgba(165,0,255,0.15)' : h >= 2 ? 'rgba(90,200,250,0.15)' : 'rgba(241,34,42,0.15)';
             return (
               <div key={i} style={{
                 background: bg, border: `1px solid ${col}60`,
