@@ -231,6 +231,11 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       if (msg.type === 'bet_ok') updateSlot(s === 2 ? 1 : 0, { status: 'active' });
       if (msg.type === 'bet_queued') updateSlot(s === 2 ? 1 : 0, { status: 'queued' });
       if (msg.type === 'bet_fail') updateSlot(s === 2 ? 1 : 0, { status: 'idle', result: { text: String(msg.error ?? 'Failed'), win: false } });
+      if (msg.type === 'bet_cancelled') updateSlot(s === 2 ? 1 : 0, { status: 'idle', result: null });
+      if (msg.type === 'bet_cancel_fail') {
+        // Revert to placed/active so user sees their bet is still live
+        updateSlot(s === 2 ? 1 : 0, { status: 'active' });
+      }
       if (msg.type === 'cashout_ok') {
         const m = Number(msg.mult);
         const payout = Number(msg.payout);
@@ -463,13 +468,13 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     if (effectiveStatus === 'active' && isFlying) {
       btnContent = (
         <button onClick={() => cashOut(slotIdx)} style={{
-          width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none', cursor: 'pointer',
+          width: '100%', padding: '12px 0', borderRadius: '12px', border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg,#FF8C00,#CC4400)',
           boxShadow: '0 0 16px rgba(255,107,0,0.5)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
         }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', letterSpacing: '0.8px' }}>CASHOUT  ₹{potentialWin.toLocaleString('en-IN')}</span>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>{mult.toFixed(2)}x</span>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', letterSpacing: '2px' }}>CASHOUT</span>
+          <span style={{ fontSize: '22px', fontWeight: 900, color: '#fff', letterSpacing: '-0.5px' }}>₹{potentialWin.toLocaleString('en-IN')}</span>
         </button>
       );
     } else if (effectiveStatus === 'placed') {

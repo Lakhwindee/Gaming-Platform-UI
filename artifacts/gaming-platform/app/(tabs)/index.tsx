@@ -372,7 +372,12 @@ export default function GameScreen() {
       }
 
       if (msg.type === "bet_cancelled") {
-        updateSlot(slotIdx, { status: "idle" });
+        updateSlot(slotIdx, { status: "idle", result: null });
+      }
+
+      if (msg.type === "bet_cancel_fail") {
+        // Round already flying — revert to active so cashout button shows
+        updateSlot(slotIdx, { status: "active" });
       }
 
       if (msg.type === "cashout_ok") {
@@ -513,7 +518,8 @@ export default function GameScreen() {
       btnContent = (
         <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
-            <Text style={styles.mainBtnText}>CASHOUT  ₹{potentialWin.toLocaleString("en-IN")}</Text>
+            <Text style={styles.cashoutLabel}>CASHOUT</Text>
+            <Text style={styles.cashoutAmt}>₹{potentialWin.toLocaleString("en-IN")}</Text>
           </LinearGradient>
         </TouchableOpacity>
       );
@@ -956,6 +962,8 @@ const styles = StyleSheet.create({
   mainBtnText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 0.8 },
   mainBtnSub: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF", marginTop: 1 },
   cashoutGlow: { shadowColor: "#FF6B00", shadowRadius: 16, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  cashoutLabel: { fontSize: 9, fontFamily: "Inter_700Bold", color: "rgba(255,255,255,0.75)", letterSpacing: 2, marginBottom: 1 },
+  cashoutAmt: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: -0.5 },
   placedBtn: { flex: 1, alignItems: "center", justifyContent: "center", borderRadius: 12, paddingVertical: 10, borderWidth: 1.5, borderColor: "rgba(0,200,83,0.4)", backgroundColor: "rgba(0,200,83,0.07)" },
   placedBtnTop: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#00C853", letterSpacing: 1.5, marginBottom: 3 },
   placedBtnAmt: { fontSize: 16, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 3 },
