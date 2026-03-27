@@ -6,3 +6,15 @@ id = "JEriCeS73RjHSyw82XtMO"
 uri = "file://attached_assets/generated_images/blaze_insta_ad.png"
 type = "image"
 title = "BLAZE — Instagram Ad (9:16)"
+
+[[outputs]]
+id = "cfSykvL0LotbBJeysuEQi"
+uri = "file://attached_assets/generated_images/blaze_ad_phone.png"
+type = "image"
+title = "BLAZE Ad — Phone Mockup (9:16 Story/Reel)"
+
+[[outputs]]
+id = "te_KSQmI46TV8mrGMNNZz"
+uri = "file://attached_assets/generated_images/blaze_ad_square.png"
+type = "image"
+title = "BLAZE Ad — Square (1:1 Feed Post)"
