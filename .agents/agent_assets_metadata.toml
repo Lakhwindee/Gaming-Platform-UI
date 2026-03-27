@@ -18,3 +18,9 @@ id = "te_KSQmI46TV8mrGMNNZz"
 uri = "file://attached_assets/generated_images/blaze_ad_square.png"
 type = "image"
 title = "BLAZE Ad — Square (1:1 Feed Post)"
+
+[[outputs]]
+id = "r-f6hU2V5o4FvdcVaNaoc"
+uri = "file://attached_assets/generated_videos/blaze_crash_game_ad.mp4"
+type = "video"
+title = "BLAZE — Instagram Ad Video (6 sec, 1080p 9:16)"
