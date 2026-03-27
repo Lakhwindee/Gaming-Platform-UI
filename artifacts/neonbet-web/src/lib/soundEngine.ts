@@ -180,45 +180,74 @@ export function playCashout() {
 
 function _doCashout(ac: AudioContext) {
   const now = ac.currentTime;
-  // Rising cascade of coin-like tones
-  const freqs = [523.25, 659.25, 783.99, 1046.5, 1318.5];
-  freqs.forEach((freq, i) => {
-    const t = now + i * 0.07;
-    const osc = ac.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = freq;
 
-    // Add metallic shimmer via slight detune
-    const osc2 = ac.createOscillator();
-    osc2.type = 'triangle';
-    osc2.frequency.value = freq * 1.01; // slight detune for shimmer
+  // ① Cute rising "wheee" glide — playful portamento
+  const glide = ac.createOscillator();
+  glide.type = 'sine';
+  glide.frequency.setValueAtTime(300, now);
+  glide.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
+  const glideGain = ac.createGain();
+  glideGain.gain.setValueAtTime(0, now);
+  glideGain.gain.linearRampToValueAtTime(0.28, now + 0.02);
+  glideGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+  glide.connect(glideGain); glideGain.connect(ac.destination);
+  glide.start(now); glide.stop(now + 0.25);
 
-    const env = ac.createGain();
-    env.gain.setValueAtTime(0, t);
-    env.gain.linearRampToValueAtTime(0.4, t + 0.015);
-    env.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  // ② Happy ascending notes — C-E-G-C major arpeggio (classic win jingle)
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((freq, i) => {
+    const t = now + 0.12 + i * 0.09;
 
-    const env2 = ac.createGain();
-    env2.gain.value = 0.25;
+    // Main note — sine for softness
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq;
 
-    osc.connect(env); env.connect(ac.destination);
-    osc2.connect(env2); env2.connect(env);
-    osc.start(t); osc.stop(t + 0.55);
-    osc2.start(t); osc2.stop(t + 0.55);
+    // Slight detune copy for warmth
+    const o2 = ac.createOscillator();
+    o2.type = 'sine';
+    o2.frequency.value = freq * 1.005;
+
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.38, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.08, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+    const g2 = ac.createGain(); g2.gain.value = 0.4;
+
+    o.connect(g); g.connect(ac.destination);
+    o2.connect(g2); g2.connect(g);
+    o.start(t); o.stop(t + 0.5);
+    o2.start(t); o2.stop(t + 0.5);
   });
 
-  // Final big chord — triumphant
-  const chord = [523.25, 659.25, 783.99];
-  const chordT = now + freqs.length * 0.07;
-  chord.forEach((freq) => {
+  // ③ Sparkle twinkling at the end — high-pitched fairy dust
+  const sparkleFreqs = [2093, 2637, 3136, 2637, 3136, 2093, 3520];
+  const sparkleStart = now + 0.12 + notes.length * 0.09 + 0.05;
+  sparkleFreqs.forEach((freq, i) => {
+    const t = sparkleStart + i * 0.045;
+    const s = ac.createOscillator();
+    s.type = 'sine';
+    s.frequency.value = freq;
+    const sg = ac.createGain();
+    sg.gain.setValueAtTime(0, t);
+    sg.gain.linearRampToValueAtTime(0.15, t + 0.008);
+    sg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    s.connect(sg); sg.connect(ac.destination);
+    s.start(t); s.stop(t + 0.12);
+  });
+
+  // ④ Final soft "ding" chord — warm and satisfying conclusion
+  const chordT = sparkleStart + sparkleFreqs.length * 0.045 + 0.02;
+  [523.25, 659.25, 783.99, 1046.5].forEach((freq) => {
     const o = ac.createOscillator();
     o.type = 'sine';
     o.frequency.value = freq;
     const g = ac.createGain();
-    g.gain.setValueAtTime(0, chordT);
-    g.gain.linearRampToValueAtTime(0.3, chordT + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, chordT + 0.8);
+    g.gain.setValueAtTime(0.22, chordT);
+    g.gain.exponentialRampToValueAtTime(0.001, chordT + 1.0);
     o.connect(g); g.connect(ac.destination);
-    o.start(chordT); o.stop(chordT + 0.85);
+    o.start(chordT); o.stop(chordT + 1.1);
   });
 }
