@@ -40,17 +40,17 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
   const profit = user.balance - 10000;
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '32px 24px', animation: 'slideIn 0.3s ease' }}>
-      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '32px', fontWeight: 900, letterSpacing: '-1px' }}>👤 My Profile</h1>
+    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 16px', animation: 'slideIn 0.3s ease' }}>
+      <div style={{ marginBottom: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 900, letterSpacing: '-1px' }}>👤 My Profile</h1>
         <button onClick={logout} style={{
           background: 'var(--bg3)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)', padding: '10px 20px',
-          color: 'var(--text2)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+          borderRadius: 'var(--radius)', padding: '8px 16px',
+          color: 'var(--text2)', fontWeight: 600, fontSize: '13px', cursor: 'pointer',
         }}>Sign Out</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
         {/* Profile card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{
@@ -133,7 +133,7 @@ export default function Profile({ onAuthOpen }: { onAuthOpen: () => void }) {
 
         {/* Stats */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
             {[
               { label: 'Total Games', value: totalGames.toString(), icon: '🎮', color: 'var(--text)' },
               { label: 'Games Won', value: user.totalWins.toString(), icon: '🏆', color: 'var(--neon-green)' },

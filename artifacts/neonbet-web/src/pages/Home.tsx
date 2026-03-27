@@ -49,35 +49,35 @@ export default function Home() {
   const banner = BANNERS[bannerIdx];
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Hero banner */}
       <div style={{
         borderRadius: 'var(--radius-xl)', background: banner.bg, border: `1px solid ${banner.color}30`,
-        padding: '36px 40px', marginBottom: '24px', position: 'relative', overflow: 'hidden',
-        transition: 'all 0.5s ease', minHeight: '160px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '24px', marginBottom: '24px', position: 'relative', overflow: 'hidden',
+        transition: 'all 0.5s ease', minHeight: 'auto',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start', gap: '16px',
       }}>
         <div style={{
           position: 'absolute', right: '-20px', top: '-20px',
           width: '200px', height: '200px', borderRadius: '50%',
           background: banner.color, opacity: 0.07, filter: 'blur(40px)',
         }} />
-        <div>
-          <div style={{ fontSize: '64px', marginBottom: '12px' }}>{banner.icon}</div>
-          <h1 style={{ fontSize: '36px', fontWeight: 900, letterSpacing: '-1px', marginBottom: '8px', color: banner.color }}>
+        <div style={{ width: '100%' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>{banner.icon}</div>
+          <h1 style={{ fontSize: '28px', fontWeight: 900, letterSpacing: '-1px', marginBottom: '8px', color: banner.color }}>
             {banner.title}
           </h1>
-          <p style={{ color: 'var(--text2)', fontSize: '16px', marginBottom: '20px' }}>{banner.sub}</p>
+          <p style={{ color: 'var(--text2)', fontSize: '14px', marginBottom: '16px' }}>{banner.sub}</p>
           <button onClick={() => navigate('promotions')} style={{
             background: banner.color, color: '#000', border: 'none',
-            borderRadius: 'var(--radius)', padding: '14px 28px',
-            fontWeight: 800, fontSize: '16px', cursor: 'pointer',
+            borderRadius: 'var(--radius)', padding: '12px 24px',
+            fontWeight: 800, fontSize: '14px', cursor: 'pointer',
           }}>{banner.btn}</button>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '6px', width: '100%', justifyContent: 'center' }}>
           {BANNERS.map((_, i) => (
             <div key={i} onClick={() => setBannerIdx(i)} style={{
-              width: '8px', height: '8px', borderRadius: '50%',
+              width: '6px', height: '6px', borderRadius: '50%',
               background: i === bannerIdx ? banner.color : 'var(--text3)', cursor: 'pointer',
               transition: 'background 0.3s',
             }} />
@@ -86,7 +86,7 @@ export default function Home() {
       </div>
 
       {/* Stats bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '28px' }}>
         {[
           { label: 'Players Online',  value: '14,832', icon: '🟢', color: 'var(--neon-green)' },
           { label: 'Games Available', value: '1',      icon: '🎮', color: 'var(--neon-blue)' },
@@ -107,7 +107,7 @@ export default function Home() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         <div>
           {/* Fast Games */}
           <h2 style={{ fontWeight: 800, fontSize: '20px', marginBottom: '14px' }}>⚡ Play Crash</h2>
