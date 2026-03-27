@@ -422,13 +422,13 @@ export default function GameScreen() {
 
   function placeBet(slotIdx: 0 | 1) {
     if (!authState.user) { Alert.alert("Login Required", "Please login to place bets"); return; }
-    const slot = slots[slotIdx];
+    const slot = slotRefs.current[slotIdx]; // always up-to-date
     const isEffectivelyIdle = slot.status === "idle" ||
       slot.status === "cashedout" || slot.status === "lost";
     if (!isEffectivelyIdle) return;
     wsSend({ type: "place_bet", slot: slotIdx + 1, amount: slot.amount });
     updateSlot(slotIdx, {
-      status: (phase === "flying" || phase === "crashed") ? "queued" : "placed",
+      status: (WSC.state.phase === "flying" || WSC.state.phase === "crashed") ? "queued" : "placed",
       result: null,
     });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -443,8 +443,10 @@ export default function GameScreen() {
   }
 
   function cashOut(slotIdx: 0 | 1) {
-    const slot = slots[slotIdx];
-    if (slot.status !== "active" || phase !== "flying") return;
+    // Always use slotRefs.current (synchronously updated) — never stale closure slots[]
+    const slot = slotRefs.current[slotIdx];
+    // Always use WSC.state.phase — never stale closure phase variable
+    if (slot.status !== "active" || WSC.state.phase !== "flying") return;
     wsSend({ type: "cashout", slot: slotIdx + 1 });
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
   }
