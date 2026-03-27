@@ -98,7 +98,7 @@ export default function WalletScreen() {
 
   const [transactions, setTransactions] = useState<ApiTransaction[]>([]);
   const [txLoading,    setTxLoading]    = useState(false);
-  const [tab,          setTab]          = useState<"deposit" | "withdraw" | "history">("withdraw");
+  const [tab,          setTab]          = useState<"deposit" | "withdraw" | "history">("deposit");
   const [loading,      setLoading]      = useState(false);
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
@@ -326,6 +326,11 @@ export default function WalletScreen() {
           </View>
           <View style={styles.balanceDivider} />
           <View style={styles.quickRow}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => setTab("deposit")}>
+              <Ionicons name="add-circle" size={16} color={C.green} />
+              <Text style={[styles.quickBtnText, { color: C.green }]}>Add Money</Text>
+            </TouchableOpacity>
+            <View style={styles.quickDivider} />
             <TouchableOpacity style={styles.quickBtn} onPress={() => setTab("withdraw")}>
               <Ionicons name="arrow-up-circle" size={16} color={C.red} />
               <Text style={[styles.quickBtnText, { color: C.red }]}>Withdraw</Text>
@@ -340,10 +345,10 @@ export default function WalletScreen() {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {(["withdraw", "history"] as const).map(t => (
+          {(["deposit", "withdraw", "history"] as const).map(t => (
             <TouchableOpacity key={t} style={[styles.tabBtn, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === "withdraw" ? "Withdraw" : "History"}
+                {t === "deposit" ? "Deposit" : t === "withdraw" ? "Withdraw" : "History"}
               </Text>
             </TouchableOpacity>
           ))}

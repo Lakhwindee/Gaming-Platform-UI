@@ -87,7 +87,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { state, refreshBalance } = useGame();
   const token: string | null = typeof window !== 'undefined' ? localStorage.getItem('nb_token') : null;
 
-  const [tab, setTab]     = useState<'deposit' | 'withdraw' | 'history'>('withdraw');
+  const [tab, setTab]     = useState<'deposit' | 'withdraw' | 'history'>('deposit');
   const [loading, setLoading] = useState(false);
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
@@ -316,14 +316,14 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
           ₹{balance.toLocaleString('en-IN')}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {(['withdraw', 'history'] as const).map(t => (
+          {(['deposit', 'withdraw', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               flex: 1, padding: '8px 0', borderRadius: 10, border: 'none',
               background: tab === t ? C.red : 'rgba(255,255,255,0.06)',
               color: tab === t ? '#fff' : C.textMuted,
               fontWeight: 700, fontSize: 12, cursor: 'pointer', letterSpacing: 0.5,
             }}>
-              {t === 'withdraw' ? '↑ Withdraw' : '📋 History'}
+              {t === 'deposit' ? '+ Add' : t === 'withdraw' ? '↑ Withdraw' : '📋 History'}
             </button>
           ))}
         </div>
