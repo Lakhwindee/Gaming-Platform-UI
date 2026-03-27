@@ -560,23 +560,14 @@ export default function GameScreen() {
     const potentialWin = effectiveStatus === "active" ? Math.floor(slot.amount * mult) : 0;
 
     let btnContent: React.ReactNode;
-    const canStillCancel = effectiveStatus === "active" && phase === "flying" && elapsedSec < 5.0 && WSC.state.startTime > 0;
     if (effectiveStatus === "active" && phase === "flying") {
       btnContent = (
-        <View style={{ flex: 1, gap: 5 }}>
-          <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85}>
-            <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow]}>
-              <Text style={styles.cashoutLabel}>CASHOUT</Text>
-              <Text style={styles.cashoutAmt}>₹{potentialWin.toLocaleString("en-IN")}</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          {canStillCancel && (
-            <TouchableOpacity onPress={() => cancelBet(slotIdx)} activeOpacity={0.7}
-              style={{ alignItems: "center", paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: "rgba(255,26,58,0.35)", backgroundColor: "rgba(255,26,58,0.06)" }}>
-              <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#FF4D4D", letterSpacing: 1.5 }}>✕  CANCEL BET</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TouchableOpacity onPress={() => cashOut(slotIdx)} activeOpacity={0.85} style={{ flex: 1 }}>
+          <LinearGradient colors={["#FF8C00", "#CC4400"]} style={[styles.mainBtn, styles.cashoutGlow, { flex: 1, justifyContent: "center" }]}>
+            <Text style={styles.cashoutLabel}>CASHOUT</Text>
+            <Text style={styles.cashoutAmt}>₹{potentialWin.toLocaleString("en-IN")}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       );
     } else if (effectiveStatus === "placed") {
       btnContent = (

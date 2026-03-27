@@ -93,12 +93,13 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        <form onSubmit={tab === 'register' ? handleRegister : handleLogin}>
+        <form onSubmit={tab === 'register' ? handleRegister : handleLogin} noValidate>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
               <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>USERNAME</label>
               <input value={username} onChange={e => setUsername(e.target.value)}
-                placeholder="Enter username" disabled={loading} style={inputStyle}
+                type="text" autoComplete="username" placeholder="Enter username"
+                disabled={loading} style={inputStyle}
                 onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                 onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
               />
@@ -108,7 +109,8 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
               <div>
                 <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>EMAIL</label>
                 <input value={email} onChange={e => setEmail(e.target.value)}
-                  type="email" placeholder="Enter email" disabled={loading} style={inputStyle}
+                  type="text" inputMode="email" autoComplete="email"
+                  placeholder="Enter email" disabled={loading} style={inputStyle}
                   onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                   onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
                 />
@@ -118,7 +120,8 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
             <div>
               <label style={{ display: 'block', color: 'var(--text2)', fontSize: '12px', fontWeight: 700, marginBottom: '8px', letterSpacing: '1px' }}>PASSWORD</label>
               <input value={password} onChange={e => setPassword(e.target.value)}
-                type="password" placeholder={tab === 'register' ? 'Min 6 characters' : 'Enter password'}
+                type="password" autoComplete={tab === 'register' ? 'new-password' : 'current-password'}
+                placeholder={tab === 'register' ? 'Min 6 characters' : 'Enter password'}
                 disabled={loading} style={inputStyle}
                 onFocus={e => (e.target as HTMLInputElement).style.borderColor = 'var(--primary)'}
                 onBlur={e => (e.target as HTMLInputElement).style.borderColor = 'var(--border)'}
