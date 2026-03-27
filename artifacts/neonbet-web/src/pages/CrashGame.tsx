@@ -367,11 +367,6 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       }
       ctx!.globalAlpha = 1;
 
-      // Subtle grid — same as Expo background
-      ctx!.strokeStyle = 'rgba(255,255,255,0.04)'; ctx!.lineWidth = 1;
-      for (let gx = 0; gx < W; gx += 60) { ctx!.beginPath(); ctx!.moveTo(gx, 0); ctx!.lineTo(gx, H); ctx!.stroke(); }
-      for (let gy = 0; gy < H; gy += 50) { ctx!.beginPath(); ctx!.moveTo(0, gy); ctx!.lineTo(W, gy); ctx!.stroke(); }
-
       // Positions — exact Expo logic
       const origX = W * 0.09, origY = H * 0.88;
       const pos = (isFlying || isCrashed)
