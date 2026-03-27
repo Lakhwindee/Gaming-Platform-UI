@@ -358,15 +358,15 @@ export default function WalletScreen() {
                     </View>
                     <Text style={[styles.payPendingTitle, { color: "#FFD700" }]}>Payment Under Review</Text>
                     <Text style={styles.payPendingSubtitle}>
-                      Aapki payment verify ho rahi hai. Admin approve karte hi{" "}
+                      Your payment is being verified by our team. Once approved,{" "}
                       <Text style={{ color: C.green, fontFamily: "Inter_700Bold" }}>
                         ₹{pendingTxn.total.toLocaleString("en-IN")}
                       </Text>{" "}
-                      aapke wallet mein credit ho jayega.
+                      will be credited to your wallet.
                     </Text>
                     <View style={{ marginTop: 12, backgroundColor: "rgba(255,215,0,0.08)", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "rgba(255,215,0,0.2)", width: "100%" }}>
                       <Text style={{ color: "#aaa", fontSize: 12, textAlign: "center", fontFamily: "Inter_400Regular" }}>
-                        Aam taur par 30 minute ke andar credit hota hai.
+                        Deposits are typically processed within 30 minutes.
                       </Text>
                     </View>
                     <TouchableOpacity

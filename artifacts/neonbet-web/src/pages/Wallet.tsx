@@ -331,11 +331,11 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
                   <div style={{ fontSize: 52 }}>⏳</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#FFD700', marginTop: 8 }}>Payment Under Review</div>
                   <div style={{ fontSize: 14, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                    Aapki payment verify ho rahi hai.<br/>
-                    Admin approve karte hi <strong style={{ color: C.green }}>₹{pendingTxn.total.toLocaleString('en-IN')}</strong> aapke wallet mein credit ho jayega.
+                    Your payment is being verified by our team.<br/>
+                    Once approved, <strong style={{ color: C.green }}>₹{pendingTxn.total.toLocaleString('en-IN')}</strong> will be credited to your wallet.
                   </div>
                   <div style={{ marginTop: 12, fontSize: 12, color: '#aaa', background: 'rgba(255,215,0,0.08)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(255,215,0,0.2)' }}>
-                    Aam taur par 30 minute ke andar credit hota hai.
+                    Deposits are typically processed within 30 minutes.
                   </div>
                   <button onClick={() => { setPayState('idle'); setPendingTxn(null); setUtrInput(''); }} style={{ marginTop: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#aaa', padding: '10px 20px', cursor: 'pointer', fontSize: 13 }}>
                     OK, Got It
