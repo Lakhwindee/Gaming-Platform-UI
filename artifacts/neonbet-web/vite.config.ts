@@ -52,6 +52,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, "/api"),
       },
+      [`${basePath}api`]: {
+        target: `http://localhost:${apiPort}`,
+        changeOrigin: true,
+        rewrite: (p) => p.replace(new RegExp(`^${basePath}api`), "/api"),
+      },
       [`${basePath}ws`]: {
         target: `ws://localhost:${apiPort}`,
         ws: true,
