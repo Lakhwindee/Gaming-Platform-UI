@@ -30,3 +30,15 @@ id = "5LXMUwM1cqLL0B7occKp5"
 uri = "file://attached_assets/generated_videos/blaze_pro_ad_v2.mp4"
 type = "video"
 title = "BLAZE — Pro Ad Video (8 sec, 1080p 9:16)"
+
+[[outputs]]
+id = "kda4NZQmsfGxcPX2YL4hx"
+uri = "file://attached_assets/generated_videos/blaze_hd_part1.mp4"
+type = "video"
+title = "Part 1 — Launch + Multiplier rising (8 sec)"
+
+[[outputs]]
+id = "1gkVtHHEZ1qePS3m6-12V"
+uri = "file://attached_assets/generated_videos/blaze_hd_part2.mp4"
+type = "video"
+title = "Part 2 — 100x Climax + WIN screen (6 sec)"
