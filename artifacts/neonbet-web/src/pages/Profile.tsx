@@ -352,8 +352,6 @@ export default function Profile({ onAuthOpen }: { onAuthOpen?: () => void }) {
         <br />
         <a
           href="/api/admin"
-          target="_blank"
-          rel="noopener noreferrer"
           style={{ color: 'rgba(255,26,58,0.3)', fontSize: 10, textDecoration: 'none', marginTop: 6, display: 'inline-block', letterSpacing: 1 }}
         >
           admin
