@@ -87,7 +87,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { state, refreshBalance } = useGame();
   const token: string | null = typeof window !== 'undefined' ? localStorage.getItem('nb_token') : null;
 
-  const [tab, setTab]     = useState<'deposit' | 'withdraw' | 'history'>('deposit');
+  const [tab, setTab]     = useState<'deposit' | 'withdraw' | 'history'>('withdraw');
   const [loading, setLoading] = useState(false);
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
@@ -111,6 +111,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const visChangeRef = useRef<(() => void) | null>(null);
+  const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const finalAmount = (() => {
     if (customAmt.trim()) {
@@ -315,14 +316,14 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
           ₹{balance.toLocaleString('en-IN')}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {(['deposit', 'withdraw', 'history'] as const).map(t => (
+          {(['withdraw', 'history'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               flex: 1, padding: '8px 0', borderRadius: 10, border: 'none',
               background: tab === t ? C.red : 'rgba(255,255,255,0.06)',
               color: tab === t ? '#fff' : C.textMuted,
               fontWeight: 700, fontSize: 12, cursor: 'pointer', letterSpacing: 0.5,
             }}>
-              {t === 'deposit' ? '+ Add' : t === 'withdraw' ? '↑ Out' : '📋 History'}
+              {t === 'withdraw' ? '↑ Withdraw' : '📋 History'}
             </button>
           ))}
         </div>
