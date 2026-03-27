@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
-import { getEngineSnapshot, setForcedCrash, getOnlineUserIds, getOnlineStats } from "../lib/gameEngine";
+import { getEngineSnapshot, setForcedCrash, setCrashQueue, getCrashQueue, getOnlineUserIds, getOnlineStats } from "../lib/gameEngine";
 
 const router = Router();
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "blaze-admin-2025";
@@ -215,56 +215,27 @@ router.get("/admin", (_req, res) => {
     <!-- GAME CONTROL -->
     <div class="section" id="tab-game">
       <div class="game-grid">
-        <div class="card">
-          <div class="card-header"><span class="card-title">Force Next Crash</span></div>
+
+        <!-- ROUND SCHEDULER -->
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header" style="justify-content:space-between">
+            <span class="card-title">🗓️ Round Scheduler — Agle 10 Rounds</span>
+            <span id="queueStatus" style="font-size:12px;color:var(--muted)">Queue: 0 rounds</span>
+          </div>
           <div style="padding:18px">
-            <p style="color:var(--muted);font-size:12px;margin-bottom:14px">Set the multiplier at which the NEXT round will crash. Takes effect on next round start.</p>
-            <div class="control-row">
-              <input type="number" id="crashInput" placeholder="e.g. 1.50" step="0.01" min="1.01" />
-              <button onclick="forceCrash()" class="btn-sm" style="padding:14px 18px;font-size:13px">SET</button>
+            <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Har round ka blast point set karo. Blank rounds auto (random) honge. Save karne ke baad queue active ho jaata hai.</p>
+
+            <div id="schedulerRows" style="display:flex;flex-direction:column;gap:10px"></div>
+
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+              <button onclick="saveSchedule()" style="flex:1;min-width:140px;background:var(--red);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.5px">✅ Save &amp; Queue</button>
+              <button onclick="clearSchedule()" style="background:rgba(255,255,255,0.07);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:13px 20px;font-size:13px;font-weight:600;cursor:pointer">🗑️ Clear All</button>
             </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-              <div style="width:100%;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🔴 Very Low</div>
-              <button class="btn-sm" onclick="setC('1.01')">1.01x</button>
-              <button class="btn-sm" onclick="setC('1.20')">1.20x</button>
-              <button class="btn-sm" onclick="setC('1.30')">1.30x</button>
-              <button class="btn-sm" onclick="setC('1.50')">1.50x</button>
-              <button class="btn-sm" onclick="setC('1.75')">1.75x</button>
-              <button class="btn-sm" onclick="setC('2.00')">2.00x</button>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-              <div style="width:100%;font-size:10px;color:#FF6B00;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🟠 Low–Medium</div>
-              <button class="btn-sm" style="background:#FF6B00" onclick="setC('2.50')">2.50x</button>
-              <button class="btn-sm" style="background:#FF6B00" onclick="setC('3.00')">3.00x</button>
-              <button class="btn-sm" style="background:#FF6B00" onclick="setC('4.00')">4.00x</button>
-              <button class="btn-sm" style="background:#FF6B00" onclick="setC('5.00')">5.00x</button>
-              <button class="btn-sm" style="background:#FF6B00" onclick="setC('7.00')">7.00x</button>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-              <div style="width:100%;font-size:10px;color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🟢 Medium–High</div>
-              <button class="btn-sm green" onclick="setC('10.00')">10x</button>
-              <button class="btn-sm green" onclick="setC('12.00')">12x</button>
-              <button class="btn-sm green" onclick="setC('15.00')">15x</button>
-              <button class="btn-sm green" onclick="setC('20.00')">20x</button>
-              <button class="btn-sm green" onclick="setC('25.00')">25x</button>
-              <button class="btn-sm green" onclick="setC('30.00')">30x</button>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-              <div style="width:100%;font-size:10px;color:var(--blue);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🔵 High</div>
-              <button class="btn-sm blue" onclick="setC('50.00')">50x</button>
-              <button class="btn-sm blue" onclick="setC('75.00')">75x</button>
-              <button class="btn-sm blue" onclick="setC('100.00')">100x</button>
-              <button class="btn-sm blue" onclick="setC('150.00')">150x</button>
-              <button class="btn-sm blue" onclick="setC('200.00')">200x</button>
-            </div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-              <div style="width:100%;font-size:10px;color:var(--pink);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">🩷 Extreme</div>
-              <button class="btn-sm" style="background:var(--pink)" onclick="setC('500.00')">500x</button>
-              <button class="btn-sm" style="background:var(--pink)" onclick="setC('1000.00')">1000x</button>
-            </div>
-            <div id="forcedCrashStatus" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
+            <div id="scheduleMsg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
           </div>
         </div>
+
+        <!-- LIVE GAME -->
         <div class="card">
           <div class="card-header"><span class="card-title">Live Game</span></div>
           <div style="padding:18px">
@@ -278,10 +249,20 @@ router.get("/admin", (_req, res) => {
             </div>
           </div>
         </div>
+
+        <!-- CURRENT QUEUE PREVIEW -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">📋 Active Queue</span></div>
+          <div style="padding:18px">
+            <div id="activeQueueList" style="display:flex;flex-direction:column;gap:6px">
+              <div style="color:var(--muted);font-size:12px">Loading...</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- LIVE BETS -->
-      <div class="card" style="margin-top:0">
+      <div class="card" style="margin-top:16px">
         <div class="card-header">
           <span class="card-title">🎯 Live Bets This Round</span>
           <span style="color:var(--muted);font-size:11px" id="liveBetsCount">0 bets</span>
@@ -327,6 +308,7 @@ async function doLogin() {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     loadOverview(); loadUsers(); loadTransactions(); loadWithdrawalsBadge();
+    buildSchedulerRows(); loadQueueStatus();
     startLivePoll();
   } catch(e) {
     document.getElementById('loginErr').textContent = 'Wrong secret key';
@@ -346,6 +328,7 @@ function switchTab(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'withdrawals') loadWithdrawals();
+  if (name === 'game') loadQueueStatus();
 }
 
 function fmtAmt(n) {
@@ -496,18 +479,108 @@ async function rejectWithdraw(id) {
   } catch(e) { toast(e.message, true); }
 }
 
-function setC(v) {
-  document.getElementById('crashInput').value = v;
-  forceCrash();
+// ── Round Scheduler ──────────────────────────────────────────────────────
+const PRESETS = [
+  { label:'1.01x', v:'1.01', c:'var(--red)' },
+  { label:'1.5x',  v:'1.50', c:'var(--red)' },
+  { label:'2x',    v:'2.00', c:'#FF6B00' },
+  { label:'5x',    v:'5.00', c:'#FF6B00' },
+  { label:'10x',   v:'10.00',c:'var(--green)' },
+  { label:'25x',   v:'25.00',c:'var(--green)' },
+  { label:'50x',   v:'50.00',c:'var(--blue)' },
+  { label:'100x',  v:'100.00',c:'var(--blue)' },
+];
+
+function multColor(v) {
+  if (!v || isNaN(v)) return 'var(--muted)';
+  if (v < 2)   return 'var(--red)';
+  if (v < 10)  return '#FF6B00';
+  if (v < 50)  return 'var(--green)';
+  return 'var(--blue)';
 }
-async function forceCrash() {
-  const v = parseFloat(document.getElementById('crashInput').value);
-  if (isNaN(v) || v < 1.01) { toast('Enter a valid multiplier (min 1.01)', true); return; }
+
+function buildSchedulerRows() {
+  const container = document.getElementById('schedulerRows');
+  container.innerHTML = '';
+  for (let i = 0; i < 10; i++) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;flex-wrap:wrap';
+    const label = document.createElement('div');
+    label.style.cssText = 'min-width:64px;font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase';
+    label.textContent = 'Round ' + (i+1);
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = '0.01'; inp.min = '1.01';
+    inp.id = 'sched_' + i;
+    inp.placeholder = 'Auto (random)';
+    inp.style.cssText = 'width:130px;background:#111;border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;color:#f0e6f0;font-size:14px;font-weight:700;outline:none';
+    inp.addEventListener('input', () => {
+      const val = parseFloat(inp.value);
+      inp.style.color = multColor(val);
+      inp.style.borderColor = isNaN(val) ? 'var(--border)' : multColor(val);
+    });
+    const presetWrap = document.createElement('div');
+    presetWrap.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;flex:1';
+    PRESETS.forEach(p => {
+      const btn = document.createElement('button');
+      btn.textContent = p.label;
+      btn.style.cssText = \`background:\${p.c}22;color:\${p.c};border:1px solid \${p.c}55;border-radius:6px;padding:4px 8px;font-size:11px;font-weight:700;cursor:pointer\`;
+      btn.onclick = () => { inp.value = p.v; inp.style.color = p.c; inp.style.borderColor = p.c; };
+      presetWrap.appendChild(btn);
+    });
+    const clrBtn = document.createElement('button');
+    clrBtn.textContent = '✕';
+    clrBtn.title = 'Clear';
+    clrBtn.style.cssText = 'background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer';
+    clrBtn.onclick = () => { inp.value=''; inp.style.color=''; inp.style.borderColor='var(--border)'; };
+    row.append(label, inp, presetWrap, clrBtn);
+    container.appendChild(row);
+  }
+}
+
+async function saveSchedule() {
+  const points = [];
+  for (let i = 0; i < 10; i++) {
+    const v = parseFloat(document.getElementById('sched_'+i).value);
+    if (!isNaN(v) && v >= 1.01) points.push(Math.round(v*100)/100);
+    else points.push(null);
+  }
+  const nonNull = points.filter(x => x !== null);
   try {
-    await api('/api/admin/game/force-crash', { method:'POST', body: JSON.stringify({ crashPoint: v }) });
-    document.getElementById('forcedCrashStatus').innerHTML = \`<span style="color:var(--green)">✓ Next round will crash at \${v.toFixed(2)}x</span>\`;
-    toast('Force crash set: '+v.toFixed(2)+'x');
+    await api('/api/admin/crash-queue', { method:'POST', body: JSON.stringify({ queue: nonNull }) });
+    const msg = document.getElementById('scheduleMsg');
+    msg.innerHTML = \`<span style="color:var(--green)">✅ Queued \${nonNull.length} round(s): \${nonNull.map(x=>x+'x').join(', ') || '—'}</span>\`;
+    toast('Schedule saved — ' + nonNull.length + ' rounds queued');
+    await loadQueueStatus();
   } catch(e) { toast(e.message, true); }
+}
+
+async function clearSchedule() {
+  try {
+    await api('/api/admin/crash-queue', { method:'POST', body: JSON.stringify({ queue: [] }) });
+    document.getElementById('scheduleMsg').innerHTML = '<span style="color:var(--muted)">Queue cleared — rounds will be random.</span>';
+    toast('Queue cleared');
+    await loadQueueStatus();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function loadQueueStatus() {
+  try {
+    const d = await api('/api/admin/crash-queue');
+    const q = d.queue || [];
+    document.getElementById('queueStatus').textContent = 'Queue: ' + q.length + ' round' + (q.length!==1?'s':'');
+    const list = document.getElementById('activeQueueList');
+    if (!q.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:12px">No scheduled rounds — all auto (random)</div>';
+      return;
+    }
+    list.innerHTML = q.map((v,i) => {
+      const c = multColor(v);
+      return \`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border-left:3px solid \${c}">
+        <span style="color:var(--muted);font-size:11px;min-width:60px">Round \${i+1}</span>
+        <span style="font-size:16px;font-weight:800;color:\${c}">\${v.toFixed(2)}x</span>
+      </div>\`;
+    }).join('');
+  } catch(_){}
 }
 
 function startLivePoll() {
@@ -739,6 +812,24 @@ router.post("/admin/game/force-crash", (req, res) => {
     return res.status(400).json({ error: "Invalid crash point (min 1.01)" });
   setForcedCrash(Math.round(crashPoint * 100) / 100);
   res.json({ ok: true, nextCrash: crashPoint });
+});
+
+router.get("/admin/crash-queue", (req, res) => {
+  if (!checkAuth(req, res)) return;
+  res.json({ queue: getCrashQueue() });
+});
+
+router.post("/admin/crash-queue", (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const { queue } = req.body as { queue?: unknown[] };
+  if (!Array.isArray(queue)) return res.status(400).json({ error: "queue must be an array" });
+  const valid = queue
+    .map(v => parseFloat(String(v)))
+    .filter(v => Number.isFinite(v) && v >= 1.01)
+    .map(v => Math.round(v * 100) / 100)
+    .slice(0, 10);
+  setCrashQueue(valid);
+  res.json({ ok: true, queued: valid.length, queue: valid });
 });
 
 export default router;

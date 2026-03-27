@@ -594,12 +594,16 @@ export function getOnlineStats(): { userCount: number; totalActiveBet: number } 
   return { userCount: seen.size, totalActiveBet };
 }
 
-let _forcedCrash: number | null = null;
+const _crashQueue: number[] = [];
+export function setCrashQueue(points: number[]) {
+  _crashQueue.length = 0;
+  for (const p of points) _crashQueue.push(p);
+}
+export function getCrashQueue(): number[] { return [..._crashQueue]; }
 export function setForcedCrash(point: number | null) {
-  _forcedCrash = point;
+  if (point !== null) { _crashQueue.unshift(point); }
+  else { _crashQueue.length = 0; }
 }
 export function consumeForcedCrash(): number | null {
-  const v = _forcedCrash;
-  _forcedCrash = null;
-  return v;
+  return _crashQueue.length > 0 ? _crashQueue.shift()! : null;
 }
