@@ -133,6 +133,7 @@ router.get("/admin", (_req, res) => {
     <div class="tab active" onclick="switchTab('overview')">Overview</div>
     <div class="tab" onclick="switchTab('users')">Users</div>
     <div class="tab" onclick="switchTab('transactions')">Transactions</div>
+    <div class="tab" onclick="switchTab('deposits')">Deposits <span id="depBadge" style="background:var(--green);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;display:none"></span></div>
     <div class="tab" onclick="switchTab('withdrawals')">Withdrawals <span id="wdBadge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;display:none"></span></div>
     <div class="tab" onclick="switchTab('game')">Game Control</div>
   </div>
@@ -186,6 +187,31 @@ router.get("/admin", (_req, res) => {
         <table>
           <thead><tr><th>ID</th><th>User ID</th><th>Type</th><th>Amount</th><th>Note</th><th>Status</th><th>Time</th></tr></thead>
           <tbody id="txTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DEPOSITS -->
+    <div class="section" id="tab-deposits">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">💰 Deposit Verification</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="depFilter" onchange="loadDeposits()" style="background:#111;border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:#f0e6f0;font-size:12px">
+              <option value="admin_pending" selected>Pending Approval</option>
+              <option value="completed">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="all">All</option>
+            </select>
+            <button class="btn-sm blue" onclick="loadDeposits()" style="padding:6px 14px">Refresh</button>
+          </div>
+        </div>
+        <div style="padding:12px 18px;background:rgba(0,200,83,0.05);border-bottom:1px solid var(--border)">
+          <p style="color:var(--muted);font-size:12px">⚠️ Pehle apne PhonePe/GPay mein UTR number verify karo, phir Approve karo. Approve karne ke baad user ka balance credit hoga.</p>
+        </div>
+        <table>
+          <thead><tr><th>#</th><th>User</th><th>Amount</th><th>UTR / Note</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
+          <tbody id="depTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -307,7 +333,7 @@ async function doLogin() {
     await api('/api/admin/ping');
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    loadOverview(); loadUsers(); loadTransactions(); loadWithdrawalsBadge();
+    loadOverview(); loadUsers(); loadTransactions(); loadWithdrawalsBadge(); loadDepositsBadge();
     buildSchedulerRows(); loadQueueStatus();
     startLivePoll();
   } catch(e) {
@@ -324,9 +350,10 @@ function doLogout() {
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['overview','users','transactions','withdrawals','game'][i]===name));
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['overview','users','transactions','deposits','withdrawals','game'][i]===name));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'deposits') loadDeposits();
   if (name === 'withdrawals') loadWithdrawals();
   if (name === 'game') loadQueueStatus();
 }
@@ -432,6 +459,64 @@ async function loadWithdrawalsBadge() {
     if (rows.length > 0) { badge.textContent = rows.length; badge.style.display = 'inline'; }
     else { badge.style.display = 'none'; }
   } catch(_){}
+}
+
+async function loadDepositsBadge() {
+  try {
+    const rows = await api('/api/admin/deposits?status=admin_pending');
+    const badge = document.getElementById('depBadge');
+    if (rows.length > 0) { badge.textContent = rows.length; badge.style.display = 'inline'; }
+    else { badge.style.display = 'none'; }
+  } catch(_){}
+}
+
+async function loadDeposits() {
+  const filter = document.getElementById('depFilter')?.value || 'admin_pending';
+  const url = filter === 'all' ? '/api/admin/deposits' : \`/api/admin/deposits?status=\${filter}\`;
+  try {
+    const rows = await api(url);
+    const tbody = document.getElementById('depTable');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Koi pending deposit nahi hai</td></tr>'; return; }
+    tbody.innerHTML = rows.map(d => {
+      const note = d.note || '—';
+      const utrMatch = note.match(/UTR:\\s*([\\w]+)/);
+      const utr = utrMatch ? \`<span style="font-family:monospace;color:var(--gold);font-size:12px;background:rgba(255,215,0,0.1);padding:2px 6px;border-radius:4px">\${utrMatch[1]}</span>\` : \`<span style="color:#666">\${note}</span>\`;
+      const actions = d.status === 'admin_pending' ? \`<div class="action-row">
+        <button class="btn-sm green" onclick="approveDeposit(\${d.id})">✓ Approve</button>
+        <button class="btn-sm" style="background:#555" onclick="rejectDeposit(\${d.id})">✗ Reject</button>
+      </div>\` : '—';
+      const statusCls = d.status === 'admin_pending' ? 'wd-pending' : d.status === 'completed' ? 'wd-approved' : 'wd-rejected';
+      const statusLabel = d.status === 'admin_pending' ? '⏳ Pending' : d.status === 'completed' ? '✓ Approved' : '✗ Rejected';
+      return \`<tr>
+        <td style="color:#666">#\${d.id}</td>
+        <td style="font-weight:700">\${d.username || '#'+d.userId}</td>
+        <td style="color:var(--green);font-weight:700;font-size:15px">\${fmtAmt(d.amount)}</td>
+        <td>\${utr}</td>
+        <td><span class="\${statusCls}">\${statusLabel}</span></td>
+        <td style="color:#666;font-size:11px">\${timeAgo(d.createdAt)}</td>
+        <td>\${actions}</td>
+      </tr>\`;
+    }).join('');
+    loadDepositsBadge();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function approveDeposit(id) {
+  if (!confirm('Kya aapne PhonePe/GPay mein payment verify kar li? Approve karne ke baad user ka balance credit ho jayega.')) return;
+  try {
+    const r = await api(\`/api/admin/deposits/\${id}/approve\`, { method: 'POST' });
+    toast('✓ Deposit approved — ₹' + (r.totalCredit || '') + ' credited to user');
+    loadDeposits();
+  } catch(e) { toast(e.message, true); }
+}
+
+async function rejectDeposit(id) {
+  if (!confirm('Is deposit request ko reject karo? User ko payment nahi milegi.')) return;
+  try {
+    await api(\`/api/admin/deposits/\${id}/reject\`, { method: 'POST' });
+    toast('Deposit rejected');
+    loadDeposits();
+  } catch(e) { toast(e.message, true); }
 }
 
 async function loadWithdrawals() {
@@ -797,6 +882,98 @@ router.post("/admin/withdrawals/:id/reject", async (req, res) => {
     res.json(result);
   } catch (e) {
     res.status(400).json({ error: e instanceof Error ? e.message : "Server error" });
+  }
+});
+
+// ── Deposit Verification API ─────────────────────────────────────────
+router.get("/admin/deposits", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const status = req.query.status as string | undefined;
+  try {
+    const rows = await db
+      .select({
+        id: transactionsTable.id,
+        userId: transactionsTable.userId,
+        amount: transactionsTable.amount,
+        note: transactionsTable.note,
+        status: transactionsTable.status,
+        createdAt: transactionsTable.createdAt,
+        username: usersTable.username,
+      })
+      .from(transactionsTable)
+      .leftJoin(usersTable, eq(transactionsTable.userId, usersTable.id))
+      .where(
+        status && status !== "all"
+          ? and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, status))
+          : eq(transactionsTable.type, "deposit")
+      )
+      .orderBy(desc(transactionsTable.createdAt))
+      .limit(200);
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+router.post("/admin/deposits/:id/approve", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const txId = parseInt(req.params.id);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [txRow] = await tx
+        .select()
+        .from(transactionsTable)
+        .where(and(eq(transactionsTable.id, txId), eq(transactionsTable.status, "admin_pending")));
+      if (!txRow) throw new Error("Deposit not found or already processed");
+
+      const depositAmount = txRow.amount;
+      const bonus = depositAmount >= 1000 ? Math.floor(depositAmount * 0.1) : 0;
+      const totalCredit = depositAmount + bonus;
+
+      await tx.update(usersTable).set({
+        balance: sql`balance + ${totalCredit}`,
+        wagerRequirement: sql`wager_requirement + ${depositAmount}`,
+      }).where(eq(usersTable.id, txRow.userId));
+
+      const noteStr = bonus > 0
+        ? txRow.note + ` [Admin Approved +₹${bonus} bonus]`
+        : txRow.note + ` [Admin Approved]`;
+
+      await tx.update(transactionsTable)
+        .set({ status: "completed", note: noteStr })
+        .where(eq(transactionsTable.id, txId));
+
+      if (bonus > 0) {
+        await tx.insert(transactionsTable).values({
+          userId: txRow.userId,
+          type: "bonus",
+          amount: bonus,
+          note: `10% deposit bonus on ₹${depositAmount}`,
+          status: "completed",
+        });
+      }
+
+      return { ok: true, depositAmount, bonus, totalCredit };
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : "Server error" });
+  }
+});
+
+router.post("/admin/deposits/:id/reject", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const txId = parseInt(req.params.id);
+  try {
+    const rows = await db
+      .update(transactionsTable)
+      .set({ status: "rejected" })
+      .where(and(eq(transactionsTable.id, txId), eq(transactionsTable.status, "admin_pending")))
+      .returning({ id: transactionsTable.id });
+    if (!rows.length) return res.status(404).json({ error: "Deposit not found or already processed" });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
   }
 });
 

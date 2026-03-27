@@ -14,7 +14,7 @@ import { api, ApiTransaction, UpiInitResult } from "@/lib/api";
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 type PayMethod = "gpay" | "phonepe" | "paytm" | "upi";
-type PayState = "idle" | "initiating" | "waiting" | "confirming" | "success";
+type PayState = "idle" | "initiating" | "waiting" | "confirming" | "pending_approval";
 
 const PAY_METHODS: { id: PayMethod; label: string; color: string; bg: string }[] = [
   { id: "gpay",    label: "Google Pay", color: "#34A853", bg: "rgba(52,168,83,0.15)" },
@@ -223,17 +223,8 @@ export default function WalletScreen() {
     setAutoFailMsg("");
     try {
       await api.upiConfirm(authState.token, pendingTxn.txnRef, utr);
-      await refreshBalance();
       upiAppOpenedRef.current = false;
-      setPayState("success");
-      setTimeout(() => {
-        setPayState("idle");
-        setPendingTxn(null);
-        setUtrInput("");
-        setCustomAmt("");
-        setSelectedAmt(500);
-        setAutoFailMsg("");
-      }, 3000);
+      setPayState("pending_approval");
     } catch (e) {
       setAutoFailMsg(e instanceof Error ? e.message : "Something went wrong. Try again.");
     } finally {
@@ -358,17 +349,32 @@ export default function WalletScreen() {
         {tab === "deposit" && (
           <View>
             {/* Payment Waiting / Confirming overlay */}
-            {(payState === "waiting" || payState === "confirming" || payState === "success") && pendingTxn && (
+            {(payState === "waiting" || payState === "confirming" || payState === "pending_approval") && pendingTxn && (
               <View style={styles.payPendingBox}>
-                {payState === "success" ? (
+                {payState === "pending_approval" ? (
                   <>
                     <View style={styles.successIcon}>
-                      <Ionicons name="checkmark-circle" size={52} color={C.green} />
+                      <Ionicons name="time-outline" size={52} color="#FFD700" />
                     </View>
-                    <Text style={styles.payPendingTitle}>Payment Confirmed!</Text>
+                    <Text style={[styles.payPendingTitle, { color: "#FFD700" }]}>Payment Under Review</Text>
                     <Text style={styles.payPendingSubtitle}>
-                      ₹{pendingTxn.total.toLocaleString("en-IN")} added to your wallet
+                      Aapki payment verify ho rahi hai. Admin approve karte hi{" "}
+                      <Text style={{ color: C.green, fontFamily: "Inter_700Bold" }}>
+                        ₹{pendingTxn.total.toLocaleString("en-IN")}
+                      </Text>{" "}
+                      aapke wallet mein credit ho jayega.
                     </Text>
+                    <View style={{ marginTop: 12, backgroundColor: "rgba(255,215,0,0.08)", borderRadius: 10, padding: 12, borderWidth: 1, borderColor: "rgba(255,215,0,0.2)", width: "100%" }}>
+                      <Text style={{ color: "#aaa", fontSize: 12, textAlign: "center", fontFamily: "Inter_400Regular" }}>
+                        Aam taur par 30 minute ke andar credit hota hai.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => { setPayState("idle"); setPendingTxn(null); setUtrInput(""); }}
+                      style={{ marginTop: 14, backgroundColor: "rgba(255,255,255,0.07)", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 24, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)" }}
+                    >
+                      <Text style={{ color: "#aaa", fontSize: 13, fontFamily: "Inter_600SemiBold" }}>OK, Got It</Text>
+                    </TouchableOpacity>
                   </>
                 ) : (
                   <>

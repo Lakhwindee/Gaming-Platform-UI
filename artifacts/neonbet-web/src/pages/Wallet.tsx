@@ -5,7 +5,7 @@ import { api, ApiTransaction, UpiInitResult } from '../lib/api';
 const AMOUNTS = [100, 200, 500, 1000, 2000, 5000];
 
 type PayMethod = 'gpay' | 'phonepe' | 'paytm' | 'upi';
-type PayState = 'idle' | 'initiating' | 'waiting' | 'confirming' | 'success';
+type PayState = 'idle' | 'initiating' | 'waiting' | 'confirming' | 'pending_approval';
 
 const PAY_METHODS: { id: PayMethod; label: string; color: string; bg: string }[] = [
   { id: 'gpay',    label: 'Google Pay', color: '#34A853', bg: 'rgba(52,168,83,0.15)' },
@@ -238,17 +238,8 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
     setAutoFailMsg('');
     try {
       await api.upiConfirm(token, pendingTxn.txnRef, utr);
-      await refreshBalance();
       stopPoll();
-      setPayState('success');
-      setTimeout(() => {
-        setPayState('idle');
-        setPendingTxn(null);
-        setUtrInput('');
-        setCustomAmt('');
-        setSelectedAmt(500);
-        setAutoFailMsg('');
-      }, 3000);
+      setPayState('pending_approval');
     } catch (e) {
       setAutoFailMsg(e instanceof Error ? e.message : 'Something went wrong. Try again.');
     } finally {
@@ -333,15 +324,22 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
       {tab === 'deposit' && (
         <div>
           {/* Pending payment overlay */}
-          {(payState === 'waiting' || payState === 'confirming' || payState === 'success') && pendingTxn && (
+          {(payState === 'waiting' || payState === 'confirming' || payState === 'pending_approval') && pendingTxn && (
             <div style={{ ...card, textAlign: 'center' }}>
-              {payState === 'success' ? (
+              {payState === 'pending_approval' ? (
                 <>
-                  <div style={{ fontSize: 52 }}>✅</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: C.green, marginTop: 8 }}>Payment Confirmed!</div>
-                  <div style={{ fontSize: 14, color: C.textMuted, marginTop: 4 }}>
-                    ₹{pendingTxn.total.toLocaleString('en-IN')} added to your wallet
+                  <div style={{ fontSize: 52 }}>⏳</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#FFD700', marginTop: 8 }}>Payment Under Review</div>
+                  <div style={{ fontSize: 14, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                    Aapki payment verify ho rahi hai.<br/>
+                    Admin approve karte hi <strong style={{ color: C.green }}>₹{pendingTxn.total.toLocaleString('en-IN')}</strong> aapke wallet mein credit ho jayega.
                   </div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#aaa', background: 'rgba(255,215,0,0.08)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(255,215,0,0.2)' }}>
+                    Aam taur par 30 minute ke andar credit hota hai.
+                  </div>
+                  <button onClick={() => { setPayState('idle'); setPendingTxn(null); setUtrInput(''); }} style={{ marginTop: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#aaa', padding: '10px 20px', cursor: 'pointer', fontSize: 13 }}>
+                    OK, Got It
+                  </button>
                 </>
               ) : (
                 <>

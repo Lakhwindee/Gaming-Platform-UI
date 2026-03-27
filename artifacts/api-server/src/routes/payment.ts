@@ -58,57 +58,41 @@ router.post("/payment/upi-initiate", async (req, res) => {
   }
 });
 
+// User submits UTR — does NOT credit balance, sets admin_pending for manual review
 router.post("/payment/upi-confirm", async (req, res) => {
   const userId = getUser(req.headers.authorization);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   const { txnRef, utr } = req.body as { txnRef?: string; utr?: string };
   if (!txnRef) return res.status(400).json({ error: "Missing transaction reference" });
+  if (!utr?.trim()) return res.status(400).json({ error: "UTR/Transaction ID required" });
 
   try {
-    const result = await db.transaction(async (tx) => {
-      const [txn] = await tx
-        .select()
-        .from(transactionsTable)
-        .where(
-          and(
-            eq(transactionsTable.txRef, txnRef),
-            eq(transactionsTable.userId, userId),
-            eq(transactionsTable.status, "pending"),
-          )
-        );
+    const [txn] = await db
+      .select()
+      .from(transactionsTable)
+      .where(
+        and(
+          eq(transactionsTable.txRef, txnRef),
+          eq(transactionsTable.userId, userId),
+          eq(transactionsTable.status, "pending"),
+        )
+      );
 
-      if (!txn) throw new Error("Transaction not found or already processed");
+    if (!txn) throw new Error("Transaction not found or already processed");
 
-      const depositAmount = txn.amount;
-      const bonus = depositAmount >= 1000 ? Math.floor(depositAmount * 0.1) : 0;
-      const totalCredit = depositAmount + bonus;
+    const bonus = txn.amount >= 1000 ? Math.floor(txn.amount * 0.1) : 0;
+    const noteStr = bonus > 0
+      ? `UPI deposit ₹${txn.amount} + ₹${bonus} bonus | UTR: ${utr.trim()}`
+      : `UPI deposit ₹${txn.amount} | UTR: ${utr.trim()}`;
 
-      const [user] = await tx
-        .select({ balance: usersTable.balance })
-        .from(usersTable)
-        .where(eq(usersTable.id, userId));
-      if (!user) throw new Error("User not found");
+    await db
+      .update(transactionsTable)
+      .set({ status: "admin_pending", note: noteStr })
+      .where(eq(transactionsTable.txRef, txnRef));
 
-      const newBalance = user.balance + totalCredit;
-      await tx.update(usersTable).set({
-        balance: newBalance,
-        wagerRequirement: sql`wager_requirement + ${depositAmount}`,
-      }).where(eq(usersTable.id, userId));
-
-      const noteStr = bonus > 0
-        ? `UPI deposit ₹${depositAmount} + ₹${bonus} bonus${utr ? ` | UTR: ${utr}` : ""}`
-        : `UPI deposit ₹${depositAmount}${utr ? ` | UTR: ${utr}` : ""}`;
-
-      await tx
-        .update(transactionsTable)
-        .set({ status: "completed", note: noteStr })
-        .where(eq(transactionsTable.txRef, txnRef));
-
-      return { balance: newBalance, depositAmount, bonus, totalCredit };
-    });
-
-    res.json({ success: true, ...result });
+    // Balance NOT credited yet — admin must approve first
+    res.json({ success: true, status: "admin_pending", message: "Payment submitted for admin verification. Balance will be credited after approval." });
   } catch (e) {
     console.error("upi-confirm error:", e);
     res.status(500).json({ error: e instanceof Error ? e.message : "Failed to confirm payment" });
