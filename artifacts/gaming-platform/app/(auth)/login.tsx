@@ -30,6 +30,10 @@ export default function LoginScreen() {
       Alert.alert("Error", "Please enter your email");
       return;
     }
+    if (tab === "register" && password.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters");
+      return;
+    }
     setLoading(true);
     try {
       if (tab === "login") {
@@ -110,7 +114,7 @@ export default function LoginScreen() {
                 <Ionicons name="lock-closed-outline" size={18} color={C.textMuted} style={{ marginRight: 8 }} />
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
-                  placeholder="Enter password"
+                  placeholder={tab === "register" ? "Min. 6 characters" : "Enter password"}
                   placeholderTextColor={C.textMuted}
                   value={password}
                   onChangeText={setPassword}
@@ -120,6 +124,9 @@ export default function LoginScreen() {
                   <Ionicons name={showPass ? "eye-off-outline" : "eye-outline"} size={18} color={C.textMuted} />
                 </TouchableOpacity>
               </View>
+              {tab === "register" && (
+                <Text style={styles.hint}>Password must be at least 6 characters</Text>
+              )}
             </View>
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading} activeOpacity={0.85}>
@@ -159,4 +166,5 @@ const styles = StyleSheet.create({
   submitGrad: { paddingVertical: 16, alignItems: "center" },
   submitText: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 2 },
   bonus: { textAlign: "center", marginTop: 16, fontSize: 13, fontFamily: "Inter_400Regular", color: C.gold },
+  hint: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 6, marginLeft: 2 },
 });
