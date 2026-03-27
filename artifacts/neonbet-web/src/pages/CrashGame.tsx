@@ -539,25 +539,26 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     );
   }
 
-  // ── Bets row ─────────────────────────────────────────────────────────────
-  function BetRow({ b, i }: { b: RoundBet; i: number }) {
+  // ── Bets row — exact Expo sizes ──────────────────────────────────────────
+  function BetRow({ b }: { b: RoundBet }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
-        <Avatar idx={b.avatar} size={32} />
-        <span style={{ flex: 1.4, fontSize: '13px', fontWeight: 700, color: C.textSoft, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.user}</span>
-        <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 600, color: C.textMuted, textAlign: 'right' }}>₹{b.amount.toLocaleString('en-IN')}</span>
-        <span style={{ flex: 0.9, fontSize: '13px', fontWeight: 700, textAlign: 'center', color: b.cashout ? multColor(b.cashout) : '#555' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+        <Avatar idx={b.avatar} size={28} />
+        <span style={{ flex: 1.4, fontSize: '12px', fontWeight: 600, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.user}</span>
+        <span style={{ flex: 1.5, fontSize: '11px', fontWeight: 500, color: C.textMuted, textAlign: 'right' }}>₹{b.amount.toLocaleString('en-IN')}</span>
+        <span style={{ flex: 0.9, fontSize: '12px', fontWeight: 700, textAlign: 'center', color: b.cashout ? multColor(b.cashout) : '#555' }}>
           {b.cashout ? `${b.cashout.toFixed(2)}x` : '—'}
         </span>
-        <span style={{ flex: 1.5, fontSize: '13px', fontWeight: 700, textAlign: 'right', color: b.winAmount > 0 ? '#00C853' : '#555' }}>
+        <span style={{ flex: 1.5, fontSize: '11px', fontWeight: 600, textAlign: 'right', color: b.winAmount > 0 ? '#00C853' : '#555' }}>
           {b.winAmount > 0 ? `₹${b.winAmount.toLocaleString('en-IN')}` : '0.00'}
         </span>
       </div>
     );
   }
 
+  // column header — exact Expo: rgba(255,255,255,0.35)
   const colHead = (label: string, flex: number, align: 'left' | 'right' | 'center' = 'left') => (
-    <span style={{ flex, fontSize: '11px', fontWeight: 600, color: C.textDim, textAlign: align }}>{label}</span>
+    <span style={{ flex, fontSize: '10px', fontWeight: 500, color: 'rgba(255,255,255,0.35)', textAlign: align, letterSpacing: '0.5px' }}>{label}</span>
   );
 
   const cashPct = betCount > 0 ? Math.min(100, (cashedCount / betCount) * 100) : 0;
@@ -593,10 +594,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', marginBottom: '12px', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${cashPct}%`, background: '#00C853', borderRadius: '2px', transition: 'width 0.4s' }} />
           </div>
-          <div style={{ display: 'flex', paddingBottom: '6px', borderBottom: `1px solid rgba(255,255,255,0.06)`, marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', paddingBottom: '6px', borderBottom: `1px solid rgba(255,255,255,0.06)`, marginBottom: '4px' }}>
             {colHead('Player', 1.8)}{colHead('Bet INR', 1.5, 'right')}{colHead('X', 0.9, 'center')}{colHead('Win INR', 1.5, 'right')}
           </div>
-          {allBets.slice(0, 18).map((b, i) => <BetRow key={i} b={b} i={i} />)}
+          {allBets.slice(0, 18).map((b, i) => <BetRow key={i} b={b} />)}
           {allBets.length === 0 && <div style={{ textAlign: 'center', padding: '24px', color: C.textDim, fontSize: '13px' }}>Waiting for bets...</div>}
         </div>
       )}
@@ -604,40 +605,43 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       {/* ── PREVIOUS ── */}
       {betsTab === 'prev' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: C.textMuted }}>Round Result</span>
-            <span style={{ fontSize: '22px', fontWeight: 700, color: prevRound ? multColor(prevRound.result) : '#555' }}>
+          {/* Centered header — exact Expo prevHeader */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', marginBottom: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 500, color: C.textMuted, letterSpacing: '1.5px', marginBottom: '4px' }}>Round Result</span>
+            <span style={{ fontSize: '34px', fontWeight: 700, color: prevRound ? multColor(prevRound.result) : '#888' }}>
               {prevRound ? `${prevRound.result.toFixed(2)}x` : '—'}
             </span>
           </div>
-          <div style={{ display: 'flex', paddingBottom: '6px', borderBottom: `1px solid rgba(255,255,255,0.06)`, marginBottom: '4px' }}>
+          <div style={{ display: 'flex', paddingBottom: '6px', borderBottom: `1px solid rgba(255,255,255,0.08)`, marginBottom: '2px' }}>
             {colHead('Player', 1.8)}{colHead('Bet INR', 1.5, 'right')}{colHead('X', 0.9, 'center')}{colHead('Win INR', 1.5, 'right')}
           </div>
-          {(prevRound?.bets ?? []).slice(0, 18).map((b, i) => <BetRow key={i} b={b} i={i} />)}
-          {!prevRound && <div style={{ textAlign: 'center', padding: '24px', color: C.textDim, fontSize: '13px' }}>No previous round data yet</div>}
+          {(prevRound?.bets ?? []).slice(0, 18).map((b, i) => <BetRow key={i} b={b} />)}
+          {!prevRound && <div style={{ textAlign: 'center', padding: '24px', color: C.textMuted, fontSize: '13px', fontWeight: 500 }}>No previous round data yet</div>}
         </div>
       )}
 
       {/* ── TOP ── */}
       {betsTab === 'top' && (
         <div>
-          {/* Sort row */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+          {/* Sort row — exact Expo topFilterBtn/topFilterBtnActive */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
             {(['X','Win','Rounds'] as TopSort[]).map(f => (
               <button key={f} onClick={() => setTopSort(f)} style={{
-                flex: 1, padding: '5px 0', borderRadius: '8px', border: `1px solid ${topSort === f ? C.primaryBright : C.border}`,
-                background: topSort === f ? 'rgba(255,26,58,0.15)' : 'rgba(0,0,0,0.3)',
-                color: topSort === f ? C.red : C.textMuted, fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                flex: 1, padding: '6px 0', borderRadius: '8px', cursor: 'pointer',
+                border: `1px solid ${topSort === f ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                background: topSort === f ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.25)',
+                color: topSort === f ? C.text : C.textMuted, fontSize: '11px', fontWeight: 600,
               }}>{f}</button>
             ))}
           </div>
           {/* Time row */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             {(['Day','Month','Year'] as TopTime[]).map(f => (
               <button key={f} onClick={() => setTopTime(f)} style={{
-                flex: 1, padding: '5px 0', borderRadius: '8px', border: `1px solid ${topTime === f ? C.primaryBright : C.border}`,
-                background: topTime === f ? 'rgba(255,26,58,0.15)' : 'rgba(0,0,0,0.3)',
-                color: topTime === f ? C.red : C.textMuted, fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                flex: 1, padding: '6px 0', borderRadius: '8px', cursor: 'pointer',
+                border: `1px solid ${topTime === f ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                background: topTime === f ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.25)',
+                color: topTime === f ? C.text : C.textMuted, fontSize: '11px', fontWeight: 600,
               }}>{f}</button>
             ))}
           </div>
@@ -649,24 +653,25 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
               const d = new Date(iso);
               return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
             };
+            const fmtMult = (m: number) => m >= 1000 ? m.toLocaleString('en-US', { maximumFractionDigits: 2 })+'x' : m.toFixed(2)+'x';
             return (
               <div>
-                <div style={{ display:'flex', justifyContent:'space-between', paddingBottom:'8px', borderBottom:`1px solid rgba(255,255,255,0.06)`, marginBottom:'4px' }}>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>Date & Time</span>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>X</span>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 2px', borderBottom:`1px solid rgba(255,255,255,0.08)`, marginBottom:'2px' }}>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>Date & Time</span>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>X</span>
                 </div>
                 {rows.map((h,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
-                    <span style={{ fontSize:'12px', color:C.textMuted }}>{fmtDate(h.date)}</span>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 0', borderBottom:`1px solid rgba(255,255,255,0.05)` }}>
+                    <span style={{ fontSize:'12px', fontWeight:500, color:C.textMuted }}>{fmtDate(h.date)}</span>
                     <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                      <span style={{ fontSize:'13px', fontWeight:700, color:multColor(h.mult) }}>{h.mult >= 1000 ? h.mult.toFixed(0)+'x' : h.mult.toFixed(2)+'x'}</span>
-                      <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(0,200,83,0.2)', border:'1px solid rgba(0,200,83,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <span style={{ fontSize:'9px', color:'#00C853', fontWeight:700 }}>✓</span>
+                      <span style={{ fontSize:'14px', fontWeight:700, color:'#C62AE8' }}>{fmtMult(h.mult)}</span>
+                      <div style={{ width:28, height:28, borderRadius:'14px', background:'rgba(120,120,140,0.2)', border:'1px solid rgba(180,180,200,0.25)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span style={{ fontSize:'13px', color:'rgba(180,180,200,0.8)', fontWeight:700 }}>✓</span>
                       </div>
                     </div>
                   </div>
                 ))}
-                {rows.length === 0 && <div style={{ textAlign:'center', padding:'24px', color:C.textDim, fontSize:'13px' }}>No records for this period</div>}
+                {rows.length === 0 && <div style={{ textAlign:'center', padding:'24px', color:C.textMuted, fontSize:'13px', fontWeight:500 }}>No records for this period</div>}
               </div>
             );
           })()}
@@ -676,28 +681,28 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
             const rows = topBets.filter((t: TopBet) => Date.now() - new Date((t as unknown as {date:string}).date ?? 0).getTime() < cutoff);
             return (
               <div>
-                <div style={{ display:'flex', justifyContent:'space-between', paddingBottom:'8px', borderBottom:`1px solid rgba(255,255,255,0.06)`, marginBottom:'4px' }}>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>Player</span>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>Win INR</span>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 2px', borderBottom:`1px solid rgba(255,255,255,0.08)`, marginBottom:'2px' }}>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>Player</span>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>Win INR</span>
                 </div>
                 {rows.map((t: TopBet, i: number) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 0', borderBottom:`1px solid rgba(255,255,255,0.05)` }}>
                     <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                       <Avatar idx={t.avatar} size={28} />
                       <div>
-                        <div style={{ fontSize:'13px', fontWeight:700, color:C.textSoft }}>{t.user}</div>
-                        <div style={{ fontSize:'10px', color:multColor(t.mult) }}>{t.mult.toFixed(2)}x</div>
+                        <div style={{ fontSize:'13px', fontWeight:700, color:C.text }}>{t.user}</div>
+                        <div style={{ fontSize:'10px', fontWeight:700, color:multColor(t.mult) }}>{t.mult.toFixed(2)}x</div>
                       </div>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                      <span style={{ fontSize:'13px', fontWeight:700, color:'#00C853' }}>₹{t.win.toLocaleString('en-IN')}</span>
-                      <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(0,200,83,0.2)', border:'1px solid rgba(0,200,83,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <span style={{ fontSize:'9px', color:'#00C853', fontWeight:700 }}>✓</span>
+                      <span style={{ fontSize:'13px', fontWeight:600, color:'#00C853' }}>₹{t.win.toLocaleString('en-IN')}</span>
+                      <div style={{ width:28, height:28, borderRadius:'14px', background:'rgba(120,120,140,0.2)', border:'1px solid rgba(180,180,200,0.25)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span style={{ fontSize:'13px', color:'rgba(180,180,200,0.8)', fontWeight:700 }}>✓</span>
                       </div>
                     </div>
                   </div>
                 ))}
-                {rows.length === 0 && <div style={{ textAlign:'center', padding:'24px', color:C.textDim, fontSize:'13px' }}>No records for this period</div>}
+                {rows.length === 0 && <div style={{ textAlign:'center', padding:'24px', color:C.textMuted, fontSize:'13px', fontWeight:500 }}>No records for this period</div>}
               </div>
             );
           })()}
@@ -715,23 +720,23 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
             ];
             return (
               <div>
-                <div style={{ display:'flex', justifyContent:'space-between', paddingBottom:'8px', borderBottom:`1px solid rgba(255,255,255,0.06)`, marginBottom:'4px' }}>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>Player</span>
-                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textDim }}>Rounds</span>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 2px', borderBottom:`1px solid rgba(255,255,255,0.08)`, marginBottom:'2px' }}>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>Player</span>
+                  <span style={{ fontSize:'11px', fontWeight:600, color:C.textMuted }}>Rounds</span>
                 </div>
                 {ROUNDS_DATA.map((r, i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:`1px solid rgba(255,255,255,0.04)` }}>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'11px 0', borderBottom:`1px solid rgba(255,255,255,0.05)` }}>
                     <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                       <Avatar idx={r.avatar} size={28} />
-                      <span style={{ fontSize:'13px', fontWeight:700, color:C.textSoft }}>{r.user}</span>
+                      <span style={{ fontSize:'13px', fontWeight:700, color:C.text }}>{r.user}</span>
                     </div>
                     <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
                       <div style={{ textAlign:'right' }}>
                         <div style={{ fontSize:'13px', fontWeight:600, color:C.textMuted }}>{r.rounds.toLocaleString()}</div>
-                        <div style={{ fontSize:'10px', color:C.textDim, textAlign:'right' }}>{r.wins} wins</div>
+                        <div style={{ fontSize:'10px', fontWeight:500, color:C.textMuted, textAlign:'right' }}>{r.wins} wins</div>
                       </div>
-                      <div style={{ width:18, height:18, borderRadius:'50%', background:'rgba(0,200,83,0.2)', border:'1px solid rgba(0,200,83,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        <span style={{ fontSize:'9px', color:'#00C853', fontWeight:700 }}>✓</span>
+                      <div style={{ width:28, height:28, borderRadius:'14px', background:'rgba(120,120,140,0.2)', border:'1px solid rgba(180,180,200,0.25)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span style={{ fontSize:'13px', color:'rgba(180,180,200,0.8)', fontWeight:700 }}>✓</span>
                       </div>
                     </div>
                   </div>
