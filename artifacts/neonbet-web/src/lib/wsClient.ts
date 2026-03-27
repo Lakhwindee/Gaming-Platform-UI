@@ -79,7 +79,7 @@ export function connectWS(token: string | null) {
     let msg: Record<string, unknown>;
     try { msg = JSON.parse(e.data as string); } catch { return; }
     if (msg.type === 'state') {
-      WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true };
+      WSC.state = { ...WSC.state, ...(msg as Partial<WSState>), connected: true, synced: true };
       notify();
     }
     WSC.msgListeners.forEach(fn => fn(msg));

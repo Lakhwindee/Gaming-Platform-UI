@@ -149,30 +149,35 @@ function GameCanvas({ phase, mult, countdown, elapsed, synced }: {
   const [, setTick] = useState(0);
   const rafRef = useRef<number>(0);
 
-  // Drive re-renders at ~60fps for smooth flicker animation
+  // Drive re-renders at ~60fps — same as expo's useAnimatedValue loop
   useEffect(() => {
     const loop = () => { setTick(n => n + 1); rafRef.current = requestAnimationFrame(loop); };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
+  // Compute live elapsed every frame from startTime (smooth 60fps) — same as expo
+  const liveElapsed = (phase === "flying" && WSC.state.startTime > 0)
+    ? (Date.now() - WSC.state.startTime) / 1000
+    : elapsed;
+
   const pos = (phase === "flying" || phase === "crashed")
-    ? getPos(elapsed)
+    ? getPos(liveElapsed)
     : { x: ORIG_X + 10, y: ORIG_Y - 20 };
 
   let pathD = `M ${ORIG_X} ${ORIG_Y}`;
   if (phase === "flying" || phase === "crashed") {
     const steps = 40;
     for (let i = 1; i <= steps; i++) {
-      const t = elapsed * (i / steps);
+      const t = liveElapsed * (i / steps);
       const p = getPos(t);
       pathD += ` L ${p.x} ${p.y}`;
     }
   }
 
   const dT = 0.3;
-  const e0 = Math.max(elapsed - dT, 0.001);
-  const e1 = elapsed + dT;
+  const e0 = Math.max(liveElapsed - dT, 0.001);
+  const e1 = liveElapsed + dT;
   const pA = getPos(e0);
   const pB = getPos(e1);
   const angle = Math.atan2(pB.y - pA.y, pB.x - pA.x);
