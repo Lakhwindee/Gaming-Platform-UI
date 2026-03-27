@@ -182,6 +182,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const slot2Ref = useRef(slot2);
   const stateRef = useRef(state);
   const prevPhaseRef = useRef<Phase>(WSC.state.phase);
+  const multOverlayRef = useRef<HTMLDivElement>(null);
   // Two-step confirm for queued bets (prevents accidental bets during flying)
   const [pendingConfirm, setPendingConfirm] = useState<[boolean, boolean]>([false, false]);
   const pendingConfirmRef = useRef<[boolean, boolean]>([false, false]);
@@ -419,32 +420,41 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         drawRocket(ctx!, pos.x, pos.y, smoothAngRef.current, isFlying, isWaiting, t);
       }
 
-      // Multiplier overlay — exact Expo text positioning
-      const mColor2 = isCrashed ? '#FF1A3A' : '#FFFFFF';
-      ctx!.save();
-      ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
+      // Multiplier overlay — rendered as HTML (tabular-nums, no canvas shake)
       if (isFlying) {
         updateAmbientMult(m); // Drone pitch rises with multiplier
-        ctx!.font = 'bold 54px Inter,sans-serif';
-        ctx!.fillStyle = mColor2;
-        ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.42);
+        if (multOverlayRef.current) {
+          multOverlayRef.current.textContent = `${m.toFixed(2)}x`;
+          multOverlayRef.current.style.color = '#FFFFFF';
+          multOverlayRef.current.style.top = '42%';
+          multOverlayRef.current.style.display = 'block';
+        }
       } else if (isCrashed) {
-        ctx!.font = 'bold 54px Inter,sans-serif';
-        ctx!.fillStyle = '#FF1A3A';
-        ctx!.fillText(`${m.toFixed(2)}x`, W / 2, H * 0.38);
+        if (multOverlayRef.current) {
+          multOverlayRef.current.textContent = `${m.toFixed(2)}x`;
+          multOverlayRef.current.style.color = '#FF1A3A';
+          multOverlayRef.current.style.top = '38%';
+          multOverlayRef.current.style.display = 'block';
+        }
+        ctx!.save();
+        ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
         ctx!.font = 'bold 20px Inter,sans-serif';
         ctx!.fillStyle = '#FF4500'; ctx!.letterSpacing = '5px';
         ctx!.fillText('💥  BLAST!', W / 2, H * 0.38 + 48);
+        ctx!.restore();
       } else if (isWaiting) {
+        if (multOverlayRef.current) { multOverlayRef.current.style.display = 'none'; }
         const cd = WSC.state.countdown;
+        ctx!.save();
+        ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
         ctx!.font = 'bold 10px Inter,sans-serif';
         ctx!.fillStyle = C.textMuted; ctx!.letterSpacing = '2px';
         ctx!.fillText('NEXT ROUND IN', W / 2, H * 0.38);
         ctx!.font = 'bold 40px Inter,sans-serif';
         ctx!.fillStyle = C.textMuted; ctx!.letterSpacing = '0px';
         ctx!.fillText(cd > 0 ? `${Math.ceil(cd)}s` : '...', W / 2, H * 0.38 + 40);
+        ctx!.restore();
       }
-      ctx!.restore();
 
       animRef.current = requestAnimationFrame(draw);
     }
@@ -949,8 +959,22 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
 
   // ── Canvas element ────────────────────────────────────────────────────────
   const canvasEl = (
-    <div style={{ borderRadius: '16px', overflow: 'hidden', border: `1px solid ${C.border}`, background: 'rgba(4,0,12,0.9)', marginBottom: '12px' }}>
+    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${C.border}`, background: 'rgba(4,0,12,0.9)', marginBottom: '12px' }}>
       <canvas ref={canvasRef} width={480} height={CV_H} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <div ref={multOverlayRef} style={{
+        display: 'none',
+        position: 'absolute',
+        left: 0, right: 0,
+        transform: 'translateY(-50%)',
+        textAlign: 'center',
+        fontFamily: 'Inter, sans-serif',
+        fontWeight: 700,
+        fontSize: 'clamp(36px, 11vw, 54px)',
+        fontVariantNumeric: 'tabular-nums',
+        letterSpacing: '-0.5px',
+        lineHeight: 1,
+        pointerEvents: 'none',
+      }} />
     </div>
   );
 

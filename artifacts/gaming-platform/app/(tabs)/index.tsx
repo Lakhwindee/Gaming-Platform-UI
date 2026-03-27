@@ -1062,7 +1062,7 @@ const styles = StyleSheet.create({
   histText: { fontSize: 11, fontFamily: "Inter_700Bold" },
   canvas: { width: CV_W, height: CV_H, backgroundColor: "#04000C", borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: "hidden", marginBottom: 12 },
   multOverlay: { alignItems: "center", justifyContent: "center" },
-  multText: { fontSize: 54, fontFamily: "Inter_700Bold" },
+  multText: { fontSize: 54, fontFamily: "Inter_700Bold", fontVariant: ["tabular-nums"] },
   countLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted, letterSpacing: 2, marginBottom: 2 },
   crashedLabel: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FF4500", letterSpacing: 5, marginTop: 4, textShadowColor: "#FF4500", textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
   dualPanel: { flexDirection: "row", gap: 8, marginBottom: 12 },
