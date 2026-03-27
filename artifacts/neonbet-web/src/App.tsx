@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import Profile from './pages/Profile';
 import AuthModal from './pages/AuthModal';
@@ -18,56 +18,44 @@ function Header({ onAuthOpen }: { onAuthOpen: () => void }) {
     return () => { WSC.listeners.delete(update); };
   }, []);
   const connected = WSC.state.connected;
+  const chipStyle: React.CSSProperties = {
+    backgroundColor: 'rgba(180,0,40,0.13)',
+    borderRadius: '10px',
+    border: '1px solid rgba(255,30,60,0.22)',
+    padding: '6px 10px',
+    cursor: 'pointer',
+    textAlign: 'left' as const,
+  };
   return (
     <header style={{
-      height: '58px', background: 'var(--bg2)',
-      borderBottom: '1px solid var(--border)',
+      background: 'var(--bg2)',
+      borderBottom: '1px solid rgba(255,30,60,0.22)',
       display: 'grid', gridTemplateColumns: '1fr auto 1fr',
-      alignItems: 'center', padding: '0 14px',
+      alignItems: 'center', padding: '10px 16px',
       position: 'sticky', top: 0, zIndex: 100, flexShrink: 0,
     }}>
-      {/* Left: Balance or Login */}
+      {/* Left: Balance chip */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
-        {state.user ? (
-          <button onClick={toggleWallet} style={{
-            background: 'rgba(255,58,58,0.12)', border: '1px solid rgba(255,58,58,0.28)',
-            borderRadius: '10px', padding: '6px 10px', cursor: 'pointer', textAlign: 'left',
-          }}>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', fontWeight: 700, letterSpacing: '0.8px' }}>BALANCE</div>
-            <div style={{ fontSize: '15px', fontWeight: 900, color: '#FFD700', lineHeight: 1 }}>
-              ₹{state.user.balance.toLocaleString('en-IN')}
-            </div>
-          </button>
-        ) : (
-          <button onClick={onAuthOpen} style={{
-            background: 'var(--primary)', color: '#fff',
-            border: 'none', borderRadius: '10px',
-            padding: '9px 16px', fontWeight: 800,
-            fontSize: '13px', cursor: 'pointer',
-          }}>Login / Register</button>
-        )}
+        <button onClick={state.user ? toggleWallet : onAuthOpen} style={chipStyle}>
+          <div style={{ fontSize: '9px', color: '#AA7788', fontWeight: 600, letterSpacing: '1.5px', lineHeight: 1.2 }}>BALANCE</div>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: '#FFD700', lineHeight: 1.2 }}>
+            ₹{(state.user?.balance ?? 0).toLocaleString('en-IN')}
+          </div>
+        </button>
       </div>
 
       {/* Center: BLAZE */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ fontWeight: 900, fontSize: '20px', letterSpacing: '2px', color: '#FF3A3A', fontFamily: 'Inter, sans-serif' }}>BLAZE</span>
-      </div>
+      <span style={{ fontWeight: 700, fontSize: '18px', letterSpacing: '4px', color: '#FF1A3A' }}>BLAZE</span>
 
-      {/* Right: LIVE badge */}
+      {/* Right: LIVE chip */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '5px',
-          background: connected ? 'rgba(0,230,118,0.12)' : 'rgba(255,58,58,0.12)',
-          border: `1px solid ${connected ? 'rgba(0,230,118,0.3)' : 'rgba(255,58,58,0.3)'}`,
-          borderRadius: '8px', padding: '5px 10px',
-        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', ...chipStyle, cursor: 'default' }}>
           <div style={{
             width: '7px', height: '7px', borderRadius: '50%',
-            background: connected ? '#00E676' : '#FF3A3A',
-            boxShadow: connected ? '0 0 6px #00E676' : '0 0 6px #FF3A3A',
+            background: connected ? '#00E676' : '#FF1A3A',
           }} />
-          <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.8px', color: connected ? '#00E676' : '#FF5555' }}>
-            {connected ? 'LIVE' : 'OFF'}
+          <span style={{ fontSize: '10px', fontWeight: 600, color: '#AA7788' }}>
+            {connected ? 'LIVE' : 'OFFLINE'}
           </span>
         </div>
       </div>

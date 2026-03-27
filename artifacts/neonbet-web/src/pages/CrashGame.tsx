@@ -410,90 +410,105 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const isFlying = phase === 'flying' || phase === 'crashed';
 
     let mainBtn: React.ReactNode;
+    const btnBase: React.CSSProperties = {
+      width: '100%', padding: '14px 0', borderRadius: '12px', border: 'none', cursor: 'pointer',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+    };
     if (slot.status === 'active') {
       mainBtn = (
         <button onClick={() => cashOut(slotIdx)} style={{
-          width: '100%', padding: '13px', borderRadius: '12px', border: 'none', cursor: 'pointer',
-          background: 'linear-gradient(135deg,#FF3A3A,#CC0000)',
-          color: '#fff', fontWeight: 900, fontSize: '14px', letterSpacing: '0.5px',
+          ...btnBase, background: 'linear-gradient(135deg,#FF1A3A,#CC0022)',
+          boxShadow: '0 0 16px rgba(255,26,58,0.4)',
         }}>
-          CASHOUT @ {mult.toFixed(2)}x
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#fff', letterSpacing: '0.8px' }}>CASHOUT</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>{mult.toFixed(2)}x</span>
+          <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', letterSpacing: '1px' }}>₹{(slot.amount * mult).toFixed(0)}</span>
         </button>
       );
     } else if (slot.status === 'queued') {
       mainBtn = (
         <button onClick={() => cancelBet(slotIdx)} style={{
-          width: '100%', padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,200,0,0.4)', cursor: 'pointer',
-          background: 'rgba(255,200,0,0.08)',
-          color: '#FFD700', fontWeight: 800, fontSize: '14px',
+          ...btnBase, border: '1.5px solid rgba(255,200,0,0.4)',
+          background: 'rgba(255,200,0,0.07)', color: '#FFD700',
         }}>
-          ⏳ QUEUED — Cancel
+          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.8px' }}>QUEUED</span>
+          <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,200,0,0.7)', letterSpacing: '1px' }}>TAP TO CANCEL</span>
         </button>
       );
     } else if (slot.status === 'cashedout') {
       mainBtn = (
         <button disabled style={{
-          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-          background: 'rgba(0,180,80,0.1)', color: '#00C853', fontWeight: 800, fontSize: '14px',
+          ...btnBase, border: '1.5px solid rgba(0,200,83,0.4)',
+          background: 'rgba(0,200,83,0.07)',
         }}>
-          EXITED @ {slot.cashedOutAt?.toFixed(2)}x ✓
+          <span style={{ fontSize: '9px', fontWeight: 700, color: '#00C853', letterSpacing: '1.5px' }}>EXITED</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>{slot.cashedOutAt?.toFixed(2)}x</span>
         </button>
       );
     } else if (slot.status === 'lost') {
       mainBtn = (
         <button disabled style={{
-          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-          background: 'rgba(255,58,58,0.08)', color: '#FF5555', fontWeight: 800, fontSize: '14px',
+          ...btnBase, background: 'rgba(255,26,58,0.07)',
+          border: '1.5px solid rgba(255,26,58,0.25)',
         }}>
-          FLEW AWAY 💥
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF1A3A', letterSpacing: '0.8px' }}>FLEW AWAY 💥</span>
         </button>
       );
     } else {
       const canBet = !!state.user && slot.status === 'idle';
       mainBtn = (
         <button onClick={() => placeBet(slotIdx)} disabled={!canBet} style={{
-          width: '100%', padding: '13px', borderRadius: '12px', border: 'none',
-          cursor: canBet ? 'pointer' : 'default',
-          background: canBet
-            ? (isFlying ? 'linear-gradient(135deg,#1565C0,#0D47A1)' : 'linear-gradient(135deg,#00C853,#009C41)')
-            : 'rgba(40,40,60,0.4)',
-          color: canBet ? '#fff' : '#556', fontWeight: 900, fontSize: '14px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
+          ...btnBase, cursor: canBet ? 'pointer' : 'default',
+          background: !canBet
+            ? 'rgba(40,10,20,0.5)'
+            : isFlying
+              ? 'linear-gradient(135deg,#1565C0,#0D47A1)'
+              : 'linear-gradient(135deg,#00C853,#009C41)',
         }}>
-          <span>{!state.user ? 'LOGIN TO BET' : isFlying ? `BET NEXT  ₹${slot.amount.toLocaleString('en-IN')}` : `BET  ₹${slot.amount.toLocaleString('en-IN')}`}</span>
-          {isFlying && canBet && <span style={{ fontSize: '10px', fontWeight: 600, opacity: 0.8 }}>next round</span>}
+          <span style={{ fontSize: '11px', fontWeight: 700, color: canBet ? '#fff' : '#664455', letterSpacing: '0.8px' }}>
+            {!state.user ? 'LOGIN TO BET' : isFlying ? 'BET NEXT' : 'BET'}
+          </span>
+          {canBet && (
+            <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>₹{slot.amount.toLocaleString('en-IN')}</span>
+          )}
+          {isFlying && canBet && <span style={{ fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', letterSpacing: '1px' }}>next round</span>}
         </button>
       );
     }
 
+    const BORDER = 'rgba(255,30,60,0.22)';
     return (
       <div style={{
-        background: 'rgba(180,0,40,0.08)', border: '1px solid rgba(255,58,58,0.15)',
-        borderRadius: '14px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px',
+        background: 'rgba(180,0,40,0.13)', border: `1px solid ${BORDER}`,
+        borderRadius: '16px', padding: '11px', display: 'flex', flexDirection: 'column', gap: '10px',
       }}>
+        {/* Panel header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '12px', fontWeight: 800, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.8px' }}>{label}</span>
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#AA7788', letterSpacing: '2px' }}>{label}</span>
           {slot.result && (
             <span style={{
-              fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+              fontSize: '10px', fontWeight: 700, padding: '3px 7px', borderRadius: '8px',
               background: slot.result.win ? 'rgba(0,200,83,0.15)' : 'rgba(255,26,58,0.15)',
-              color: slot.result.win ? '#00C853' : '#FF5555',
+              color: slot.result.win ? '#00C853' : '#FF1A3A',
             }}>{slot.result.text}</span>
           )}
         </div>
 
+        {/* Amount row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <button onClick={() => setSlotAmount(slotIdx, slot.amount - 50)} disabled={!canEdit} style={{
-            width: '32px', height: '34px', borderRadius: '9px', border: 'none', cursor: canEdit ? 'pointer' : 'default',
-            background: 'rgba(255,58,58,0.18)', color: '#FF3A3A', fontSize: '20px', fontWeight: 900,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: canEdit ? 1 : 0.4, flexShrink: 0,
+            width: '34px', height: '34px', borderRadius: '10px',
+            background: 'rgba(255,26,58,0.12)', border: `1px solid ${BORDER}`,
+            color: '#fff', fontSize: '20px', fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: canEdit ? 1 : 0.35, flexShrink: 0, cursor: canEdit ? 'pointer' : 'default',
           }}>−</button>
           <div style={{
-            flex: 1, minWidth: 0, background: 'rgba(10,5,20,0.6)', borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center',
-            padding: '0 6px', height: '34px', overflow: 'hidden',
+            flex: 1, minWidth: 0, background: 'rgba(0,0,0,0.4)',
+            borderRadius: '10px', border: `1px solid ${BORDER}`,
+            display: 'flex', alignItems: 'center', padding: '7px 9px', overflow: 'hidden',
           }}>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginRight: '2px', flexShrink: 0 }}>₹</span>
+            <span style={{ color: '#FFD700', fontSize: '14px', fontWeight: 700, marginRight: '2px', flexShrink: 0 }}>₹</span>
             <input
               type="number" value={slot.input} disabled={!canEdit}
               onChange={e => { const setSlot = slotIdx === 0 ? setSlot1 : setSlot2; setSlot(s => ({ ...s, input: e.target.value })); }}
@@ -504,25 +519,28 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
               }}
               style={{
                 flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: '#fff',
-                fontSize: '14px', fontWeight: 800, outline: 'none', opacity: canEdit ? 1 : 0.5,
+                fontSize: '15px', fontWeight: 700, outline: 'none', opacity: canEdit ? 1 : 0.5,
               }}
             />
           </div>
           <button onClick={() => setSlotAmount(slotIdx, slot.amount + 50)} disabled={!canEdit} style={{
-            width: '32px', height: '34px', borderRadius: '9px', border: 'none', cursor: canEdit ? 'pointer' : 'default',
-            background: 'rgba(255,58,58,0.18)', color: '#FF3A3A', fontSize: '20px', fontWeight: 900,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: canEdit ? 1 : 0.4, flexShrink: 0,
+            width: '34px', height: '34px', borderRadius: '10px',
+            background: 'rgba(255,26,58,0.12)', border: `1px solid ${BORDER}`,
+            color: '#fff', fontSize: '20px', fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: canEdit ? 1 : 0.35, flexShrink: 0, cursor: canEdit ? 'pointer' : 'default',
           }}>+</button>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px' }}>
+        {/* Preset chips */}
+        <div style={{ display: 'flex', gap: '5px' }}>
           {[100, 250, 500, 1000].map(v => (
             <button key={v} onClick={() => setSlotAmount(slotIdx, v)} disabled={!canEdit} style={{
               flex: 1, padding: '6px 0', borderRadius: '8px', border: '1px solid',
-              fontSize: '11px', fontWeight: 800, cursor: canEdit ? 'pointer' : 'default',
-              background: slot.amount === v ? 'rgba(255,58,58,0.22)' : 'transparent',
-              borderColor: slot.amount === v ? 'rgba(255,58,58,0.6)' : 'rgba(255,255,255,0.12)',
-              color: slot.amount === v ? '#FF3A3A' : 'rgba(255,255,255,0.5)',
+              fontSize: '10px', fontWeight: 600, cursor: canEdit ? 'pointer' : 'default',
+              background: slot.amount === v ? 'rgba(255,26,58,0.18)' : 'rgba(0,0,0,0.3)',
+              borderColor: slot.amount === v ? '#FF1A3A' : BORDER,
+              color: slot.amount === v ? '#FF1A3A' : '#AA7788',
               opacity: canEdit ? 1 : 0.5,
             }}>{v >= 1000 ? '₹1K' : `₹${v}`}</button>
           ))}
@@ -556,12 +574,12 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const cashPct = betCount > 0 ? Math.min(100, (cashedCount / betCount) * 100) : 0;
 
   const historyStrip = (
-    <div style={{ overflowX: 'auto', display: 'flex', gap: '6px', padding: '10px 12px', scrollbarWidth: 'none' as const }}>
+    <div style={{ overflowX: 'auto', display: 'flex', gap: '5px', padding: '10px 12px 10px', scrollbarWidth: 'none' as const }}>
       {history.map((h, i) => {
         const col = multColor(h);
-        const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,58,58,0.13)';
+        const bg  = h >= 10 ? 'rgba(255,77,255,0.13)' : h >= 2 ? 'rgba(77,166,255,0.13)' : 'rgba(255,26,58,0.13)';
         return (
-          <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '20px', padding: '4px 10px', fontSize: '12px', fontWeight: 800, color: col }}>
+          <div key={i} style={{ flexShrink: 0, background: bg, border: `1px solid ${col}55`, borderRadius: '8px', padding: '4px 9px', fontSize: '11px', fontWeight: 700, color: col }}>
             {h.toFixed(2)}x
           </div>
         );
@@ -570,24 +588,23 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   );
 
   const betsSection = (
-      <div style={{ margin: '0 12px', background: 'rgba(10,5,20,0.6)', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(180,0,40,0.13)', borderRadius: '16px', border: '1px solid rgba(255,30,60,0.22)', padding: '14px' }}>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        {/* Pill Tab Bar — exact Expo style */}
+        <div style={{ display: 'flex', background: 'rgba(0,0,0,0.35)', borderRadius: '20px', padding: '3px', marginBottom: '14px' }}>
           {(['all', 'prev', 'top'] as BetsTab[]).map(tab => (
             <button key={tab} onClick={() => setBetsTab(tab)} style={{
-              flex: 1, padding: '12px 0', border: 'none', cursor: 'pointer',
-              background: betsTab === tab ? 'rgba(255,58,58,0.12)' : 'transparent',
-              color: betsTab === tab ? '#FF3A3A' : 'rgba(255,255,255,0.4)',
-              fontWeight: 800, fontSize: '13px', letterSpacing: '0.3px',
-              borderBottom: betsTab === tab ? '2px solid #FF3A3A' : '2px solid transparent',
+              flex: 1, padding: '7px 0', borderRadius: '16px', border: 'none', cursor: 'pointer',
+              background: betsTab === tab ? 'rgba(255,255,255,0.12)' : 'transparent',
+              color: betsTab === tab ? '#FFFFFF' : '#AA7788',
+              fontWeight: 600, fontSize: '12px',
             }}>
               {tab === 'all' ? 'All Bets' : tab === 'prev' ? 'Previous' : 'Top'}
             </button>
           ))}
         </div>
 
-        <div style={{ padding: '12px' }}>
+        <div>
           {/* All Bets */}
           {betsTab === 'all' && (
             <>
@@ -670,7 +687,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   );
 
   const canvasEl = (
-    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,30,60,0.22)', background: 'rgba(4,0,12,0.9)' }}>
       <canvas ref={canvasRef} width={480} height={260} style={{ width: '100%', height: 'auto', display: 'block' }} />
     </div>
   );
@@ -684,7 +701,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(0)}</div>
           <div style={{ flex: '1 1 0', minWidth: '0' }}>{renderBetPanel(1)}</div>
         </div>
-        <div style={{ padding: '0 12px' }}>{betsSection}</div>
+        <div style={{ padding: '0 12px', marginBottom: '12px' }}>{betsSection}</div>
       </div>
     );
   }
