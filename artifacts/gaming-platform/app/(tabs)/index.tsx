@@ -305,6 +305,7 @@ export default function GameScreen() {
 
   // ── Sound: phase-based triggers ────────────────────────────────────────
   const prevPhaseForSound = useRef<string>("");
+  const prevPhaseForBets = useRef<string>("");
   useEffect(() => {
     const listener = () => {
       const ph = WSC.state.phase;
@@ -456,7 +457,9 @@ export default function GameScreen() {
 
       if (msg.type === "state") {
         const newPhase = (msg as { phase?: string }).phase;
-        if (newPhase === "waiting") {
+        const oldPhase = prevPhaseForBets.current;
+        if (newPhase) prevPhaseForBets.current = newPhase;
+        if (newPhase === "waiting" && oldPhase !== "waiting") {
           setSlots(prev => {
             const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
             for (let i = 0; i < 2; i++) {
@@ -468,7 +471,9 @@ export default function GameScreen() {
             return next;
           });
         }
-        if (newPhase === "flying") {
+        // Only on waiting→flying transition: promote 'placed' bets to 'active'
+        // 'queued' bets stay queued — they activate via bet_ok(auto) at round start
+        if (oldPhase !== "flying" && newPhase === "flying") {
           setSlots(prev => {
             const next: [SlotState, SlotState] = [{ ...prev[0] }, { ...prev[1] }];
             for (let i = 0; i < 2; i++) {

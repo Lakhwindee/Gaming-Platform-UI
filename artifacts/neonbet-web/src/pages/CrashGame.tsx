@@ -225,10 +225,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         stopAmbient();
         playBlast();
       }
-      if (newPhase === 'flying') {
-        // Placed/queued become active
-        if (slot1Ref.current.status === 'placed' || slot1Ref.current.status === 'queued') setSlot1(s => ({ ...s, status: 'active' }));
-        if (slot2Ref.current.status === 'placed' || slot2Ref.current.status === 'queued') setSlot2(s => ({ ...s, status: 'active' }));
+      if (oldPhase !== 'flying' && newPhase === 'flying') {
+        // Only 'placed' bets (confirmed for current round) go active — 'queued' bets stay queued until next round's bet_ok
+        if (slot1Ref.current.status === 'placed') setSlot1(s => ({ ...s, status: 'active' }));
+        if (slot2Ref.current.status === 'placed') setSlot2(s => ({ ...s, status: 'active' }));
         // 🎵 Start ambient music when rocket flies
         startAmbient();
       }
@@ -244,9 +244,10 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const handler = (msg: Record<string, unknown>) => {
       const s = Number(msg.slot ?? 1);
       if (msg.type === 'bet_ok') {
-        // Keep as 'placed' so cancel button stays visible — same as Expo
-        // Phase transition (waiting→flying) will promote to 'active' automatically
-        updateSlot(s === 2 ? 1 : 0, { status: 'placed' });
+        // auto=true → queued bet activated for this round → set active immediately
+        // normal bet_ok → stays 'placed' until waiting→flying transition promotes it
+        const isAuto = msg.auto === true;
+        updateSlot(s === 2 ? 1 : 0, { status: isAuto ? 'active' : 'placed' });
       }
       if (msg.type === 'bet_queued') updateSlot(s === 2 ? 1 : 0, { status: 'queued' });
       if (msg.type === 'bet_fail') {
