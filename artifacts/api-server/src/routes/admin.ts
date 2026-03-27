@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, transactionsTable } from "@workspace/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
-import { getEngineSnapshot, setForcedCrash } from "../lib/gameEngine";
+import { getEngineSnapshot, setForcedCrash, getOnlineUserIds, getOnlineStats } from "../lib/gameEngine";
 
 const router = Router();
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "blaze-admin-2025";
@@ -57,6 +57,7 @@ router.get("/admin", (_req, res) => {
   .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
   .stat-val{font-size:26px;font-weight:700;color:var(--gold)}
   .stat-lbl{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+  .online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);margin-right:5px;vertical-align:middle}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
   .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
   .card-title{font-size:13px;font-weight:700;color:#f0e6f0;letter-spacing:1px;text-transform:uppercase}
@@ -142,6 +143,7 @@ router.get("/admin", (_req, res) => {
     <div class="section active" id="tab-overview">
       <div class="stats-row" id="overviewStats">
         <div class="stat-card"><div class="stat-val" id="st-users">—</div><div class="stat-lbl">Total Users</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-online" style="color:var(--green)">—</div><div class="stat-lbl">🟢 Online Now</div></div>
         <div class="stat-card"><div class="stat-val" id="st-balance">—</div><div class="stat-lbl">Total Balance</div></div>
         <div class="stat-card"><div class="stat-val" id="st-wagered">—</div><div class="stat-lbl">Total Wagered</div></div>
         <div class="stat-card"><div class="stat-val" id="st-deposits">—</div><div class="stat-lbl">Total Deposits</div></div>
@@ -171,8 +173,8 @@ router.get("/admin", (_req, res) => {
       </div>
       <div class="card">
         <table>
-          <thead><tr><th>#</th><th>Username</th><th>Balance</th><th>Wins</th><th>Wagered</th><th>VIP</th><th>Joined</th><th>Action</th></tr></thead>
-          <tbody id="userTable"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+          <thead><tr><th>#</th><th>Status</th><th>Username</th><th>Email</th><th>Balance</th><th>Wins</th><th>Losses</th><th>Wagered</th><th>VIP</th><th>Joined</th><th>Action</th></tr></thead>
+          <tbody id="userTable"><tr><td colspan="11" class="empty">Loading...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -363,6 +365,7 @@ async function loadOverview() {
       api('/api/admin/stats'), api('/api/admin/game'), api('/api/admin/transactions?limit=8')
     ]);
     document.getElementById('st-users').textContent = stats.totalUsers;
+    document.getElementById('st-online').textContent = stats.onlineUsers ?? snap.clientCount ?? 0;
     document.getElementById('st-balance').textContent = fmtAmt(stats.totalBalance);
     document.getElementById('st-wagered').textContent = fmtAmt(stats.totalWagered);
     document.getElementById('st-deposits').textContent = fmtAmt(stats.totalDeposits);
@@ -390,10 +393,13 @@ async function loadUsers() {
 function renderUsers(list) {
   const tbody = document.getElementById('userTable');
   tbody.innerHTML = list.length ? list.map(u => \`<tr>
-    <td style="color:#666">\${u.id}</td>
-    <td style="font-weight:600">\${u.username}</td>
-    <td style="color:var(--gold)">\${fmtAmt(u.balance)}</td>
+    <td style="color:#666;font-size:11px">#\${u.id}</td>
+    <td>\${u.online ? '<span class="online-dot"></span><span style="color:var(--green);font-size:10px;font-weight:700">ONLINE</span>' : '<span style="color:#555;font-size:10px">offline</span>'}</td>
+    <td style="font-weight:700">\${u.username}</td>
+    <td style="color:#aaa;font-size:11px;font-family:monospace">\${u.email || '—'}</td>
+    <td style="color:var(--gold);font-weight:700">\${fmtAmt(u.balance)}</td>
     <td style="color:var(--green)">\${u.totalWins}</td>
+    <td style="color:var(--red)">\${u.totalLosses}</td>
     <td style="color:#aaa">\${fmtAmt(u.totalWagered)}</td>
     <td><span class="badge badge-\${u.vipLevel.toLowerCase()}">\${u.vipLevel}</span></td>
     <td style="color:#666;font-size:11px">\${timeAgo(u.createdAt)}</td>
@@ -401,7 +407,7 @@ function renderUsers(list) {
       <input class="edit-bal" type="number" id="bal_\${u.id}" placeholder="±amount" />
       <button class="btn-sm green" onclick="adjustBalance(\${u.id}, '\${u.username}')">Adjust</button>
     </td>
-  </tr>\`).join('') : '<tr><td colspan="8" class="empty">No users</td></tr>';
+  </tr>\`).join('') : '<tr><td colspan="11" class="empty">No users found</td></tr>';
 }
 
 function filterUsers() {
@@ -569,11 +575,13 @@ router.get("/admin/stats", async (req, res) => {
       totalDeposits: sql<number>`coalesce(sum(amount),0)::bigint`,
     }).from(transactionsTable).where(eq(transactionsTable.type, "deposit"));
 
+    const onlineIds = getOnlineUserIds();
     res.json({
       totalUsers: rows[0]?.totalUsers ?? 0,
       totalBalance: Number(rows[0]?.totalBalance ?? 0),
       totalWagered: Number(rows[0]?.totalWagered ?? 0),
       totalDeposits: Number(depRows[0]?.totalDeposits ?? 0),
+      onlineUsers: onlineIds.size,
     });
   } catch (e) {
     res.status(500).json({ error: "Server error" });
@@ -594,7 +602,9 @@ router.get("/admin/users", async (req, res) => {
       vipLevel: usersTable.vipLevel,
       createdAt: usersTable.createdAt,
     }).from(usersTable).orderBy(desc(usersTable.createdAt));
-    res.json(rows);
+    const onlineIds = getOnlineUserIds();
+    const result = rows.map(r => ({ ...r, online: onlineIds.has(r.id) }));
+    res.json(result);
   } catch (e) {
     res.status(500).json({ error: "Server error" });
   }

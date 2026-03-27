@@ -290,13 +290,49 @@ async function startCountdown() {
   }, 1000);
 }
 
+// ── Smart crash: crash early when real users bet big ────────────────────────
+function adjustCrashForRealBets(): void {
+  let totalReal = 0;
+  for (const [, c] of clients) {
+    for (const slot of c.slots) {
+      if (slot.active) totalReal += slot.amount;
+    }
+  }
+  if (totalReal <= 0) return;
+
+  const r = Math.random();
+  let newCrash: number | null = null;
+
+  if (totalReal >= 10000) {
+    // ≥ ₹10K: 88% chance to crash before 1.5x
+    if (r < 0.88) newCrash = 1.01 + Math.random() * 0.48;
+  } else if (totalReal >= 5000) {
+    // ₹5K–₹10K: 78% chance to crash before 2x
+    if (r < 0.78) newCrash = 1.01 + Math.random() * 0.98;
+  } else if (totalReal >= 2000) {
+    // ₹2K–₹5K: 65% chance to crash before 2x
+    if (r < 0.65) newCrash = 1.01 + Math.random() * 0.98;
+  } else if (totalReal >= 1000) {
+    // ₹1K–₹2K: 52% chance to crash before 2x
+    if (r < 0.52) newCrash = 1.01 + Math.random() * 0.98;
+  } else if (totalReal >= 500) {
+    // ₹500–₹1K: 40% chance to crash before 2x
+    if (r < 0.40) newCrash = 1.01 + Math.random() * 0.98;
+  }
+
+  if (newCrash !== null) {
+    ENG.crashPoint = parseFloat(newCrash.toFixed(2));
+  }
+}
+
 async function startFlight() {
+  adjustCrashForRealBets(); // re-evaluate crash point based on real bets placed
   ENG.phase = 'flying';
   ENG.startTime = Date.now();
   ENG.mult = 1.0;
   try {
     await db.update(gameRoundsTable)
-      .set({ status: 'flying', startedAt: new Date() })
+      .set({ status: 'flying', startedAt: new Date(), crashPoint: String(ENG.crashPoint) })
       .where(eq(gameRoundsTable.id, ENG.roundId));
   } catch (e) { console.error('DB start flight:', e); }
 
@@ -517,8 +553,26 @@ export function getEngineSnapshot() {
     crashPoint: ENG.crashPoint,
     activeBets: ENG.allBets.length,
     allBets: ENG.allBets,
-    clientCount: 0,
+    clientCount: clients.size,
   };
+}
+
+export function getOnlineUserIds(): Set<number> {
+  const ids = new Set<number>();
+  for (const [, c] of clients) {
+    if (c.userId) ids.add(c.userId);
+  }
+  return ids;
+}
+
+export function getOnlineStats(): { userCount: number; totalActiveBet: number } {
+  let totalActiveBet = 0;
+  const seen = new Set<number>();
+  for (const [, c] of clients) {
+    if (c.userId) seen.add(c.userId);
+    for (const slot of c.slots) if (slot.active) totalActiveBet += slot.amount;
+  }
+  return { userCount: seen.size, totalActiveBet };
 }
 
 let _forcedCrash: number | null = null;
