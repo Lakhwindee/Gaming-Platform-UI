@@ -304,22 +304,22 @@ function adjustCrashForRealBets(): void {
 
   const r = Math.random();
 
-  // ── Case 1: No real bets placed (users watching/on profile, not betting)
-  // Rocket flies HIGH to create FOMO and attract bets next round
-  if (totalReal === 0) {
-    if (connectedUsers === 0) return; // nobody online, normal random
-    // Boost crash point: 70% chance of a big round (5x–200x)
-    if (r < 0.70) {
+  // ── Case 1: No bets OR very few bets (< ₹500 total)
+  // Rocket flies HIGH to create FOMO — lure users into betting next round
+  if (totalReal < 500) {
+    if (connectedUsers === 0) return; // nobody online, skip
+    // 75% chance of a big high round
+    if (r < 0.75) {
       const tier = Math.random();
-      if (tier < 0.35)      ENG.crashPoint = parseFloat((5  + Math.random() * 15).toFixed(2));  // 5–20x
-      else if (tier < 0.65) ENG.crashPoint = parseFloat((20 + Math.random() * 30).toFixed(2));  // 20–50x
-      else if (tier < 0.85) ENG.crashPoint = parseFloat((50 + Math.random() * 50).toFixed(2));  // 50–100x
-      else                  ENG.crashPoint = parseFloat((100 + Math.random() * 100).toFixed(2)); // 100–200x
+      if (tier < 0.30)      ENG.crashPoint = parseFloat((5  + Math.random() * 15).toFixed(2));  // 5–20x
+      else if (tier < 0.60) ENG.crashPoint = parseFloat((20 + Math.random() * 30).toFixed(2));  // 20–50x
+      else if (tier < 0.82) ENG.crashPoint = parseFloat((50 + Math.random() * 50).toFixed(2));  // 50–100x
+      else                  ENG.crashPoint = parseFloat((100 + Math.random() * 900).toFixed(2)); // 100–1000x
     }
     return;
   }
 
-  // ── Case 2: Real bets placed — crash based on how much is at stake
+  // ── Case 2: Decent bets placed — crash early based on total stake
   let newCrash: number | null = null;
 
   if (totalReal >= 10000) {
