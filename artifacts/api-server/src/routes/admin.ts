@@ -23,86 +23,132 @@ router.get("/admin", (_req, res) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>Blaze Admin</title>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0010;color:#f0e6f0;min-height:100vh}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0010;color:#f0e6f0;min-height:100vh;overflow-x:hidden}
   :root{--red:#FF1A3A;--gold:#FFD700;--green:#00C853;--blue:#4DA6FF;--pink:#FF4DFF;--card:rgba(180,0,40,0.13);--border:rgba(255,30,60,0.22);--muted:#AA7788}
+
+  /* LOGIN */
   #login{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-  .login-box{background:rgba(255,26,58,0.08);border:1px solid var(--border);border-radius:20px;padding:40px;width:100%;max-width:380px;text-align:center}
-  .login-box h1{font-size:28px;color:var(--red);margin-bottom:6px;letter-spacing:2px}
-  .login-box p{color:var(--muted);font-size:13px;margin-bottom:28px}
-  .logo{font-size:48px;margin-bottom:16px}
-  input{width:100%;background:rgba(0,0,0,0.4);border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;color:#f0e6f0;font-size:15px;outline:none;margin-bottom:14px}
+  .login-box{background:rgba(255,26,58,0.08);border:1px solid var(--border);border-radius:20px;padding:36px 24px;width:100%;max-width:360px;text-align:center}
+  .login-box h1{font-size:26px;color:var(--red);margin-bottom:6px;letter-spacing:2px}
+  .login-box p{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .logo{font-size:44px;margin-bottom:14px}
+  input{width:100%;background:rgba(0,0,0,0.4);border:1.5px solid var(--border);border-radius:12px;padding:15px 16px;color:#f0e6f0;font-size:16px;outline:none;margin-bottom:12px;-webkit-appearance:none}
   input:focus{border-color:var(--red)}
-  button{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px}
-  button:hover{opacity:0.9} button:disabled{opacity:0.5;cursor:not-allowed}
+  button{width:100%;background:var(--red);color:#fff;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px;-webkit-appearance:none}
+  button:active{opacity:0.85} button:disabled{opacity:0.5;cursor:not-allowed}
   .err{color:var(--red);font-size:12px;margin-top:8px}
+
+  /* APP SHELL */
   #app{display:none;min-height:100vh}
-  .topbar{background:rgba(0,0,0,0.6);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;backdrop-filter:blur(8px)}
-  .topbar h1{font-size:18px;color:var(--red);letter-spacing:1px}
-  .topbar-right{display:flex;align-items:center;gap:12px}
-  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+  .topbar{background:rgba(0,0,0,0.85);border-bottom:1px solid var(--border);padding:0 14px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+  .topbar-left{display:flex;align-items:center;gap:8px}
+  .topbar h1{font-size:16px;color:var(--red);letter-spacing:1px;font-weight:800}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-  .phase-badge{background:rgba(0,200,83,0.15);border:1px solid rgba(0,200,83,0.3);color:var(--green);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase}
-  .logout-btn{background:transparent;border:1px solid var(--border);width:auto;padding:6px 14px;font-size:12px;border-radius:8px;color:var(--muted)}
-  .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.3);padding:0 20px}
-  .tab{padding:14px 20px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;transition:all 0.2s}
+  .phase-badge{background:rgba(0,200,83,0.15);border:1px solid rgba(0,200,83,0.3);color:var(--green);padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase}
+  .logout-btn{background:transparent;border:1px solid var(--border);width:auto;padding:7px 13px;font-size:12px;border-radius:8px;color:var(--muted)}
+
+  /* TABS — horizontally scrollable */
+  .tabs-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);scrollbar-width:none}
+  .tabs-wrap::-webkit-scrollbar{display:none}
+  .tabs{display:flex;white-space:nowrap;padding:0 8px;min-width:max-content}
+  .tab{display:inline-flex;align-items:center;gap:4px;padding:13px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;transition:all 0.2s;flex-shrink:0}
   .tab.active{color:var(--red);border-bottom-color:var(--red)}
-  .tab:hover:not(.active){color:#f0e6f0}
-  .content{padding:20px;max-width:1100px;margin:0 auto}
+
+  /* CONTENT */
+  .content{padding:14px;max-width:1100px;margin:0 auto}
   .section{display:none}.section.active{display:block}
-  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
-  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;text-align:center}
-  .stat-val{font-size:26px;font-weight:700;color:var(--gold)}
-  .stat-lbl{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
-  .online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);margin-right:5px;vertical-align:middle}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
-  .card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-  .card-title{font-size:13px;font-weight:700;color:#f0e6f0;letter-spacing:1px;text-transform:uppercase}
-  table{width:100%;border-collapse:collapse}
-  th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
-  td{padding:12px 14px;font-size:13px;border-bottom:1px solid rgba(255,30,60,0.08)}
+
+  /* STAT CARDS */
+  .stats-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+  @media(min-width:600px){.stats-row{grid-template-columns:repeat(5,1fr)}}
+  .stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center}
+  .stat-val{font-size:22px;font-weight:700;color:var(--gold)}
+  .stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:0.5px;text-transform:uppercase}
+  .online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);margin-right:4px;vertical-align:middle}
+
+  /* CARD */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
+  .card-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .card-title{font-size:12px;font-weight:700;color:#f0e6f0;letter-spacing:0.5px;text-transform:uppercase}
+
+  /* TABLE (desktop) */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;min-width:500px}
+  th{padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+  td{padding:11px 12px;font-size:13px;border-bottom:1px solid rgba(255,30,60,0.08);white-space:nowrap}
   tr:last-child td{border-bottom:none}
-  tr:hover td{background:rgba(255,26,58,0.05)}
+
+  /* MOBILE CARDS for deposits/withdrawals/users */
+  .m-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin:10px 14px;display:flex;flex-direction:column;gap:8px}
+  .m-card-row{display:flex;justify-content:space-between;align-items:center}
+  .m-card-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+  .m-card-val{font-size:14px;font-weight:700;color:#f0e6f0}
+  .m-card-actions{display:flex;gap:8px;margin-top:4px}
+  .m-card-actions button{flex:1;padding:11px 8px;font-size:13px;border-radius:10px;font-weight:700}
+
+  /* BADGES */
   .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase}
   .badge-bronze{background:rgba(205,127,50,0.2);color:#CD7F32}
   .badge-silver{background:rgba(192,192,192,0.2);color:#C0C0C0}
   .badge-gold{background:rgba(255,215,0,0.2);color:var(--gold)}
   .badge-platinum{background:rgba(0,207,255,0.2);color:#00CFFF}
   .badge-diamond{background:rgba(191,0,255,0.2);color:#BF00FF}
-  .edit-bal{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:#f0e6f0;font-size:12px;width:90px;margin-right:6px}
-  .btn-sm{background:var(--red);border:none;border-radius:6px;padding:5px 12px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;width:auto}
-  .btn-sm.green{background:var(--green)}
-  .btn-sm.blue{background:var(--blue)}
-  .btn-sm:hover{opacity:0.85}
-  .search-row{display:flex;gap:10px;margin-bottom:16px}
-  .search-row input{margin:0;flex:1}
-  .game-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:600px){.game-grid{grid-template-columns:1fr}}
-  .big-val{font-size:42px;font-weight:700;text-align:center;padding:20px 0}
-  .control-row{display:flex;gap:10px;align-items:center;margin-bottom:12px}
-  .control-row input{margin:0;flex:1}
-  .control-row button{width:auto;padding:14px 20px}
-  .toast{position:fixed;bottom:20px;right:20px;background:#222;border:1px solid var(--green);border-radius:10px;padding:12px 18px;font-size:13px;color:var(--green);z-index:999;transform:translateY(100px);transition:transform 0.3s}
-  .toast.show{transform:translateY(0)}
-  .toast.err{border-color:var(--red);color:var(--red)}
-  .tx-type{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase}
-  .tx-deposit{background:rgba(0,200,83,0.15);color:var(--green)}
-  .tx-withdraw{background:rgba(255,107,0,0.15);color:#FF6B00}
-  .tx-bonus{background:rgba(255,215,0,0.15);color:var(--gold)}
-  .tx-bet{background:rgba(255,26,58,0.15);color:var(--red)}
-  .empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
   .wd-pending{background:rgba(255,215,0,0.18);color:var(--gold);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
   .wd-approved{background:rgba(0,200,83,0.18);color:var(--green);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
   .wd-rejected{background:rgba(255,26,58,0.18);color:var(--red);padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
   .bet-active{background:rgba(255,215,0,0.15);color:var(--gold);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
   .bet-cashed{background:rgba(0,200,83,0.15);color:var(--green);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
   .bet-crashed{background:rgba(255,26,58,0.15);color:var(--red);padding:2px 6px;border-radius:5px;font-size:10px;font-weight:700}
-  .action-row{display:flex;gap:6px}
-  .spinner{border:2px solid rgba(255,26,58,0.2);border-top-color:var(--red);border-radius:50%;width:20px;height:20px;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px}
+  .tx-type{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700;text-transform:uppercase}
+  .tx-deposit{background:rgba(0,200,83,0.15);color:var(--green)}
+  .tx-withdraw{background:rgba(255,107,0,0.15);color:#FF6B00}
+  .tx-bonus{background:rgba(255,215,0,0.15);color:var(--gold)}
+  .tx-bet{background:rgba(255,26,58,0.15);color:var(--red)}
+
+  /* BUTTONS */
+  .btn-sm{background:var(--red);border:none;border-radius:8px;padding:7px 14px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;width:auto;white-space:nowrap}
+  .btn-sm.green{background:var(--green);color:#000}
+  .btn-sm.blue{background:var(--blue)}
+  .btn-sm.grey{background:rgba(255,255,255,0.1);color:var(--muted);border:1px solid var(--border)}
+
+  /* SEARCH */
+  .search-row{display:flex;gap:8px;margin-bottom:14px}
+  .search-row input{margin:0;flex:1;padding:12px 14px;font-size:14px}
+  .search-row .btn-sm{padding:12px 16px;font-size:13px}
+
+  /* SELECT */
+  select{background:#111;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:#f0e6f0;font-size:13px;outline:none;-webkit-appearance:none}
+
+  /* GAME GRID */
+  .game-grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:700px){.game-grid{grid-template-columns:1fr 1fr}}
+  .big-val{font-size:48px;font-weight:700;text-align:center;padding:16px 0}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(120px);background:#1a0020;border:1px solid var(--green);border-radius:12px;padding:12px 20px;font-size:14px;color:var(--green);z-index:999;transition:transform 0.3s;text-align:center;max-width:90vw;white-space:nowrap}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:var(--red);color:var(--red)}
+
+  /* MISC */
+  .empty{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+  .spinner{border:2px solid rgba(255,26,58,0.2);border-top-color:var(--red);border-radius:50%;width:18px;height:18px;animation:spin 0.7s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .info-bar{padding:10px 14px;background:rgba(0,200,83,0.05);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.5}
+
+  /* USER CARD mobile */
+  .user-m-card{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+  .user-m-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+  .user-m-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;text-align:center}
+  .user-m-stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;margin-bottom:2px}
+  .user-m-stat-val{font-size:13px;font-weight:700}
+  .user-m-adjust{display:flex;gap:8px;align-items:center}
+  .user-m-adjust input{flex:1;margin:0;padding:10px 12px;font-size:14px}
+  .user-m-adjust button{padding:10px 16px;font-size:13px;border-radius:10px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -112,7 +158,7 @@ router.get("/admin", (_req, res) => {
     <div class="logo">🚀</div>
     <h1>BLAZE</h1>
     <p>Admin Control Panel</p>
-    <input type="password" id="pw" placeholder="Enter admin secret key" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <input type="password" id="pw" placeholder="Secret key" onkeydown="if(event.key==='Enter')doLogin()" autocomplete="current-password"/>
     <button onclick="doLogin()" id="loginBtn">SIGN IN</button>
     <div class="err" id="loginErr"></div>
   </div>
@@ -120,22 +166,26 @@ router.get("/admin", (_req, res) => {
 
 <div id="app">
   <div class="topbar">
-    <h1>🚀 BLAZE ADMIN</h1>
-    <div class="topbar-right">
+    <div class="topbar-left">
       <div class="live-dot"></div>
-      <span class="phase-badge" id="phaseBadge">WAITING</span>
-      <span style="color:var(--muted);font-size:13px" id="liveMultText">—</span>
-      <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+      <h1>🚀 BLAZE ADMIN</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="phase-badge" id="phaseBadge">—</span>
+      <span style="color:var(--muted);font-size:12px;font-weight:700" id="liveMultText">—</span>
+      <button class="logout-btn" onclick="doLogout()">Out</button>
     </div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('overview')">Overview</div>
-    <div class="tab" onclick="switchTab('users')">Users</div>
-    <div class="tab" onclick="switchTab('transactions')">Transactions</div>
-    <div class="tab" onclick="switchTab('deposits')">Deposits <span id="depBadge" style="background:var(--green);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;display:none"></span></div>
-    <div class="tab" onclick="switchTab('withdrawals')">Withdrawals <span id="wdBadge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;display:none"></span></div>
-    <div class="tab" onclick="switchTab('game')">Game Control</div>
+  <div class="tabs-wrap">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('overview')">📊 Overview</div>
+      <div class="tab" onclick="switchTab('deposits')">💰 Deposits <span id="depBadge" style="background:var(--green);color:#000;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:2px;display:none"></span></div>
+      <div class="tab" onclick="switchTab('withdrawals')">💸 Withdrawals <span id="wdBadge" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:2px;display:none"></span></div>
+      <div class="tab" onclick="switchTab('users')">👥 Users</div>
+      <div class="tab" onclick="switchTab('transactions')">📋 Transactions</div>
+      <div class="tab" onclick="switchTab('game')">🎮 Game</div>
+    </div>
   </div>
 
   <div class="content">
@@ -143,51 +193,27 @@ router.get("/admin", (_req, res) => {
     <!-- OVERVIEW -->
     <div class="section active" id="tab-overview">
       <div class="stats-row" id="overviewStats">
-        <div class="stat-card"><div class="stat-val" id="st-users">—</div><div class="stat-lbl">Total Users</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-online" style="color:var(--green)">—</div><div class="stat-lbl">🟢 Online Now</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-balance">—</div><div class="stat-lbl">Total Balance</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-wagered">—</div><div class="stat-lbl">Total Wagered</div></div>
-        <div class="stat-card"><div class="stat-val" id="st-deposits">—</div><div class="stat-lbl">Total Deposits</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-users">—</div><div class="stat-lbl">Users</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-online" style="color:var(--green)">—</div><div class="stat-lbl">🟢 Online</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-balance">—</div><div class="stat-lbl">Balance</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-wagered">—</div><div class="stat-lbl">Wagered</div></div>
+        <div class="stat-card"><div class="stat-val" id="st-deposits">—</div><div class="stat-lbl">Deposits</div></div>
       </div>
+
+      <!-- Live state mini card -->
       <div class="card">
-        <div class="card-header"><span class="card-title">Live Game State</span><button class="btn-sm blue" onclick="loadOverview()">Refresh</button></div>
-        <div style="padding:20px">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center">
-            <div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Phase</div><div style="font-size:18px;font-weight:700;color:var(--gold)" id="gamePhase">—</div></div>
-            <div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Multiplier</div><div style="font-size:18px;font-weight:700;color:var(--red)" id="gameMult">—</div></div>
-            <div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Active Bets</div><div style="font-size:18px;font-weight:700;color:var(--green)" id="gameActiveBets">—</div></div>
-          </div>
+        <div class="card-header"><span class="card-title">Live Game</span><button class="btn-sm blue" onclick="loadOverview()">Refresh</button></div>
+        <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+          <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Phase</div><div style="font-size:16px;font-weight:700;color:var(--gold)" id="gamePhase">—</div></div>
+          <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Mult</div><div style="font-size:16px;font-weight:700;color:var(--red)" id="gameMult">—</div></div>
+          <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">Active Bets</div><div style="font-size:16px;font-weight:700;color:var(--green)" id="gameActiveBets">—</div></div>
         </div>
       </div>
+
+      <!-- Recent Transactions -->
       <div class="card">
         <div class="card-header"><span class="card-title">Recent Transactions</span></div>
-        <table><thead><tr><th>User</th><th>Type</th><th>Amount</th><th>Note</th><th>Time</th></tr></thead>
-        <tbody id="recentTxTable"><tr><td colspan="5" class="empty">Loading...</td></tr></tbody></table>
-      </div>
-    </div>
-
-    <!-- USERS -->
-    <div class="section" id="tab-users">
-      <div class="search-row">
-        <input type="text" id="userSearch" placeholder="Search by username..." oninput="filterUsers()" />
-        <button class="btn-sm blue" onclick="loadUsers()" style="padding:14px 18px">Refresh</button>
-      </div>
-      <div class="card">
-        <table>
-          <thead><tr><th>#</th><th>Status</th><th>Username</th><th>Email</th><th>Balance</th><th>Wins</th><th>Losses</th><th>Wagered</th><th>VIP</th><th>Joined</th><th>Action</th></tr></thead>
-          <tbody id="userTable"><tr><td colspan="11" class="empty">Loading...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- TRANSACTIONS -->
-    <div class="section" id="tab-transactions">
-      <div class="card">
-        <div class="card-header"><span class="card-title">All Transactions</span><button class="btn-sm blue" onclick="loadTransactions()">Refresh</button></div>
-        <table>
-          <thead><tr><th>ID</th><th>User ID</th><th>Type</th><th>Amount</th><th>Note</th><th>Status</th><th>Time</th></tr></thead>
-          <tbody id="txTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
-        </table>
+        <div id="recentTxList" style="padding:4px 0"></div>
       </div>
     </div>
 
@@ -196,24 +222,19 @@ router.get("/admin", (_req, res) => {
       <div class="card">
         <div class="card-header">
           <span class="card-title">💰 Deposit Verification</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select id="depFilter" onchange="loadDeposits()" style="background:#111;border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:#f0e6f0;font-size:12px">
-              <option value="admin_pending" selected>Pending Approval</option>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="depFilter" onchange="loadDeposits()">
+              <option value="admin_pending" selected>Pending</option>
               <option value="completed">Approved</option>
               <option value="rejected">Rejected</option>
               <option value="all">All</option>
             </select>
-            <button class="btn-sm blue" onclick="loadDeposits()" style="padding:6px 14px">Refresh</button>
+            <button class="btn-sm blue" onclick="loadDeposits()">↻</button>
           </div>
         </div>
-        <div style="padding:12px 18px;background:rgba(0,200,83,0.05);border-bottom:1px solid var(--border)">
-          <p style="color:var(--muted);font-size:12px">⚠️ Pehle apne PhonePe/GPay mein UTR number verify karo, phir Approve karo. Approve karne ke baad user ka balance credit hoga.</p>
-        </div>
-        <table>
-          <thead><tr><th>#</th><th>User</th><th>Amount</th><th>UTR / Note</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
-          <tbody id="depTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
-        </table>
+        <div class="info-bar">⚠️ PhonePe/GPay mein UTR verify karke hi Approve karo</div>
       </div>
+      <div id="depList"></div>
     </div>
 
     <!-- WITHDRAWALS -->
@@ -221,20 +242,39 @@ router.get("/admin", (_req, res) => {
       <div class="card">
         <div class="card-header">
           <span class="card-title">💸 Withdrawal Requests</span>
-          <div style="display:flex;gap:8px;align-items:center">
-            <select id="wdFilter" onchange="loadWithdrawals()" style="background:#111;border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:#f0e6f0;font-size:12px">
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="wdFilter" onchange="loadWithdrawals()">
+              <option value="pending" selected>Pending</option>
               <option value="all">All</option>
-              <option value="pending" selected>Pending Only</option>
               <option value="completed">Approved</option>
               <option value="rejected">Rejected</option>
             </select>
-            <button class="btn-sm blue" onclick="loadWithdrawals()" style="padding:6px 14px">Refresh</button>
+            <button class="btn-sm blue" onclick="loadWithdrawals()">↻</button>
           </div>
         </div>
-        <table>
-          <thead><tr><th>#</th><th>User</th><th>Amount</th><th>UPI ID</th><th>Status</th><th>Requested</th><th>Action</th></tr></thead>
-          <tbody id="wdTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
-        </table>
+      </div>
+      <div id="wdList"></div>
+    </div>
+
+    <!-- USERS -->
+    <div class="section" id="tab-users">
+      <div class="search-row">
+        <input type="text" id="userSearch" placeholder="Search username..." oninput="filterUsers()" />
+        <button class="btn-sm blue" onclick="loadUsers()">↻</button>
+      </div>
+      <div id="userList"></div>
+    </div>
+
+    <!-- TRANSACTIONS -->
+    <div class="section" id="tab-transactions">
+      <div class="card">
+        <div class="card-header"><span class="card-title">All Transactions</span><button class="btn-sm blue" onclick="loadTransactions()">↻ Refresh</button></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>User</th><th>Type</th><th>Amount</th><th>Note</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody id="txTable"><tr><td colspan="7" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -242,44 +282,37 @@ router.get("/admin", (_req, res) => {
     <div class="section" id="tab-game">
       <div class="game-grid">
 
-        <!-- ROUND SCHEDULER -->
         <div class="card" style="grid-column:1/-1">
-          <div class="card-header" style="justify-content:space-between">
-            <span class="card-title">🗓️ Round Scheduler — Agle 10 Rounds</span>
-            <span id="queueStatus" style="font-size:12px;color:var(--muted)">Queue: 0 rounds</span>
+          <div class="card-header">
+            <span class="card-title">🗓️ Round Scheduler</span>
+            <span id="queueStatus" style="font-size:11px;color:var(--muted)">Queue: 0</span>
           </div>
-          <div style="padding:18px">
-            <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Har round ka blast point set karo. Blank rounds auto (random) honge. Save karne ke baad queue active ho jaata hai.</p>
-
-            <div id="schedulerRows" style="display:flex;flex-direction:column;gap:10px"></div>
-
-            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-              <button onclick="saveSchedule()" style="flex:1;min-width:140px;background:var(--red);color:#fff;border:none;border-radius:10px;padding:13px 20px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.5px">✅ Save &amp; Queue</button>
-              <button onclick="clearSchedule()" style="background:rgba(255,255,255,0.07);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:13px 20px;font-size:13px;font-weight:600;cursor:pointer">🗑️ Clear All</button>
+          <div style="padding:16px">
+            <p style="color:var(--muted);font-size:12px;margin-bottom:14px;line-height:1.5">Har round ka blast point set karo. Blank = auto random.</p>
+            <div id="schedulerRows" style="display:flex;flex-direction:column;gap:8px"></div>
+            <div style="display:flex;gap:8px;margin-top:16px">
+              <button onclick="saveSchedule()" style="flex:1;background:var(--red);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:700;cursor:pointer">✅ Save & Queue</button>
+              <button onclick="clearSchedule()" style="background:rgba(255,255,255,0.07);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:13px;cursor:pointer">🗑️</button>
             </div>
             <div id="scheduleMsg" style="margin-top:10px;font-size:13px;font-weight:600"></div>
           </div>
         </div>
 
-        <!-- LIVE GAME -->
         <div class="card">
           <div class="card-header"><span class="card-title">Live Game</span></div>
-          <div style="padding:18px">
-            <div id="liveGameCard">
-              <div class="big-val" id="liveMult" style="color:var(--red)">—</div>
-              <div style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:16px" id="livePhaseText">—</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
-                <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Round ID</div><div style="font-weight:700;font-size:15px" id="liveRoundId">—</div></div>
-                <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px">Crash Point</div><div style="font-weight:700;font-size:15px;color:var(--red)" id="liveCrashPoint">—</div></div>
-              </div>
+          <div style="padding:16px">
+            <div class="big-val" id="liveMult" style="color:var(--red)">—</div>
+            <div style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:14px" id="livePhaseText">—</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
+              <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Round ID</div><div style="font-weight:700;font-size:14px;margin-top:4px" id="liveRoundId">—</div></div>
+              <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Crash Point</div><div style="font-weight:700;font-size:14px;color:var(--red);margin-top:4px" id="liveCrashPoint">—</div></div>
             </div>
           </div>
         </div>
 
-        <!-- CURRENT QUEUE PREVIEW -->
         <div class="card">
           <div class="card-header"><span class="card-title">📋 Active Queue</span></div>
-          <div style="padding:18px">
+          <div style="padding:16px">
             <div id="activeQueueList" style="display:flex;flex-direction:column;gap:6px">
               <div style="color:var(--muted);font-size:12px">Loading...</div>
             </div>
@@ -287,16 +320,12 @@ router.get("/admin", (_req, res) => {
         </div>
       </div>
 
-      <!-- LIVE BETS -->
-      <div class="card" style="margin-top:16px">
+      <div class="card" style="margin-top:14px">
         <div class="card-header">
-          <span class="card-title">🎯 Live Bets This Round</span>
+          <span class="card-title">🎯 Live Bets</span>
           <span style="color:var(--muted);font-size:11px" id="liveBetsCount">0 bets</span>
         </div>
-        <table>
-          <thead><tr><th>Player</th><th>Bet Amount</th><th>Status</th><th>Cashout At</th><th>Win Amount</th></tr></thead>
-          <tbody id="liveBetsTable"><tr><td colspan="5" class="empty">Waiting for bets...</td></tr></tbody>
-        </table>
+        <div id="liveBetsList" style="padding:4px 0"></div>
       </div>
     </div>
 
@@ -313,7 +342,7 @@ function toast(msg, isErr=false) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast' + (isErr?' err':'');
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() => t.classList.remove('show'), 2800);
 }
 
 async function api(path, opts={}) {
@@ -350,7 +379,8 @@ function doLogout() {
 }
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['overview','users','transactions','deposits','withdrawals','game'][i]===name));
+  const names = ['overview','deposits','withdrawals','users','transactions','game'];
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'deposits') loadDeposits();
@@ -372,7 +402,7 @@ function timeAgo(iso) {
 async function loadOverview() {
   try {
     const [stats, snap, txs] = await Promise.all([
-      api('/api/admin/stats'), api('/api/admin/game'), api('/api/admin/transactions?limit=8')
+      api('/api/admin/stats'), api('/api/admin/game'), api('/api/admin/transactions?limit=10')
     ]);
     document.getElementById('st-users').textContent = stats.totalUsers;
     document.getElementById('st-online').textContent = stats.onlineUsers ?? snap.clientCount ?? 0;
@@ -382,14 +412,18 @@ async function loadOverview() {
     document.getElementById('gamePhase').textContent = snap.phase.toUpperCase();
     document.getElementById('gameMult').textContent = snap.mult.toFixed(2)+'x';
     document.getElementById('gameActiveBets').textContent = snap.activeBets;
-    const tbody = document.getElementById('recentTxTable');
-    tbody.innerHTML = txs.length ? txs.map(t => \`<tr>
-      <td style="color:#aaa">#\${t.userId}</td>
-      <td><span class="tx-type tx-\${t.type}">\${t.type}</span></td>
-      <td style="color:var(--gold)">\${fmtAmt(t.amount)}</td>
-      <td style="color:#aaa;font-size:11px">\${t.note||'—'}</td>
-      <td style="color:#666;font-size:11px">\${timeAgo(t.createdAt)}</td>
-    </tr>\`).join('') : '<tr><td colspan="5" class="empty">No transactions</td></tr>';
+    const list = document.getElementById('recentTxList');
+    list.innerHTML = txs.length ? txs.map(t => \`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,30,60,0.07)">
+        <div>
+          <div style="font-size:13px;font-weight:700">#\${t.userId} <span class="tx-type tx-\${t.type}">\${t.type}</span></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">\${t.note||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:var(--gold);font-weight:700">\${fmtAmt(t.amount)}</div>
+          <div style="font-size:11px;color:#555">\${timeAgo(t.createdAt)}</div>
+        </div>
+      </div>\`).join('') : '<div class="empty">No transactions</div>';
   } catch(e) { toast(e.message, true); }
 }
 
@@ -401,23 +435,34 @@ async function loadUsers() {
 }
 
 function renderUsers(list) {
-  const tbody = document.getElementById('userTable');
-  tbody.innerHTML = list.length ? list.map(u => \`<tr>
-    <td style="color:#666;font-size:11px">#\${u.id}</td>
-    <td>\${u.online ? '<span class="online-dot"></span><span style="color:var(--green);font-size:10px;font-weight:700">ONLINE</span>' : '<span style="color:#555;font-size:10px">offline</span>'}</td>
-    <td style="font-weight:700">\${u.username}</td>
-    <td style="color:#aaa;font-size:11px;font-family:monospace">\${u.email || '—'}</td>
-    <td style="color:var(--gold);font-weight:700">\${fmtAmt(u.balance)}</td>
-    <td style="color:var(--green)">\${u.totalWins}</td>
-    <td style="color:var(--red)">\${u.totalLosses}</td>
-    <td style="color:#aaa">\${fmtAmt(u.totalWagered)}</td>
-    <td><span class="badge badge-\${u.vipLevel.toLowerCase()}">\${u.vipLevel}</span></td>
-    <td style="color:#666;font-size:11px">\${timeAgo(u.createdAt)}</td>
-    <td>
-      <input class="edit-bal" type="number" id="bal_\${u.id}" placeholder="±amount" />
-      <button class="btn-sm green" onclick="adjustBalance(\${u.id}, '\${u.username}')">Adjust</button>
-    </td>
-  </tr>\`).join('') : '<tr><td colspan="11" class="empty">No users found</td></tr>';
+  const container = document.getElementById('userList');
+  if (!list.length) { container.innerHTML = '<div class="empty">No users found</div>'; return; }
+  container.innerHTML = list.map(u => \`
+    <div class="user-m-card">
+      <div class="user-m-top">
+        <div>
+          <div style="font-size:15px;font-weight:800">\${u.username}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">\${u.email||'—'}</div>
+          <div style="margin-top:5px;display:flex;gap:6px;align-items:center">
+            <span class="badge badge-\${u.vipLevel.toLowerCase()}">\${u.vipLevel}</span>
+            \${u.online ? '<span style="color:var(--green);font-size:10px;font-weight:700">🟢 ONLINE</span>' : '<span style="font-size:10px;color:#555">offline</span>'}
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:800;color:var(--gold)">\${fmtAmt(u.balance)}</div>
+          <div style="font-size:10px;color:#555;margin-top:2px">\${timeAgo(u.createdAt)}</div>
+        </div>
+      </div>
+      <div class="user-m-stats">
+        <div><div class="user-m-stat-lbl">Wins</div><div class="user-m-stat-val" style="color:var(--green)">\${u.totalWins}</div></div>
+        <div><div class="user-m-stat-lbl">Losses</div><div class="user-m-stat-val" style="color:var(--red)">\${u.totalLosses}</div></div>
+        <div><div class="user-m-stat-lbl">Wagered</div><div class="user-m-stat-val">\${fmtAmt(u.totalWagered)}</div></div>
+      </div>
+      <div class="user-m-adjust">
+        <input type="number" id="bal_\${u.id}" placeholder="±amount e.g. 500" />
+        <button class="btn-sm green" onclick="adjustBalance(\${u.id}, '\${u.username}')">Adjust Balance</button>
+      </div>
+    </div>\`).join('');
 }
 
 function filterUsers() {
@@ -475,27 +520,38 @@ async function loadDeposits() {
   const url = filter === 'all' ? '/api/admin/deposits' : \`/api/admin/deposits?status=\${filter}\`;
   try {
     const rows = await api(url);
-    const tbody = document.getElementById('depTable');
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Koi pending deposit nahi hai</td></tr>'; return; }
-    tbody.innerHTML = rows.map(d => {
+    const list = document.getElementById('depList');
+    if (!rows.length) { list.innerHTML = '<div class="empty">Koi deposit nahi hai</div>'; return; }
+    list.innerHTML = rows.map(d => {
       const note = d.note || '—';
       const utrMatch = note.match(/UTR:\\s*([\\w]+)/);
-      const utr = utrMatch ? \`<span style="font-family:monospace;color:var(--gold);font-size:12px;background:rgba(255,215,0,0.1);padding:2px 6px;border-radius:4px">\${utrMatch[1]}</span>\` : \`<span style="color:#666">\${note}</span>\`;
-      const actions = d.status === 'admin_pending' ? \`<div class="action-row">
-        <button class="btn-sm green" onclick="approveDeposit(\${d.id})">✓ Approve</button>
-        <button class="btn-sm" style="background:#555" onclick="rejectDeposit(\${d.id})">✗ Reject</button>
-      </div>\` : '—';
+      const utrDisplay = utrMatch
+        ? \`<span style="font-family:monospace;font-size:13px;font-weight:700;color:var(--gold);background:rgba(255,215,0,0.1);padding:3px 8px;border-radius:6px">\${utrMatch[1]}</span>\`
+        : \`<span style="color:#888;font-size:12px">\${note.slice(0,40)}</span>\`;
       const statusCls = d.status === 'admin_pending' ? 'wd-pending' : d.status === 'completed' ? 'wd-approved' : 'wd-rejected';
       const statusLabel = d.status === 'admin_pending' ? '⏳ Pending' : d.status === 'completed' ? '✓ Approved' : '✗ Rejected';
-      return \`<tr>
-        <td style="color:#666">#\${d.id}</td>
-        <td style="font-weight:700">\${d.username || '#'+d.userId}</td>
-        <td style="color:var(--green);font-weight:700;font-size:15px">\${fmtAmt(d.amount)}</td>
-        <td>\${utr}</td>
-        <td><span class="\${statusCls}">\${statusLabel}</span></td>
-        <td style="color:#666;font-size:11px">\${timeAgo(d.createdAt)}</td>
-        <td>\${actions}</td>
-      </tr>\`;
+      const actions = d.status === 'admin_pending' ? \`
+        <div class="m-card-actions">
+          <button class="btn-sm green" style="padding:12px;font-size:14px;border-radius:10px" onclick="approveDeposit(\${d.id})">✓ Approve</button>
+          <button class="btn-sm grey" style="padding:12px;font-size:14px;border-radius:10px" onclick="rejectDeposit(\${d.id})">✗ Reject</button>
+        </div>\` : '';
+      return \`<div class="m-card">
+        <div class="m-card-row">
+          <div>
+            <div style="font-size:16px;font-weight:800">\${d.username || '#'+d.userId}</div>
+            <div style="font-size:11px;color:#555;margin-top:2px">#\${d.id} · \${timeAgo(d.createdAt)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:800;color:var(--green)">\${fmtAmt(d.amount)}</div>
+            <span class="\${statusCls}">\${statusLabel}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0 2px">
+          <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">UTR:</span>
+          \${utrDisplay}
+        </div>
+        \${actions}
+      </div>\`;
     }).join('');
     loadDepositsBadge();
   } catch(e) { toast(e.message, true); }
@@ -524,25 +580,34 @@ async function loadWithdrawals() {
   const url = filter === 'all' ? '/api/admin/withdrawals' : \`/api/admin/withdrawals?status=\${filter}\`;
   try {
     const rows = await api(url);
-    const tbody = document.getElementById('wdTable');
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No withdrawal requests found</td></tr>'; return; }
-    tbody.innerHTML = rows.map(w => {
+    const list = document.getElementById('wdList');
+    if (!rows.length) { list.innerHTML = '<div class="empty">No withdrawal requests</div>'; return; }
+    list.innerHTML = rows.map(w => {
       const upi = (w.note || '').replace('Withdrawal to ', '') || '—';
-      const actions = w.status === 'pending' ? \`<div class="action-row">
-        <button class="btn-sm green" onclick="approveWithdraw(\${w.id})">✓ Approve</button>
-        <button class="btn-sm" style="background:#555" onclick="rejectWithdraw(\${w.id})">✗ Reject</button>
-      </div>\` : '—';
       const statusCls = w.status === 'pending' ? 'wd-pending' : w.status === 'completed' ? 'wd-approved' : 'wd-rejected';
       const statusLabel = w.status === 'pending' ? '⏳ Pending' : w.status === 'completed' ? '✓ Approved' : '✗ Rejected';
-      return \`<tr>
-        <td style="color:#666">#\${w.id}</td>
-        <td style="font-weight:700">\${w.username || '#'+w.userId}</td>
-        <td style="color:var(--gold);font-weight:700">\${fmtAmt(w.amount)}</td>
-        <td style="color:#aaa;font-family:monospace;font-size:12px">\${upi}</td>
-        <td><span class="\${statusCls}">\${statusLabel}</span></td>
-        <td style="color:#666;font-size:11px">\${timeAgo(w.createdAt)}</td>
-        <td>\${actions}</td>
-      </tr>\`;
+      const actions = w.status === 'pending' ? \`
+        <div class="m-card-actions">
+          <button class="btn-sm green" style="padding:12px;font-size:14px;border-radius:10px" onclick="approveWithdraw(\${w.id})">✓ Approve</button>
+          <button class="btn-sm grey" style="padding:12px;font-size:14px;border-radius:10px" onclick="rejectWithdraw(\${w.id})">✗ Reject</button>
+        </div>\` : '';
+      return \`<div class="m-card">
+        <div class="m-card-row">
+          <div>
+            <div style="font-size:16px;font-weight:800">\${w.username || '#'+w.userId}</div>
+            <div style="font-size:11px;color:#555;margin-top:2px">#\${w.id} · \${timeAgo(w.createdAt)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:800;color:var(--gold)">\${fmtAmt(w.amount)}</div>
+            <span class="\${statusCls}">\${statusLabel}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0 2px">
+          <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">UPI:</span>
+          <span style="font-family:monospace;font-size:13px;color:#aaa">\${upi}</span>
+        </div>
+        \${actions}
+      </div>\`;
     }).join('');
     loadWithdrawalsBadge();
   } catch(e) { toast(e.message, true); }
@@ -685,25 +750,31 @@ function startLivePoll() {
     } catch(_){}
   }
   function renderLiveBets(bets) {
-    const tbody = document.getElementById('liveBetsTable');
+    const list = document.getElementById('liveBetsList');
     const count = document.getElementById('liveBetsCount');
     if (!bets || !bets.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">No bets this round</td></tr>';
+      list.innerHTML = '<div class="empty">No bets this round</div>';
       count.textContent = '0 bets'; return;
     }
     count.textContent = bets.length + ' bet' + (bets.length !== 1 ? 's' : '');
-    tbody.innerHTML = bets.map(b => {
+    list.innerHTML = bets.map(b => {
       const stCls = b.status === 'active' ? 'bet-active' : b.status === 'cashed' ? 'bet-cashed' : 'bet-crashed';
       const stLabel = b.status === 'active' ? '🟡 Flying' : b.status === 'cashed' ? '✅ Cashed' : '💥 Crashed';
       const cashoutAt = b.cashout ? b.cashout.toFixed(2) + 'x' : '—';
-      const winAmt = b.winAmount > 0 ? '<span style="color:var(--green)">+' + fmtAmt(b.winAmount) + '</span>' : '—';
-      return \`<tr>
-        <td style="font-weight:700">\${b.user}</td>
-        <td style="color:var(--gold)">\${fmtAmt(b.amount)}</td>
-        <td><span class="\${stCls}">\${stLabel}</span></td>
-        <td style="color:#4DA6FF;font-weight:700">\${cashoutAt}</td>
-        <td>\${winAmt}</td>
-      </tr>\`;
+      const winAmt = b.winAmount > 0 ? \`<span style="color:var(--green);font-weight:700">+\${fmtAmt(b.winAmount)}</span>\` : '—';
+      return \`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,30,60,0.07)">
+        <div>
+          <div style="font-weight:700;font-size:14px">\${b.user}</div>
+          <div style="margin-top:3px"><span class="\${stCls}">\${stLabel}</span></div>
+        </div>
+        <div style="text-align:right">
+          <div style="color:var(--gold);font-weight:700">\${fmtAmt(b.amount)}</div>
+          <div style="font-size:12px;margin-top:2px">
+            \${b.cashout ? '<span style="color:var(--blue);font-weight:700">@'+cashoutAt+'</span>' : ''}
+            \${winAmt !== '—' ? winAmt : ''}
+          </div>
+        </div>
+      </div>\`;
     }).join('');
   }
 
