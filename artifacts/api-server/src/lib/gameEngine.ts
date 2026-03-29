@@ -383,7 +383,7 @@ async function startFlight() {
     }
 
     broadcast(statePayload());
-    if (ENG.mult >= ENG.crashPoint) await doCrash();
+    if (consumeCrashNow() || ENG.mult >= ENG.crashPoint) await doCrash();
   }, 100);
 }
 
@@ -609,4 +609,11 @@ export function setForcedCrash(point: number | null) {
 }
 export function consumeForcedCrash(): number | null {
   return _crashQueue.length > 0 ? _crashQueue.shift()! : null;
+}
+
+let _crashNow = false;
+export function triggerCrashNow() { _crashNow = true; }
+export function consumeCrashNow(): boolean {
+  if (_crashNow) { _crashNow = false; return true; }
+  return false;
 }

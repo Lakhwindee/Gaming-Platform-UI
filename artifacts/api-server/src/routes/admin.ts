@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, transactionsTable } from "@workspace/db/schema";
+import { usersTable, transactionsTable, gameRoundsTable } from "@workspace/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
-import { getEngineSnapshot, setForcedCrash, setCrashQueue, getCrashQueue, getOnlineUserIds, getOnlineStats } from "../lib/gameEngine";
+import { getEngineSnapshot, setForcedCrash, setCrashQueue, getCrashQueue, getOnlineUserIds, getOnlineStats, triggerCrashNow } from "../lib/gameEngine";
 
 const router = Router();
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "blaze-admin-2025";
@@ -299,14 +299,16 @@ router.get("/admin", (_req, res) => {
         </div>
 
         <div class="card">
-          <div class="card-header"><span class="card-title">Live Game</span></div>
+          <div class="card-header"><span class="card-title">⚡ Live Game</span></div>
           <div style="padding:16px">
             <div class="big-val" id="liveMult" style="color:var(--red)">—</div>
             <div style="text-align:center;color:var(--muted);font-size:12px;margin-bottom:14px" id="livePhaseText">—</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;margin-bottom:14px">
               <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Round ID</div><div style="font-weight:700;font-size:14px;margin-top:4px" id="liveRoundId">—</div></div>
-              <div><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px">Crash Point</div><div style="font-weight:700;font-size:14px;color:var(--red);margin-top:4px" id="liveCrashPoint">—</div></div>
+              <div style="background:rgba(255,30,60,0.12);border-radius:10px;padding:8px 4px"><div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px">🎯 Crash Point</div><div style="font-weight:900;font-size:18px;color:var(--red);margin-top:4px" id="liveCrashPoint">—</div></div>
             </div>
+            <button id="crashNowBtn" onclick="crashNow()" disabled style="width:100%;background:linear-gradient(135deg,#ff1e1e,#cc0000);color:#fff;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:900;cursor:pointer;letter-spacing:0.5px;opacity:0.4;transition:opacity 0.2s">💥 CRASH NOW</button>
+            <div id="crashNowMsg" style="margin-top:8px;font-size:12px;text-align:center;color:var(--muted)"></div>
           </div>
         </div>
 
@@ -326,6 +328,19 @@ router.get("/admin", (_req, res) => {
           <span style="color:var(--muted);font-size:11px" id="liveBetsCount">0 bets</span>
         </div>
         <div id="liveBetsList" style="padding:4px 0"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="card-header">
+          <span class="card-title">📊 Recent Rounds (Crash History)</span>
+          <button class="btn-sm blue" onclick="loadRecentRounds()">↻</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Round #</th><th>Crash Point</th><th>Status</th><th>Time</th></tr></thead>
+            <tbody id="recentRoundsTable"><tr><td colspan="4" class="empty">Loading...</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -742,11 +757,54 @@ async function loadQueueStatus() {
   } catch(_){}
 }
 
+async function crashNow() {
+  const btn = document.getElementById('crashNowBtn');
+  const msg = document.getElementById('crashNowMsg');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/admin/game/crash-now', { method: 'POST', body: JSON.stringify({}) });
+    msg.style.color = 'var(--green)';
+    msg.textContent = '💥 Crashed at ' + (r.crashedAt ? r.crashedAt.toFixed(2)+'x' : '—');
+    setTimeout(() => { msg.textContent = ''; }, 4000);
+  } catch(e) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = e.message || 'Error';
+    setTimeout(() => { msg.textContent = ''; btn.disabled = false; }, 3000);
+  }
+}
+
+async function loadRecentRounds() {
+  try {
+    const data = await api('/api/admin/game/recent-rounds');
+    const tbody = document.getElementById('recentRoundsTable');
+    if (!data.rounds || !data.rounds.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty">No rounds yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.rounds.map(r => {
+      const cp = parseFloat(r.crashPoint);
+      const cpColor = cp < 2 ? 'var(--red)' : cp < 10 ? 'var(--blue)' : 'var(--green)';
+      const time = r.crashedAt ? new Date(r.crashedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : (r.startedAt ? new Date(r.startedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—');
+      const stBadge = r.status === 'crashed' ? '<span class="status-badge rejected">Crashed</span>' : r.status === 'flying' ? '<span class="status-badge pending">Flying</span>' : '<span class="status-badge pending">Waiting</span>';
+      return \`<tr>
+        <td style="font-weight:700">#\${r.id}</td>
+        <td><span style="font-weight:900;font-size:16px;color:\${cpColor}">\${cp.toFixed(2)}x</span></td>
+        <td>\${stBadge}</td>
+        <td style="color:var(--muted);font-size:12px">\${time}</td>
+      </tr>\`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('recentRoundsTable').innerHTML = '<tr><td colspan="4" class="empty">Error loading</td></tr>';
+  }
+}
+
 function startLivePoll() {
+  loadRecentRounds();
   async function poll() {
     try {
       const snap = await api('/api/admin/game');
-      const col = snap.phase==='flying' ? 'var(--red)' : snap.phase==='crashed' ? '#FF6B00' : 'var(--muted)';
+      const isFlying = snap.phase === 'flying';
+      const col = isFlying ? 'var(--red)' : snap.phase==='crashed' ? '#FF6B00' : 'var(--muted)';
       document.getElementById('liveMult').style.color = col;
       document.getElementById('liveMult').textContent = snap.mult.toFixed(2)+'x';
       document.getElementById('livePhaseText').textContent = snap.phase.toUpperCase() + (snap.phase==='waiting'?' — '+snap.countdown+'s':'');
@@ -755,6 +813,11 @@ function startLivePoll() {
       document.getElementById('phaseBadge').textContent = snap.phase.toUpperCase();
       document.getElementById('phaseBadge').style.color = col;
       document.getElementById('liveMultText').textContent = snap.mult.toFixed(2)+'x';
+      const crashBtn = document.getElementById('crashNowBtn');
+      crashBtn.disabled = !isFlying;
+      crashBtn.style.opacity = isFlying ? '1' : '0.4';
+      crashBtn.style.cursor = isFlying ? 'pointer' : 'not-allowed';
+      if (snap.phase === 'crashed') loadRecentRounds();
       renderLiveBets(snap.allBets || []);
     } catch(_){}
   }
@@ -1096,6 +1159,32 @@ router.post("/admin/crash-queue", (req, res) => {
     .slice(0, 10);
   setCrashQueue(valid);
   res.json({ ok: true, queued: valid.length, queue: valid });
+});
+
+router.post("/admin/game/crash-now", (req, res) => {
+  if (!checkAuth(req, res)) return;
+  const snap = getEngineSnapshot();
+  if (snap.phase !== 'flying') return res.status(400).json({ error: "Game is not flying right now" });
+  triggerCrashNow();
+  res.json({ ok: true, crashedAt: snap.mult });
+});
+
+router.get("/admin/game/recent-rounds", async (req, res) => {
+  if (!checkAuth(req, res)) return;
+  try {
+    const rows = await db.select({
+      id: gameRoundsTable.id,
+      crashPoint: gameRoundsTable.crashPoint,
+      status: gameRoundsTable.status,
+      startedAt: gameRoundsTable.startedAt,
+      crashedAt: gameRoundsTable.crashedAt,
+    }).from(gameRoundsTable)
+      .orderBy(desc(gameRoundsTable.id))
+      .limit(20);
+    res.json({ rounds: rows });
+  } catch (e) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 export default router;
