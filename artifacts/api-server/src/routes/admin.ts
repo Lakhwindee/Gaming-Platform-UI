@@ -337,6 +337,7 @@ router.get("/admin", (_req, res) => {
 <script>
 let AKEY = '';
 let users = [];
+let currentTab = 'overview';
 
 function esc(str) {
   return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -383,6 +384,7 @@ function doLogout() {
 }
 
 function switchTab(name) {
+  currentTab = name;
   const names = ['overview','deposits','withdrawals','users','transactions','game'];
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', names[i]===name));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -786,6 +788,15 @@ function startLivePoll() {
   }
 
   poll(); setInterval(poll, 1000);
+
+  // Auto-refresh current tab data every 20 seconds
+  setInterval(() => {
+    if (!AKEY) return;
+    if (currentTab === 'users') loadUsers();
+    else if (currentTab === 'deposits') loadDeposits();
+    else if (currentTab === 'withdrawals') loadWithdrawals();
+    else if (currentTab === 'overview') loadOverview();
+  }, 20000);
 }
 </script>
 </body>
