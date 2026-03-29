@@ -338,6 +338,10 @@ router.get("/admin", (_req, res) => {
 let AKEY = '';
 let users = [];
 
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function toast(msg, isErr=false) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast' + (isErr?' err':'');
@@ -385,7 +389,10 @@ function switchTab(name) {
   document.getElementById('tab-'+name).classList.add('active');
   if (name === 'deposits') loadDeposits();
   if (name === 'withdrawals') loadWithdrawals();
-  if (name === 'game') loadQueueStatus();
+  if (name === 'users') loadUsers();
+  if (name === 'transactions') loadTransactions();
+  if (name === 'overview') loadOverview();
+  if (name === 'game') { loadQueueStatus(); }
 }
 
 function fmtAmt(n) {
@@ -441,8 +448,8 @@ function renderUsers(list) {
     <div class="user-m-card">
       <div class="user-m-top">
         <div>
-          <div style="font-size:15px;font-weight:800">\${u.username}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">\${u.email||'—'}</div>
+          <div style="font-size:15px;font-weight:800">\${esc(u.username)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">\${esc(u.email||'—')}</div>
           <div style="margin-top:5px;display:flex;gap:6px;align-items:center">
             <span class="badge badge-\${u.vipLevel.toLowerCase()}">\${u.vipLevel}</span>
             \${u.online ? '<span style="color:var(--green);font-size:10px;font-weight:700">🟢 ONLINE</span>' : '<span style="font-size:10px;color:#555">offline</span>'}
@@ -526,8 +533,8 @@ async function loadDeposits() {
       const note = d.note || '—';
       const utrMatch = note.match(/UTR:\\s*([\\w]+)/);
       const utrDisplay = utrMatch
-        ? \`<span style="font-family:monospace;font-size:13px;font-weight:700;color:var(--gold);background:rgba(255,215,0,0.1);padding:3px 8px;border-radius:6px">\${utrMatch[1]}</span>\`
-        : \`<span style="color:#888;font-size:12px">\${note.slice(0,40)}</span>\`;
+        ? \`<span style="font-family:monospace;font-size:13px;font-weight:700;color:var(--gold);background:rgba(255,215,0,0.1);padding:3px 8px;border-radius:6px">\${esc(utrMatch[1])}</span>\`
+        : \`<span style="color:#888;font-size:12px">\${esc(note.slice(0,40))}</span>\`;
       const statusCls = d.status === 'admin_pending' ? 'wd-pending' : d.status === 'completed' ? 'wd-approved' : 'wd-rejected';
       const statusLabel = d.status === 'admin_pending' ? '⏳ Pending' : d.status === 'completed' ? '✓ Approved' : '✗ Rejected';
       const actions = d.status === 'admin_pending' ? \`
@@ -604,7 +611,7 @@ async function loadWithdrawals() {
         </div>
         <div style="display:flex;align-items:center;gap:8px;padding:6px 0 2px">
           <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">UPI:</span>
-          <span style="font-family:monospace;font-size:13px;color:#aaa">\${upi}</span>
+          <span style="font-family:monospace;font-size:13px;color:#aaa">\${esc(upi)}</span>
         </div>
         \${actions}
       </div>\`;

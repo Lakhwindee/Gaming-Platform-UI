@@ -32,7 +32,7 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-MERCHANT_UPI_ID = "judgeproductionmusic@okaxis"
+MERCHANT_UPI_ID = "7973248683@pthdfc"
 REVENUECAT_PROJECT_ID = "projfafa0678"
 REVENUECAT_TEST_STORE_APP_ID = "appc12f0a5f37"
 REVENUECAT_APPLE_APP_STORE_APP_ID = "app613b3af307"
@@ -40,3 +40,19 @@ REVENUECAT_GOOGLE_PLAY_STORE_APP_ID = "app44131b8768"
 EXPO_PUBLIC_REVENUECAT_TEST_API_KEY = "test_hfKcIxmOlnxCkXThGsKJlHdNArr"
 EXPO_PUBLIC_REVENUECAT_IOS_API_KEY = "appl_ZjldOvBgzFTwbenmqyyawLwghuS"
 EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY = "goog_RJqBzVVGwmyUoBEsbDeZfEYtrni"
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 19702
+externalPort = 80
+
+[[ports]]
+localPort = 25951
+externalPort = 3000
