@@ -328,6 +328,7 @@ export default function Profile({ onAuthOpen }: { onAuthOpen?: () => void }) {
       <div style={{ backgroundColor: C.bgCard, borderRadius: 16, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 20 }}>
         {[
           { icon: '🔒', label: 'Change Password', color: C.red, action: () => setShowPwModal(true) },
+          { icon: '⚙️', label: 'Admin Panel', color: '#FF6B00', action: () => window.open('/api/admin', '_blank') },
           { icon: '💬', label: 'Support', color: C.green, action: () => alert('Contact us at support@blazeapp.in\nWhatsApp: +91 99999 99999') },
           { icon: 'ℹ️', label: 'About', color: C.textMuted, action: () => alert('Blaze v1.0.0\nPremium Crash Game by Star Games\n\n© 2025 Star Games') },
           { icon: '🚪', label: 'Sign Out', color: C.red, action: () => { if (confirm('Are you sure you want to sign out?')) logout(); }, isLast: true },
