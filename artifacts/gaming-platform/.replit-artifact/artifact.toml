@@ -1,5 +1,5 @@
 kind = "mobile"
-previewPath = "/"
+previewPath = "/gaming-platform/"
 title = "Gaming Platform"
 version = "1.0.0"
 id = "artifacts/gaming-platform"
@@ -13,14 +13,14 @@ version = "1.0.0"
 ensurePreviewReachable = "/status"
 localPort = 25951
 name = "expo"
-paths = ["/"]
+paths = ["/gaming-platform/"]
 
 [services.development]
 run = "pnpm --filter @workspace/gaming-platform run dev"
 
 [services.env]
 PORT = "25951"
-BASE_PATH = "/"
+BASE_PATH = "/gaming-platform/"
 
 [services.production]
 build = ["pnpm", "--filter", "@workspace/gaming-platform", "run", "build"]

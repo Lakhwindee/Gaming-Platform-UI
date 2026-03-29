@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/neonbet-web/"
+previewPath = "/"
 title = "BLAZE"
 version = "1.0.0"
 id = "artifacts/neonbet-web"
@@ -12,14 +12,14 @@ version = "1.0.0"
 [[services]]
 localPort = 19702
 name = "web"
-paths = ["/neonbet-web/"]
+paths = ["/"]
 
 [services.development]
 run = "pnpm --filter @workspace/neonbet-web run dev"
 
 [services.env]
 PORT = "19702"
-BASE_PATH = "/neonbet-web/"
+BASE_PATH = "/"
 
 [services.production]
 build = ["pnpm", "--filter", "@workspace/neonbet-web", "run", "build"]
