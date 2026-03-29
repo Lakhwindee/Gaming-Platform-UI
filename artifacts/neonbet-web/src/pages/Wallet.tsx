@@ -83,6 +83,25 @@ function txIcon(type: string) {
   return { icon: '●', color: C.textMuted };
 }
 
+const PENDING_KEY = 'nb_pending_deposit';
+
+function savePending(txn: UpiInitResult, method: PayMethod) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify({ txn, method, ts: Date.now() })); } catch {}
+}
+function clearPending() {
+  try { localStorage.removeItem(PENDING_KEY); } catch {}
+}
+function loadPending(): { txn: UpiInitResult; method: PayMethod } | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    // Expire after 2 hours
+    if (Date.now() - obj.ts > 2 * 60 * 60 * 1000) { clearPending(); return null; }
+    return obj;
+  } catch { return null; }
+}
+
 export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
   const { state, refreshBalance } = useGame();
   const token: string | null = typeof window !== 'undefined' ? localStorage.getItem('nb_token') : null;
@@ -92,10 +111,11 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
   const [selectedAmt,    setSelectedAmt]    = useState<number | null>(500);
   const [customAmt,      setCustomAmt]      = useState('');
-  const [selectedMethod, setSelectedMethod] = useState<PayMethod>('gpay');
+  const [selectedMethod, setSelectedMethod] = useState<PayMethod>(() => loadPending()?.method ?? 'gpay');
 
-  const [payState,    setPayState]    = useState<PayState>('idle');
-  const [pendingTxn,  setPendingTxn]  = useState<UpiInitResult | null>(null);
+  // Restore pending payment from localStorage on mount (handles page reloads after UPI app)
+  const [payState,    setPayState]    = useState<PayState>(() => loadPending() ? 'confirming' : 'idle');
+  const [pendingTxn,  setPendingTxn]  = useState<UpiInitResult | null>(() => loadPending()?.txn ?? null);
   const [utrInput,    setUtrInput]    = useState('');
   const [confirming,  setConfirming]  = useState(false);
   const [autoFailMsg, setAutoFailMsg] = useState('');
@@ -194,6 +214,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
     try {
       const txn = await api.upiInitiate(token!, finalAmount, selectedMethod);
       setPendingTxn(txn);
+      savePending(txn, selectedMethod); // persist so reload doesn't lose it
       setUtrInput('');
       setAutoFailMsg('');
       setPayState('waiting');
@@ -238,6 +259,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
     setAutoFailMsg('');
     try {
       await api.upiConfirm(token, pendingTxn.txnRef, utr);
+      clearPending();
       stopPoll();
       setPayState('pending_approval');
     } catch (e) {
@@ -249,6 +271,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
   function handleCancelPayment() {
     stopListeners();
+    clearPending();
     setPayState('idle');
     setPendingTxn(null);
     setUtrInput('');
@@ -337,7 +360,7 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
                   <div style={{ marginTop: 12, fontSize: 12, color: '#aaa', background: 'rgba(255,215,0,0.08)', borderRadius: 10, padding: '10px 14px', border: '1px solid rgba(255,215,0,0.2)' }}>
                     Deposits are typically processed within 30 minutes.
                   </div>
-                  <button onClick={() => { setPayState('idle'); setPendingTxn(null); setUtrInput(''); }} style={{ marginTop: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#aaa', padding: '10px 20px', cursor: 'pointer', fontSize: 13 }}>
+                  <button onClick={() => { clearPending(); setPayState('idle'); setPendingTxn(null); setUtrInput(''); }} style={{ marginTop: 14, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10, color: '#aaa', padding: '10px 20px', cursor: 'pointer', fontSize: 13 }}>
                     OK, Got It
                   </button>
                 </>
@@ -378,23 +401,28 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
 
                   {payState === 'confirming' && !confirming && (
                     <>
-                      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: C.textMuted, marginBottom: 10, textAlign: 'left' }}>
-                        <strong style={{ color: C.text }}>Google Pay</strong> → Activity → tap payment → copy{' '}
-                        <strong style={{ color: C.text }}>UPI Transaction ID</strong>
+                      {/* UTR instructions per method */}
+                      <div style={{ background: 'rgba(0,200,83,0.06)', border: '1px solid rgba(0,200,83,0.2)', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: C.textMuted, marginBottom: 10, textAlign: 'left' }}>
+                        {selectedMethod === 'gpay' && <><strong style={{ color: '#34A853' }}>Google Pay</strong>: History → tap payment → copy <strong style={{ color: C.text }}>UPI Transaction ID</strong></>}
+                        {selectedMethod === 'phonepe' && <><strong style={{ color: '#6739B7' }}>PhonePe</strong>: History → tap payment → <strong style={{ color: C.text }}>Transaction ID / UTR</strong> copy karo</>}
+                        {selectedMethod === 'paytm' && <><strong style={{ color: '#00BAF2' }}>Paytm</strong>: Passbook → tap payment → <strong style={{ color: C.text }}>UTR/Transaction ID</strong> copy karo</>}
+                        {selectedMethod === 'upi' && <>UPI app kholein → payment history → <strong style={{ color: C.text }}>UTR / Transaction ID</strong> copy karein</>}
                       </div>
                       <div style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1.5, marginBottom: 6 }}>TRANSACTION ID / UTR</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1.5, marginBottom: 6 }}>UTR / TRANSACTION ID</div>
                         <input
                           type="text"
-                          placeholder="Paste here from Google Pay"
+                          inputMode="numeric"
+                          placeholder="12-digit UTR number paste karein"
                           value={utrInput}
                           onChange={e => { setUtrInput(e.target.value); setAutoFailMsg(''); }}
                           autoFocus
                           style={{
-                            width: '100%', padding: '12px 14px', borderRadius: 10, fontSize: 14,
+                            width: '100%', padding: '14px', borderRadius: 10, fontSize: 16,
                             background: 'rgba(255,255,255,0.06)',
-                            border: `1px solid ${utrInput.length > 0 ? C.green : C.border}`,
+                            border: `2px solid ${utrInput.length > 0 ? C.green : C.border}`,
                             color: C.text, outline: 'none', boxSizing: 'border-box',
+                            fontFamily: 'monospace', letterSpacing: 1,
                           }}
                         />
                       </div>
@@ -402,15 +430,15 @@ export default function Wallet({ onAuthOpen }: { onAuthOpen: () => void }) {
                         onClick={handleConfirmPaid}
                         disabled={utrInput.trim().length === 0}
                         style={{
-                          width: '100%', padding: '13px', borderRadius: 12, border: 'none',
+                          width: '100%', padding: '15px', borderRadius: 12, border: 'none',
                           background: utrInput.trim().length > 0 ? C.green : 'rgba(0,200,83,0.2)',
-                          color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', marginBottom: 8,
+                          color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', marginBottom: 8,
                         }}
                       >
-                        ✓ CONFIRM PAYMENT
+                        ✓ SUBMIT UTR & CONFIRM
                       </button>
                       <button onClick={handleCancelPayment} style={{ background: 'none', border: 'none', color: C.textMuted, fontSize: 13, cursor: 'pointer', padding: '6px 0' }}>
-                        I didn't pay — Cancel
+                        Maine pay nahi kiya — Cancel
                       </button>
                     </>
                   )}
