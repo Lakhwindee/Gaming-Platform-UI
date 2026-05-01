@@ -137,22 +137,117 @@ function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: 
   ctx.restore();
 }
 
-function drawBlast(ctx: CanvasRenderingContext2D, x: number, y: number) {
+// Pre-computed debris particles (deterministic — no random in draw loop)
+const BLAST_DEBRIS = Array.from({ length: 20 }, (_, i) => ({
+  angle: (i / 20) * Math.PI * 2 + (i % 3) * 0.18,
+  speed: 55 + (i % 5) * 22,
+  size: 1.8 + (i % 4) * 1.1,
+  col: i % 3 === 0 ? '#FFD700' : i % 3 === 1 ? '#FF6B00' : '#FF3A3A',
+  wobble: (i % 7) * 0.45,
+}));
+
+const BLAST_SPARKS = Array.from({ length: 14 }, (_, i) => ({
+  angle: (i / 14) * Math.PI * 2 + 0.22,
+  speed: 80 + (i % 4) * 30,
+  col: i % 2 === 0 ? '#FFD700' : '#FF9500',
+}));
+
+function drawBlast(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
+  const a = Math.max(0, age); // seconds since crash
+
   ctx.save(); ctx.translate(x, y);
-  const rings = [[38,0.10],[26,0.18],[17,0.28]];
-  for (const [r, a] of rings) {
-    ctx.fillStyle = `rgba(255,80,0,${a})`; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+
+  // ── 1. Initial white flash (0–0.18s) ──────────────────────────────────
+  if (a < 0.18) {
+    const flashA = (1 - a / 0.18) * 0.75;
+    ctx.globalAlpha = flashA;
+    const flashR = 80 + a * 400;
+    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, flashR);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.4, 'rgba(255,220,100,0.6)');
+    grd.addColorStop(1, 'rgba(255,60,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(0, 0, flashR, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
   }
-  ctx.fillStyle = '#FF6B00'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.arc(0,0,2,0,Math.PI*2); ctx.fill();
-  [0,45,90,135,180,225,270,315].forEach((deg,i) => {
-    const rad = (deg*Math.PI)/180, r1=13, r2=30+(i%3)*8;
-    ctx.strokeStyle = i%2===0 ? '#FF6B00' : '#FFD700'; ctx.lineWidth = i%2===0 ? 2.5 : 1.5;
-    ctx.lineCap = 'round'; ctx.globalAlpha = 0.85;
-    ctx.beginPath(); ctx.moveTo(Math.cos(rad)*r1,Math.sin(rad)*r1); ctx.lineTo(Math.cos(rad)*r2,Math.sin(rad)*r2); ctx.stroke();
-  });
-  ctx.globalAlpha = 1; ctx.restore();
+
+  // ── 2. Expanding shockwave rings (0–0.9s) ─────────────────────────────
+  const ringDefs = [
+    { delay: 0,    speed: 110, thick: 5,  col: 'rgba(255,200,80,' },
+    { delay: 0.06, speed: 90,  thick: 3,  col: 'rgba(255,120,30,' },
+    { delay: 0.12, speed: 70,  thick: 2,  col: 'rgba(255,60,20,'  },
+  ];
+  for (const rd of ringDefs) {
+    const ra = a - rd.delay;
+    if (ra < 0 || ra > 0.9) continue;
+    const r = ra * rd.speed;
+    const alpha = Math.max(0, (1 - ra / 0.9) * 0.9);
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = `${rd.col}1)`;
+    ctx.lineWidth = rd.thick * (1 - ra / 0.9) + 0.5;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // ── 3. Debris particles flying outward (0–1.2s) ───────────────────────
+  if (a < 1.2) {
+    for (const p of BLAST_DEBRIS) {
+      const pa = Math.max(0, a - 0.04);
+      const dist = pa * p.speed + pa * pa * 15;
+      const px = Math.cos(p.angle) * dist;
+      const py = Math.sin(p.angle) * dist + pa * pa * 30; // gravity pull
+      const alpha = Math.max(0, 1 - pa / 1.0);
+      const sz = p.size * (1 - pa * 0.4);
+      ctx.globalAlpha = alpha * 0.95;
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(px, py, Math.max(0.3, sz), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 4. Spark streaks (0–0.6s) ─────────────────────────────────────────
+  if (a < 0.6) {
+    for (const sp of BLAST_SPARKS) {
+      const sa = Math.max(0, a - 0.02);
+      const d1 = sa * sp.speed * 0.6;
+      const d2 = sa * sp.speed;
+      const alpha = Math.max(0, 1 - sa / 0.55) * 0.9;
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = sp.col;
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(sp.angle) * d1, Math.sin(sp.angle) * d1);
+      ctx.lineTo(Math.cos(sp.angle) * d2, Math.sin(sp.angle) * d2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 5. Core glow — bright center fades (0–0.7s) ───────────────────────
+  if (a < 0.7) {
+    const coreA = Math.max(0, 1 - a / 0.65);
+    const coreR = 6 + a * 18;
+    const grd2 = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+    grd2.addColorStop(0, `rgba(255,255,255,${coreA})`);
+    grd2.addColorStop(0.4, `rgba(255,200,50,${coreA * 0.8})`);
+    grd2.addColorStop(1, 'rgba(255,80,0,0)');
+    ctx.fillStyle = grd2;
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
+  } else {
+    // Faint ember glow lingers
+    const emberA = Math.max(0, 1 - (a - 0.7) / 1.2) * 0.35;
+    ctx.globalAlpha = emberA;
+    const grd3 = ctx.createRadialGradient(0, 0, 0, 0, 0, 22);
+    grd3.addColorStop(0, 'rgba(255,100,20,1)');
+    grd3.addColorStop(1, 'rgba(255,40,0,0)');
+    ctx.fillStyle = grd3;
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
 }
 
 const STARS = Array.from({ length: 120 }, (_, i) => ({
@@ -454,7 +549,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.12;
 
       if (isCrashed) {
-        drawBlast(ctx!, pos.x, pos.y);
+        const blastAge = crashTimeRef.current > 0 ? (now - crashTimeRef.current) / 1000 : 0;
+        drawBlast(ctx!, pos.x, pos.y, blastAge);
       } else {
         drawRocket(ctx!, pos.x, pos.y, smoothAngRef.current, isFlying, isWaiting, t);
       }
@@ -475,12 +571,21 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
           multOverlayRef.current.style.top = '38%';
           multOverlayRef.current.style.display = 'block';
         }
-        ctx!.save();
-        ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
-        ctx!.font = 'bold 20px Inter,sans-serif';
-        ctx!.fillStyle = '#FF4500'; ctx!.letterSpacing = '5px';
-        ctx!.fillText('💥  BLAST!', W / 2, H * 0.38 + 48);
-        ctx!.restore();
+        // Animated BLAST! text — fades in then stays
+        const blastAge2 = crashTimeRef.current > 0 ? (now - crashTimeRef.current) / 1000 : 0;
+        const txtAlpha = Math.min(1, blastAge2 / 0.22);
+        const txtScale = 0.7 + Math.min(0.3, blastAge2 / 0.22 * 0.3);
+        if (txtAlpha > 0) {
+          ctx!.save();
+          ctx!.globalAlpha = txtAlpha;
+          ctx!.textAlign = 'center'; ctx!.textBaseline = 'middle';
+          ctx!.translate(W / 2, H * 0.38 + 52);
+          ctx!.scale(txtScale, txtScale);
+          ctx!.font = 'bold 22px Inter,sans-serif';
+          ctx!.fillStyle = '#FF4500'; ctx!.letterSpacing = '4px';
+          ctx!.fillText('BLAST!', 0, 0);
+          ctx!.restore();
+        }
       } else if (isWaiting) {
         if (multOverlayRef.current) { multOverlayRef.current.style.display = 'none'; }
         const cd = WSC.state.countdown;
