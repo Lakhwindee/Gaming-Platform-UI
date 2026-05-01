@@ -258,6 +258,110 @@ const STARS = Array.from({ length: 120 }, (_, i) => ({
   layer: i % 3,
 }));
 
+// Planets — seeded positions, each has a unique colour and optional ring
+const BG_PLANETS = [
+  { x: 0.17, y: 0.10, r: 20, speed: 0.0022, type: 'ice'  as const, ring: true  },
+  { x: 0.80, y: 0.19, r: 14, speed: 0.0032, type: 'mars' as const, ring: false },
+  { x: 0.50, y: 0.065, r: 11, speed: 0.0028, type: 'teal' as const, ring: true  },
+];
+
+function drawPlanet(ctx: CanvasRenderingContext2D, px: number, py: number, r: number, type: 'ice'|'mars'|'teal', ring: boolean, alpha: number) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(px, py);
+  const colors: Record<string, [string,string,string]> = {
+    ice:  ['#7ab4ff','#3366cc','#1a2a60'],
+    mars: ['#e8855a','#b84c2a','#6b2010'],
+    teal: ['#52d9c4','#1e9b8a','#0a4a42'],
+  };
+  const [c1, c2, c3] = colors[type];
+
+  // Ring behind planet (bottom half)
+  if (ring) {
+    ctx.save();
+    ctx.scale(1, 0.3);
+    ctx.globalAlpha = alpha * 0.55;
+    const ringColor = type === 'ice' ? 'rgba(180,210,255,0.7)' : 'rgba(100,220,200,0.6)';
+    ctx.strokeStyle = ringColor; ctx.lineWidth = r * 0.42;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.75, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Planet body
+  const grd = ctx.createRadialGradient(-r*0.28, -r*0.28, r*0.05, 0, 0, r);
+  grd.addColorStop(0, c1); grd.addColorStop(0.55, c2); grd.addColorStop(1, c3);
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+  // Surface detail bands
+  ctx.globalAlpha = alpha * 0.18;
+  ctx.fillStyle = c1;
+  for (let b = 0; b < 2; b++) {
+    ctx.beginPath(); ctx.ellipse(0, (b * 2 - 1) * r * 0.28, r * 0.92, r * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Atmosphere glow
+  ctx.globalAlpha = alpha * 0.22;
+  const atm = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.25);
+  atm.addColorStop(0, c1); atm.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = atm; ctx.beginPath(); ctx.arc(0, 0, r * 1.25, 0, Math.PI * 2); ctx.fill();
+
+  // Ring front (top half) — drawn over planet
+  if (ring) {
+    ctx.save();
+    ctx.scale(1, 0.3);
+    ctx.globalAlpha = alpha * 0.55;
+    const ringColor = type === 'ice' ? 'rgba(180,210,255,0.7)' : 'rgba(100,220,200,0.6)';
+    ctx.strokeStyle = ringColor; ctx.lineWidth = r * 0.42;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.75, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// UFOs — two saucers that fly across the screen periodically
+const BG_UFOS = [
+  { y: 0.155, cycle: 20, offset: 0,   scale: 1.0  },
+  { y: 0.265, cycle: 29, offset: 11,  scale: 0.72 },
+];
+
+function drawUFO(ctx: CanvasRenderingContext2D, ux: number, uy: number, sc: number, t: number, alpha: number) {
+  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(ux, uy); ctx.scale(sc, sc);
+
+  // Tractor beam glow below
+  ctx.globalAlpha = alpha * 0.18 * (0.6 + 0.4 * Math.sin(t * 3.5));
+  const beam = ctx.createLinearGradient(0, 6, 0, 46);
+  beam.addColorStop(0, 'rgba(100,255,160,0.9)'); beam.addColorStop(1, 'rgba(80,220,130,0)');
+  ctx.fillStyle = beam;
+  ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.lineTo(18, 46); ctx.lineTo(-18, 46); ctx.closePath(); ctx.fill();
+
+  // Saucer body
+  ctx.globalAlpha = alpha;
+  const bodyGrd = ctx.createLinearGradient(0, -5, 0, 7);
+  bodyGrd.addColorStop(0, '#d0d8f0'); bodyGrd.addColorStop(0.5, '#8898c8'); bodyGrd.addColorStop(1, '#455080');
+  ctx.fillStyle = bodyGrd;
+  ctx.beginPath(); ctx.ellipse(0, 2, 22, 7, 0, 0, Math.PI * 2); ctx.fill();
+
+  // Dome on top
+  const domeGrd = ctx.createRadialGradient(-3, -7, 1, 0, -6, 11);
+  domeGrd.addColorStop(0, 'rgba(180,230,255,0.95)'); domeGrd.addColorStop(0.5, 'rgba(80,150,255,0.7)'); domeGrd.addColorStop(1, 'rgba(30,60,180,0.4)');
+  ctx.fillStyle = domeGrd;
+  ctx.beginPath(); ctx.ellipse(0, -3, 11, 8, 0, Math.PI, Math.PI * 2); ctx.fill();
+
+  // Blinking rim lights
+  const lightCols = ['#ff4466','#44ffaa','#ffcc00','#44aaff','#ff44ff'];
+  for (let li = 0; li < 5; li++) {
+    const la = (li / 5) * Math.PI * 2;
+    const lx = Math.cos(la) * 17, ly = Math.sin(la) * 5 + 2;
+    const blink = 0.4 + 0.6 * Math.sin(t * 4 + li * 1.3);
+    ctx.globalAlpha = alpha * blink;
+    ctx.fillStyle = lightCols[li];
+    ctx.beginPath(); ctx.arc(lx, ly, 2.2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 // ── Main component ────────────────────────────────────────────────────────
 export default function CrashGame({ navigate }: { navigate: (t: string) => void }) {
   const { state } = useGame();
@@ -501,6 +605,25 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         }
       }
       ctx!.globalAlpha = 1;
+
+      // ── Planets ───────────────────────────────────────────────────────────
+      for (const pl of BG_PLANETS) {
+        const px = ((pl.x + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
+        const py = ((pl.y + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
+        drawPlanet(ctx!, px * W, py * H, pl.r, pl.type, pl.ring, 0.72);
+      }
+
+      // ── UFOs ──────────────────────────────────────────────────────────────
+      for (const ufo of BG_UFOS) {
+        const phase2 = ((t + ufo.offset) % ufo.cycle) / ufo.cycle; // 0→1 each cycle
+        // Flies in from right, exits left — 0.05→0.95 visible window
+        const ux = W * (1.08 - phase2 * 1.16);
+        const uy = ufo.y * H + Math.sin(t * 0.8 + ufo.offset) * 5; // gentle float
+        // Fade in/out at edges
+        const edgeFade = Math.min(1, Math.min(phase2 / 0.08, (1 - phase2) / 0.08));
+        const uAlpha = Math.max(0, edgeFade) * 0.88;
+        if (uAlpha > 0.01) drawUFO(ctx!, ux, uy, ufo.scale, t, uAlpha);
+      }
 
       // Positions — exact Expo logic
       const origX = W * 0.09, origY = H * 0.88;
