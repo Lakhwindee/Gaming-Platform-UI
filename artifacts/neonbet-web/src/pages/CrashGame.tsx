@@ -155,10 +155,12 @@ function drawBlast(ctx: CanvasRenderingContext2D, x: number, y: number) {
   ctx.globalAlpha = 1; ctx.restore();
 }
 
-const STARS = Array.from({ length: 80 }, (_, i) => ({
+const STARS = Array.from({ length: 120 }, (_, i) => ({
   x: (Math.sin(i * 137.5) * 0.5 + 0.5),
-  y: (Math.cos(i * 239.3) * 0.5 + 0.5) * 0.9,
-  r: 0.5 + (i % 3) * 0.5,
+  y: (Math.cos(i * 239.3) * 0.5 + 0.5) * 0.95,
+  r: 0.3 + (i % 4) * 0.35,
+  speed: 0.004 + (i % 5) * 0.006,
+  layer: i % 3,
 }));
 
 // ── Main component ────────────────────────────────────────────────────────
@@ -359,12 +361,30 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       bg.addColorStop(0, '#0A0120'); bg.addColorStop(1, '#04000C');
       ctx!.fillStyle = bg; ctx!.fillRect(0, 0, W, H);
 
-      // Stars
+      // Stars — moving parallax
+      const speedMult = isFlying ? (1 + Math.min(m * 0.4, 8)) : isCrashed ? 0.15 : 0.18;
+      const layerAlpha = [0.55, 0.75, 1.0];
+      const layerColors = ['#aac4ff', '#d0e8ff', '#FFFFFF'];
       for (const s of STARS) {
-        const blink = 0.5 + 0.5 * Math.sin(t * 0.9 + s.x * 20 + s.y * 15);
-        ctx!.globalAlpha = 0.3 + 0.7 * blink;
-        ctx!.fillStyle = '#FFFFFF';
-        ctx!.beginPath(); ctx!.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2); ctx!.fill();
+        const sx = ((s.x - t * s.speed * speedMult) % 1 + 1) % 1;
+        const sy = s.y;
+        const blink = 0.6 + 0.4 * Math.sin(t * 1.1 + s.x * 17 + s.y * 13);
+        ctx!.globalAlpha = layerAlpha[s.layer] * blink;
+        ctx!.fillStyle = layerColors[s.layer];
+        if (isFlying && speedMult > 2) {
+          const streakLen = s.r * speedMult * 0.9;
+          ctx!.beginPath();
+          ctx!.moveTo(sx * W + streakLen, sy * H);
+          ctx!.lineTo(sx * W - s.r * 0.5, sy * H);
+          ctx!.lineWidth = s.r * 1.1;
+          ctx!.strokeStyle = layerColors[s.layer];
+          ctx!.globalAlpha = layerAlpha[s.layer] * blink * 0.85;
+          ctx!.stroke();
+        } else {
+          ctx!.beginPath();
+          ctx!.arc(sx * W, sy * H, s.r, 0, Math.PI * 2);
+          ctx!.fill();
+        }
       }
       ctx!.globalAlpha = 1;
 
