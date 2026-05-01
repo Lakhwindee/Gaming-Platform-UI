@@ -312,6 +312,9 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   const startTimeRef = useRef(0);
   const smoothAngRef = useRef(-0.22);
   const crashTimeRef = useRef(0);
+  const starOffXRef = useRef(0);
+  const starOffYRef = useRef(0);
+  const lastDrawTimeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -342,6 +345,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         elapsedRef.current = getServerElapsed();
       } else if (phase === 'waiting') {
         elapsedRef.current = 0; startTimeRef.current = 0; smoothAngRef.current = -Math.PI / 2;
+        starOffXRef.current = 0; starOffYRef.current = 0;
       }
       if (phase === 'crashed') {
         if (crashTimeRef.current === 0) crashTimeRef.current = now;
@@ -361,25 +365,40 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       bg.addColorStop(0, '#0A0120'); bg.addColorStop(1, '#04000C');
       ctx!.fillStyle = bg; ctx!.fillRect(0, 0, W, H);
 
-      // Stars — moving parallax
-      const speedMult = isFlying ? (1 + Math.min(m * 0.4, 8)) : isCrashed ? 0.15 : 0.18;
-      const layerAlpha = [0.55, 0.75, 1.0];
-      const layerColors = ['#aac4ff', '#d0e8ff', '#FFFFFF'];
+      // Stars — direction-aware parallax (opposite to rocket heading)
+      const dt = lastDrawTimeRef.current ? Math.min((now - lastDrawTimeRef.current) / 1000, 0.05) : 0;
+      lastDrawTimeRef.current = now;
+      const speedMult = isFlying ? (1 + Math.min(m * 0.35, 9)) : isCrashed ? 0.12 : 0.14;
+      const ang = isWaiting ? -Math.PI / 2 : smoothAngRef.current;
+      // Stars move opposite to rocket direction
+      const dirX = -Math.cos(ang);
+      const dirY = -Math.sin(ang);
+      starOffXRef.current += dirX * dt * speedMult * 0.055;
+      starOffYRef.current += dirY * dt * speedMult * 0.055;
+      const layerAlpha = [0.5, 0.72, 1.0];
+      const layerColors = ['#9ab8ff', '#d4eaff', '#FFFFFF'];
+      const layerSpeed = [0.6, 0.85, 1.0];
       for (const s of STARS) {
-        const sx = ((s.x - t * s.speed * speedMult) % 1 + 1) % 1;
-        const sy = s.y;
-        const blink = 0.6 + 0.4 * Math.sin(t * 1.1 + s.x * 17 + s.y * 13);
+        const ls = layerSpeed[s.layer];
+        const sx = ((s.x + starOffXRef.current * s.speed * ls * 14) % 1 + 1) % 1;
+        const sy = ((s.y + starOffYRef.current * s.speed * ls * 14) % 1 + 1) % 1;
+        const blink = 0.65 + 0.35 * Math.sin(t * 1.1 + s.x * 17 + s.y * 13);
         ctx!.globalAlpha = layerAlpha[s.layer] * blink;
         ctx!.fillStyle = layerColors[s.layer];
-        if (isFlying && speedMult > 2) {
-          const streakLen = s.r * speedMult * 0.9;
+        if (isFlying && speedMult > 2.5) {
+          // Streak direction matches star flow direction
+          const streakLen = s.r * speedMult * 0.85;
+          ctx!.save();
+          ctx!.translate(sx * W, sy * H);
+          ctx!.rotate(Math.atan2(dirY, dirX));
           ctx!.beginPath();
-          ctx!.moveTo(sx * W + streakLen, sy * H);
-          ctx!.lineTo(sx * W - s.r * 0.5, sy * H);
+          ctx!.moveTo(streakLen, 0);
+          ctx!.lineTo(-s.r * 0.4, 0);
           ctx!.lineWidth = s.r * 1.1;
           ctx!.strokeStyle = layerColors[s.layer];
           ctx!.globalAlpha = layerAlpha[s.layer] * blink * 0.85;
           ctx!.stroke();
+          ctx!.restore();
         } else {
           ctx!.beginPath();
           ctx!.arc(sx * W, sy * H, s.r, 0, Math.PI * 2);
