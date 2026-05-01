@@ -258,105 +258,213 @@ const STARS = Array.from({ length: 120 }, (_, i) => ({
   layer: i % 3,
 }));
 
-// Planets — seeded positions, each has a unique colour and optional ring
-const BG_PLANETS = [
-  { x: 0.17, y: 0.10, r: 20, speed: 0.0022, type: 'ice'  as const, ring: true  },
-  { x: 0.80, y: 0.19, r: 14, speed: 0.0032, type: 'mars' as const, ring: false },
-  { x: 0.50, y: 0.065, r: 11, speed: 0.0028, type: 'teal' as const, ring: true  },
+// ── Realistic 3D Planets ─────────────────────────────────────────────────
+// Each planet appears only above a certain multiplier threshold
+type PlanetDef = {
+  // Base position in 0..1 canvas coordinates
+  bx: number; by: number;
+  // Visual radius (canvas pixels, before DPI scale)
+  r: number;
+  // Light direction offset (0..1 of radius)
+  lx: number; ly: number;
+  // Parallax speed factor
+  speed: number;
+  // Appears when multiplier >= threshold
+  threshold: number;
+  // Has a Saturn-style ring?
+  ring: boolean;
+  // Color stops for main gradient [highlight, midtone, shadow]
+  c: [string, string, string];
+  // Atmosphere tint
+  atm: string;
+  // Band colors [inner, outer] (null = no bands)
+  bands: [string, string] | null;
+  // Ring color (if ring=true)
+  ringCol: string;
+};
+
+const BG_PLANETS: PlanetDef[] = [
+  // Earth-like — blue-green, top-right, appears at 4x
+  {
+    bx: 0.82, by: 0.08, r: 13, lx: -0.32, ly: -0.32, speed: 0.0028, threshold: 4,
+    ring: false,
+    c: ['#5bc8ff', '#1a6fbf', '#08244a'],
+    atm: 'rgba(80,170,255,0.35)',
+    bands: ['rgba(255,255,255,0.12)', 'rgba(30,120,200,0.14)'],
+    ringCol: '',
+  },
+  // Saturn-like — gold with ring, upper-left, appears at 6x
+  {
+    bx: 0.14, by: 0.07, r: 15, lx: -0.28, ly: -0.30, speed: 0.0022, threshold: 6,
+    ring: true,
+    c: ['#f5d98a', '#c8903c', '#6b420e'],
+    atm: 'rgba(240,190,80,0.28)',
+    bands: ['rgba(255,230,140,0.18)', 'rgba(160,90,20,0.16)'],
+    ringCol: 'rgba(230,190,90,',
+  },
+  // Mars-like — dusty red, appears at 9x
+  {
+    bx: 0.62, by: 0.05, r: 10, lx: -0.30, ly: -0.28, speed: 0.0034, threshold: 9,
+    ring: false,
+    c: ['#e8805a', '#a8381a', '#501808'],
+    atm: 'rgba(220,110,60,0.25)',
+    bands: ['rgba(240,160,100,0.14)', 'rgba(120,40,10,0.16)'],
+    ringCol: '',
+  },
+  // Ice planet — deep teal-white, appears at 14x
+  {
+    bx: 0.38, by: 0.055, r: 11, lx: -0.26, ly: -0.34, speed: 0.003, threshold: 14,
+    ring: true,
+    c: ['#c0f0ff', '#4ab8d8', '#0e4a62'],
+    atm: 'rgba(140,230,255,0.30)',
+    bands: ['rgba(200,240,255,0.16)', 'rgba(30,140,180,0.14)'],
+    ringCol: 'rgba(180,230,255,',
+  },
 ];
 
-function drawPlanet(ctx: CanvasRenderingContext2D, px: number, py: number, r: number, type: 'ice'|'mars'|'teal', ring: boolean, alpha: number) {
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(px, py);
-  const colors: Record<string, [string,string,string]> = {
-    ice:  ['#7ab4ff','#3366cc','#1a2a60'],
-    mars: ['#e8855a','#b84c2a','#6b2010'],
-    teal: ['#52d9c4','#1e9b8a','#0a4a42'],
-  };
-  const [c1, c2, c3] = colors[type];
+function drawPlanet3D(ctx: CanvasRenderingContext2D, pl: PlanetDef, px: number, py: number, alpha: number) {
+  if (alpha <= 0) return;
+  const r = pl.r;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(px, py);
 
-  // Ring behind planet (bottom half)
-  if (ring) {
+  // ── Ring back half (behind planet) ──────────────────────────────────
+  if (pl.ring) {
     ctx.save();
-    ctx.scale(1, 0.3);
-    ctx.globalAlpha = alpha * 0.55;
-    const ringColor = type === 'ice' ? 'rgba(180,210,255,0.7)' : 'rgba(100,220,200,0.6)';
-    ctx.strokeStyle = ringColor; ctx.lineWidth = r * 0.42;
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.75, Math.PI * 0.12, Math.PI * 0.88); ctx.stroke();
+    ctx.scale(1, 0.28);
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.strokeStyle = pl.ringCol + '0.85)';
+    ctx.lineWidth = r * 0.52;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.85, Math.PI * 0.08, Math.PI * 0.92);
+    ctx.stroke();
+    // Darker inner shadow on ring
+    ctx.strokeStyle = pl.ringCol + '0.25)';
+    ctx.lineWidth = r * 0.18;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.55, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
     ctx.restore();
   }
 
-  // Planet body
-  const grd = ctx.createRadialGradient(-r*0.28, -r*0.28, r*0.05, 0, 0, r);
-  grd.addColorStop(0, c1); grd.addColorStop(0.55, c2); grd.addColorStop(1, c3);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = grd;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  // ── Clip to sphere ────────────────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
 
-  // Surface detail bands
-  ctx.globalAlpha = alpha * 0.18;
-  ctx.fillStyle = c1;
-  for (let b = 0; b < 2; b++) {
-    ctx.beginPath(); ctx.ellipse(0, (b * 2 - 1) * r * 0.28, r * 0.92, r * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+  // Shadow base (dark side)
+  ctx.fillStyle = pl.c[2];
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+
+  // Main body gradient — off-center radial for 3D depth
+  const hx = pl.lx * r, hy = pl.ly * r;
+  const body = ctx.createRadialGradient(hx, hy, r * 0.06, hx * 0.5, hy * 0.5, r * 1.1);
+  body.addColorStop(0,   pl.c[0]);
+  body.addColorStop(0.42, pl.c[1]);
+  body.addColorStop(1,   pl.c[2]);
+  ctx.fillStyle = body;
+  ctx.globalAlpha = alpha;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+
+  // Surface bands (horizontal stripes clipped to sphere)
+  if (pl.bands) {
+    ctx.globalAlpha = alpha;
+    for (let b = -2; b <= 2; b++) {
+      const by2 = b * r * 0.3;
+      const bw = Math.sqrt(Math.max(0, r * r - by2 * by2));
+      ctx.fillStyle = b % 2 === 0 ? pl.bands[0] : pl.bands[1];
+      ctx.fillRect(-bw, by2 - r * 0.13, bw * 2, r * 0.26);
+    }
   }
 
-  // Atmosphere glow
-  ctx.globalAlpha = alpha * 0.22;
-  const atm = ctx.createRadialGradient(0, 0, r * 0.85, 0, 0, r * 1.25);
-  atm.addColorStop(0, c1); atm.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = atm; ctx.beginPath(); ctx.arc(0, 0, r * 1.25, 0, Math.PI * 2); ctx.fill();
+  // Terminator shadow (dark crescent on right side)
+  const shadow = ctx.createRadialGradient(r * 0.55, 0, r * 0.3, r * 0.4, 0, r * 1.2);
+  shadow.addColorStop(0, 'rgba(0,0,0,0)');
+  shadow.addColorStop(0.55, 'rgba(0,0,10,0.25)');
+  shadow.addColorStop(1, 'rgba(0,0,15,0.78)');
+  ctx.fillStyle = shadow;
+  ctx.globalAlpha = alpha;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
 
-  // Ring front (top half) — drawn over planet
-  if (ring) {
+  // Specular highlight (bright spot top-left)
+  const spec = ctx.createRadialGradient(hx * 1.05, hy * 1.05, 0, hx * 0.9, hy * 0.9, r * 0.48);
+  spec.addColorStop(0, 'rgba(255,255,255,0.55)');
+  spec.addColorStop(0.5, 'rgba(255,255,255,0.10)');
+  spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spec;
+  ctx.fillRect(-r, -r, r * 2, r * 2);
+
+  ctx.restore(); // un-clip
+
+  // Atmosphere rim glow
+  ctx.globalAlpha = alpha * 0.55;
+  const atm = ctx.createRadialGradient(0, 0, r * 0.78, 0, 0, r * 1.28);
+  atm.addColorStop(0, 'rgba(0,0,0,0)');
+  atm.addColorStop(0.6, pl.atm);
+  atm.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = atm;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.28, 0, Math.PI * 2); ctx.fill();
+
+  // ── Ring front half (over planet) ────────────────────────────────────
+  if (pl.ring) {
     ctx.save();
-    ctx.scale(1, 0.3);
-    ctx.globalAlpha = alpha * 0.55;
-    const ringColor = type === 'ice' ? 'rgba(180,210,255,0.7)' : 'rgba(100,220,200,0.6)';
-    ctx.strokeStyle = ringColor; ctx.lineWidth = r * 0.42;
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.75, Math.PI * 1.12, Math.PI * 1.88); ctx.stroke();
+    ctx.scale(1, 0.28);
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.strokeStyle = pl.ringCol + '0.85)';
+    ctx.lineWidth = r * 0.52;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.85, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
     ctx.restore();
   }
 
   ctx.restore();
 }
 
-// UFOs — two saucers that fly across the screen periodically
+// ── UFO — small, subtle, flies across occasionally ────────────────────────
 const BG_UFOS = [
-  { y: 0.155, cycle: 20, offset: 0,   scale: 1.0  },
-  { y: 0.265, cycle: 29, offset: 11,  scale: 0.72 },
+  { y: 0.145, cycle: 28, offset: 0,  sc: 0.72, threshold: 5  },
+  { y: 0.24,  cycle: 38, offset: 14, sc: 0.52, threshold: 12 },
 ];
 
 function drawUFO(ctx: CanvasRenderingContext2D, ux: number, uy: number, sc: number, t: number, alpha: number) {
-  ctx.save(); ctx.globalAlpha = alpha; ctx.translate(ux, uy); ctx.scale(sc, sc);
+  if (alpha <= 0) return;
+  ctx.save(); ctx.translate(ux, uy); ctx.scale(sc, sc);
 
-  // Tractor beam glow below
-  ctx.globalAlpha = alpha * 0.18 * (0.6 + 0.4 * Math.sin(t * 3.5));
-  const beam = ctx.createLinearGradient(0, 6, 0, 46);
+  // Tractor beam
+  ctx.globalAlpha = alpha * 0.14 * (0.5 + 0.5 * Math.sin(t * 4));
+  const beam = ctx.createLinearGradient(0, 5, 0, 38);
   beam.addColorStop(0, 'rgba(100,255,160,0.9)'); beam.addColorStop(1, 'rgba(80,220,130,0)');
   ctx.fillStyle = beam;
-  ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 6); ctx.lineTo(18, 46); ctx.lineTo(-18, 46); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-7, 5); ctx.lineTo(7, 5); ctx.lineTo(14, 38); ctx.lineTo(-14, 38); ctx.closePath(); ctx.fill();
 
   // Saucer body
-  ctx.globalAlpha = alpha;
-  const bodyGrd = ctx.createLinearGradient(0, -5, 0, 7);
-  bodyGrd.addColorStop(0, '#d0d8f0'); bodyGrd.addColorStop(0.5, '#8898c8'); bodyGrd.addColorStop(1, '#455080');
-  ctx.fillStyle = bodyGrd;
-  ctx.beginPath(); ctx.ellipse(0, 2, 22, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = alpha * 0.92;
+  const bodyG = ctx.createLinearGradient(0, -4, 0, 6);
+  bodyG.addColorStop(0, '#c8d4ee'); bodyG.addColorStop(0.5, '#7888bb'); bodyG.addColorStop(1, '#334070');
+  ctx.fillStyle = bodyG;
+  ctx.beginPath(); ctx.ellipse(0, 2, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Dome on top
-  const domeGrd = ctx.createRadialGradient(-3, -7, 1, 0, -6, 11);
-  domeGrd.addColorStop(0, 'rgba(180,230,255,0.95)'); domeGrd.addColorStop(0.5, 'rgba(80,150,255,0.7)'); domeGrd.addColorStop(1, 'rgba(30,60,180,0.4)');
-  ctx.fillStyle = domeGrd;
-  ctx.beginPath(); ctx.ellipse(0, -3, 11, 8, 0, Math.PI, Math.PI * 2); ctx.fill();
+  // Metallic shine strip
+  ctx.globalAlpha = alpha * 0.3;
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 14, 2, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Blinking rim lights
-  const lightCols = ['#ff4466','#44ffaa','#ffcc00','#44aaff','#ff44ff'];
-  for (let li = 0; li < 5; li++) {
-    const la = (li / 5) * Math.PI * 2;
-    const lx = Math.cos(la) * 17, ly = Math.sin(la) * 5 + 2;
-    const blink = 0.4 + 0.6 * Math.sin(t * 4 + li * 1.3);
-    ctx.globalAlpha = alpha * blink;
-    ctx.fillStyle = lightCols[li];
-    ctx.beginPath(); ctx.arc(lx, ly, 2.2, 0, Math.PI * 2); ctx.fill();
+  // Dome
+  ctx.globalAlpha = alpha * 0.92;
+  const dG = ctx.createRadialGradient(-2.5, -7, 0.5, 0, -5, 9);
+  dG.addColorStop(0, 'rgba(200,240,255,0.95)'); dG.addColorStop(0.45, 'rgba(70,140,255,0.7)'); dG.addColorStop(1, 'rgba(20,50,160,0.35)');
+  ctx.fillStyle = dG;
+  ctx.beginPath(); ctx.ellipse(0, -2, 9, 7, 0, Math.PI, Math.PI * 2); ctx.fill();
+
+  // Rim lights
+  const lcs = ['#ff3355','#33ffaa','#ffcc00','#33aaff','#ff33ff','#88ff44'];
+  for (let li = 0; li < 6; li++) {
+    const la = (li / 6) * Math.PI * 2;
+    const blink = 0.35 + 0.65 * Math.sin(t * 5 + li * 1.05);
+    ctx.globalAlpha = alpha * blink * 0.9;
+    ctx.fillStyle = lcs[li];
+    ctx.beginPath(); ctx.arc(Math.cos(la) * 14, Math.sin(la) * 4.5 + 2, 1.8, 0, Math.PI * 2); ctx.fill();
   }
 
   ctx.restore();
