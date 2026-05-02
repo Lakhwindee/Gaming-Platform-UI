@@ -714,23 +714,25 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       }
       ctx!.globalAlpha = 1;
 
-      // ── Planets ───────────────────────────────────────────────────────────
+      // ── Planets — appear above threshold multiplier ───────────────────────
       for (const pl of BG_PLANETS) {
-        const px = ((pl.x + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
-        const py = ((pl.y + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
-        drawPlanet(ctx!, px * W, py * H, pl.r, pl.type, pl.ring, 0.72);
+        const fadeIn = Math.min(1, Math.max(0, (m - pl.threshold) / 1.5));
+        if (fadeIn <= 0) continue;
+        const px = ((pl.bx + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
+        const py = ((pl.by + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
+        drawPlanet3D(ctx!, pl, px * W, py * H, fadeIn * 0.88);
       }
 
-      // ── UFOs ──────────────────────────────────────────────────────────────
+      // ── UFOs — appear above threshold, fly right→left periodically ────────
       for (const ufo of BG_UFOS) {
-        const phase2 = ((t + ufo.offset) % ufo.cycle) / ufo.cycle; // 0→1 each cycle
-        // Flies in from right, exits left — 0.05→0.95 visible window
+        const uFadeIn = Math.min(1, Math.max(0, (m - ufo.threshold) / 1.5));
+        if (uFadeIn <= 0) continue;
+        const phase2 = ((t + ufo.offset) % ufo.cycle) / ufo.cycle;
         const ux = W * (1.08 - phase2 * 1.16);
-        const uy = ufo.y * H + Math.sin(t * 0.8 + ufo.offset) * 5; // gentle float
-        // Fade in/out at edges
-        const edgeFade = Math.min(1, Math.min(phase2 / 0.08, (1 - phase2) / 0.08));
-        const uAlpha = Math.max(0, edgeFade) * 0.88;
-        if (uAlpha > 0.01) drawUFO(ctx!, ux, uy, ufo.scale, t, uAlpha);
+        const uy = ufo.y * H + Math.sin(t * 0.9 + ufo.offset) * 5;
+        const edgeFade = Math.min(1, Math.min(phase2 / 0.07, (1 - phase2) / 0.07));
+        const uAlpha = Math.max(0, edgeFade) * uFadeIn * 0.88;
+        if (uAlpha > 0.01) drawUFO(ctx!, ux, uy, ufo.sc, t, uAlpha);
       }
 
       // Positions — exact Expo logic
