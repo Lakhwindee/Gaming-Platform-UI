@@ -283,42 +283,43 @@ type PlanetDef = {
   ringCol: string;
 };
 
+// Realistic distant planets — spread across canvas, drift slowly with stars
 const BG_PLANETS: PlanetDef[] = [
-  // Earth-like — blue-green, top-right, appears at 4x
+  // Distant blue ice giant — small, pale, upper area
   {
-    bx: 0.82, by: 0.08, r: 13, lx: -0.32, ly: -0.32, speed: 0.0028, threshold: 4,
+    bx: 0.78, by: 0.18, r: 11, lx: -0.34, ly: -0.32, speed: 0.0025, threshold: 0,
     ring: false,
-    c: ['#5bc8ff', '#1a6fbf', '#08244a'],
-    atm: 'rgba(80,170,255,0.35)',
-    bands: ['rgba(255,255,255,0.12)', 'rgba(30,120,200,0.14)'],
+    c: ['#9ec8ee', '#3e6a98', '#0d2440'],
+    atm: 'rgba(120,170,220,0.18)',
+    bands: ['rgba(180,210,235,0.06)', 'rgba(50,100,150,0.07)'],
     ringCol: '',
   },
-  // Saturn-like — gold with ring, upper-left, appears at 6x
+  // Saturn-like with subtle ring — mid-left
   {
-    bx: 0.14, by: 0.07, r: 15, lx: -0.28, ly: -0.30, speed: 0.0022, threshold: 6,
+    bx: 0.18, by: 0.32, r: 13, lx: -0.30, ly: -0.30, speed: 0.0021, threshold: 0,
     ring: true,
-    c: ['#f5d98a', '#c8903c', '#6b420e'],
-    atm: 'rgba(240,190,80,0.28)',
-    bands: ['rgba(255,230,140,0.18)', 'rgba(160,90,20,0.16)'],
-    ringCol: 'rgba(230,190,90,',
+    c: ['#d8b97a', '#8c6230', '#3a2410'],
+    atm: 'rgba(190,150,90,0.14)',
+    bands: ['rgba(220,190,130,0.09)', 'rgba(130,80,30,0.08)'],
+    ringCol: 'rgba(200,170,110,',
   },
-  // Mars-like — dusty red, appears at 9x
+  // Mars-like dusty red — small, lower-mid
   {
-    bx: 0.62, by: 0.05, r: 10, lx: -0.30, ly: -0.28, speed: 0.0034, threshold: 9,
+    bx: 0.56, by: 0.62, r: 9, lx: -0.32, ly: -0.28, speed: 0.0030, threshold: 0,
     ring: false,
-    c: ['#e8805a', '#a8381a', '#501808'],
-    atm: 'rgba(220,110,60,0.25)',
-    bands: ['rgba(240,160,100,0.14)', 'rgba(120,40,10,0.16)'],
+    c: ['#c47a5a', '#8a3d22', '#3a1408'],
+    atm: 'rgba(170,90,55,0.13)',
+    bands: ['rgba(200,140,100,0.07)', 'rgba(100,40,15,0.07)'],
     ringCol: '',
   },
-  // Ice planet — deep teal-white, appears at 14x
+  // Tiny pale moon — distant background
   {
-    bx: 0.38, by: 0.055, r: 11, lx: -0.26, ly: -0.34, speed: 0.003, threshold: 14,
-    ring: true,
-    c: ['#c0f0ff', '#4ab8d8', '#0e4a62'],
-    atm: 'rgba(140,230,255,0.30)',
-    bands: ['rgba(200,240,255,0.16)', 'rgba(30,140,180,0.14)'],
-    ringCol: 'rgba(180,230,255,',
+    bx: 0.42, by: 0.16, r: 6, lx: -0.28, ly: -0.32, speed: 0.0018, threshold: 0,
+    ring: false,
+    c: ['#d8d4c8', '#7a766a', '#2a2820'],
+    atm: 'rgba(180,175,160,0.10)',
+    bands: null,
+    ringCol: '',
   },
 ];
 
@@ -364,25 +365,36 @@ function drawPlanet3D(ctx: CanvasRenderingContext2D, pl: PlanetDef, px: number, 
   ctx.fillStyle = shadow;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  // ── Specular highlight — small bright arc ─────────────────────────────
+  // ── Subtle bands (only if defined — gas giants) ───────────────────────
+  if (pl.bands) {
+    ctx.globalAlpha = alpha;
+    for (let bi = 0; bi < 3; bi++) {
+      const by = (-r * 0.55) + bi * (r * 0.55);
+      const bh = r * 0.16;
+      ctx.fillStyle = bi % 2 === 0 ? pl.bands[0] : pl.bands[1];
+      ctx.beginPath(); ctx.ellipse(0, by, r * 0.95, bh, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // ── Specular highlight — soft, restrained ─────────────────────────────
   const sx = hx * 0.95, sy = hy * 0.95;
-  const sr = r * 0.44;
+  const sr = r * 0.40;
   const spec = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-  spec.addColorStop(0, 'rgba(255,255,255,0.52)');
-  spec.addColorStop(0.45, 'rgba(255,255,255,0.08)');
+  spec.addColorStop(0, 'rgba(255,255,255,0.32)');
+  spec.addColorStop(0.4, 'rgba(255,255,255,0.04)');
   spec.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.globalAlpha = alpha;
   ctx.fillStyle = spec;
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  // ── Atmosphere rim glow ───────────────────────────────────────────────
-  const atm = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.3);
+  // ── Atmosphere rim glow — very subtle for distant look ────────────────
+  const atm = ctx.createRadialGradient(0, 0, r * 0.92, 0, 0, r * 1.18);
   atm.addColorStop(0, 'rgba(0,0,0,0)');
-  atm.addColorStop(0.55, pl.atm);
+  atm.addColorStop(0.6, pl.atm);
   atm.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalAlpha = alpha * 0.6;
+  ctx.globalAlpha = alpha * 0.45;
   ctx.fillStyle = atm;
-  ctx.beginPath(); ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.18, 0, Math.PI * 2); ctx.fill();
 
   // ── Ring front half ───────────────────────────────────────────────────
   if (pl.ring) {
@@ -398,50 +410,44 @@ function drawPlanet3D(ctx: CanvasRenderingContext2D, pl: PlanetDef, px: number, 
   ctx.restore();
 }
 
-// ── UFO — small, subtle, flies across occasionally ────────────────────────
-const BG_UFOS = [
-  { y: 0.145, cycle: 28, offset: 0,  sc: 0.72, threshold: 5  },
-  { y: 0.24,  cycle: 38, offset: 14, sc: 0.52, threshold: 12 },
+// ── UFOs — fixed positions, drift with stars (no fly-across, no bounce) ──
+type UfoDef = { bx: number; by: number; sc: number; speed: number };
+const BG_UFOS: UfoDef[] = [
+  { bx: 0.30, by: 0.22, sc: 0.55, speed: 0.0024 },
+  { bx: 0.72, by: 0.46, sc: 0.42, speed: 0.0028 },
 ];
 
 function drawUFO(ctx: CanvasRenderingContext2D, ux: number, uy: number, sc: number, t: number, alpha: number) {
   if (alpha <= 0) return;
   ctx.save(); ctx.translate(ux, uy); ctx.scale(sc, sc);
 
-  // Tractor beam
-  ctx.globalAlpha = alpha * 0.14 * (0.5 + 0.5 * Math.sin(t * 4));
-  const beam = ctx.createLinearGradient(0, 5, 0, 38);
-  beam.addColorStop(0, 'rgba(100,255,160,0.9)'); beam.addColorStop(1, 'rgba(80,220,130,0)');
-  ctx.fillStyle = beam;
-  ctx.beginPath(); ctx.moveTo(-7, 5); ctx.lineTo(7, 5); ctx.lineTo(14, 38); ctx.lineTo(-14, 38); ctx.closePath(); ctx.fill();
-
-  // Saucer body
-  ctx.globalAlpha = alpha * 0.92;
+  // Saucer body — muted, distant look
+  ctx.globalAlpha = alpha * 0.78;
   const bodyG = ctx.createLinearGradient(0, -4, 0, 6);
-  bodyG.addColorStop(0, '#c8d4ee'); bodyG.addColorStop(0.5, '#7888bb'); bodyG.addColorStop(1, '#334070');
+  bodyG.addColorStop(0, '#a8b4cc'); bodyG.addColorStop(0.5, '#5a6890'); bodyG.addColorStop(1, '#222a48');
   ctx.fillStyle = bodyG;
   ctx.beginPath(); ctx.ellipse(0, 2, 18, 6, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Metallic shine strip
-  ctx.globalAlpha = alpha * 0.3;
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.beginPath(); ctx.ellipse(0, 0, 14, 2, 0, 0, Math.PI * 2); ctx.fill();
+  // Subtle shine strip
+  ctx.globalAlpha = alpha * 0.22;
+  ctx.fillStyle = 'rgba(220,230,255,0.55)';
+  ctx.beginPath(); ctx.ellipse(0, 0, 13, 1.6, 0, 0, Math.PI * 2); ctx.fill();
 
   // Dome
-  ctx.globalAlpha = alpha * 0.92;
+  ctx.globalAlpha = alpha * 0.78;
   const dG = ctx.createRadialGradient(-2.5, -7, 0.5, 0, -5, 9);
-  dG.addColorStop(0, 'rgba(200,240,255,0.95)'); dG.addColorStop(0.45, 'rgba(70,140,255,0.7)'); dG.addColorStop(1, 'rgba(20,50,160,0.35)');
+  dG.addColorStop(0, 'rgba(180,220,240,0.85)'); dG.addColorStop(0.5, 'rgba(60,110,200,0.5)'); dG.addColorStop(1, 'rgba(20,40,120,0.25)');
   ctx.fillStyle = dG;
   ctx.beginPath(); ctx.ellipse(0, -2, 9, 7, 0, Math.PI, Math.PI * 2); ctx.fill();
 
-  // Rim lights
-  const lcs = ['#ff3355','#33ffaa','#ffcc00','#33aaff','#ff33ff','#88ff44'];
-  for (let li = 0; li < 6; li++) {
-    const la = (li / 6) * Math.PI * 2;
-    const blink = 0.35 + 0.65 * Math.sin(t * 5 + li * 1.05);
-    ctx.globalAlpha = alpha * blink * 0.9;
+  // Rim lights — soft blink only
+  const lcs = ['#ff6677','#66ffbb','#ffd266','#66bbff'];
+  for (let li = 0; li < 4; li++) {
+    const la = (li / 4) * Math.PI * 2 + Math.PI * 0.125;
+    const blink = 0.45 + 0.45 * Math.sin(t * 2.2 + li * 1.4);
+    ctx.globalAlpha = alpha * blink * 0.7;
     ctx.fillStyle = lcs[li];
-    ctx.beginPath(); ctx.arc(Math.cos(la) * 14, Math.sin(la) * 4.5 + 2, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(Math.cos(la) * 14, Math.sin(la) * 4 + 2, 1.5, 0, Math.PI * 2); ctx.fill();
   }
 
   ctx.restore();
@@ -659,6 +665,22 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const dirY = -Math.sin(ang);
       starOffXRef.current += dirX * dt * speedMult * 0.055;
       starOffYRef.current += dirY * dt * speedMult * 0.055;
+      // ── Planets (BEHIND stars) — always visible, slow drift with stars ───
+      for (const pl of BG_PLANETS) {
+        const px = ((pl.bx + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
+        const py = ((pl.by + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
+        drawPlanet3D(ctx!, pl, px * W, py * H, 0.85);
+      }
+
+      // ── UFOs (BEHIND stars) — fixed position, drift with stars ────────────
+      for (const ufo of BG_UFOS) {
+        const ux = ((ufo.bx + starOffXRef.current * ufo.speed * 9) % 1 + 1) % 1;
+        const uy = ((ufo.by + starOffYRef.current * ufo.speed * 9) % 1 + 1) % 1;
+        drawUFO(ctx!, ux * W, uy * H, ufo.sc, t, 0.78);
+      }
+      ctx!.globalAlpha = 1;
+
+      // ── Stars (front layer, on top of planets/UFOs) ───────────────────────
       const layerAlpha = [0.5, 0.72, 1.0];
       const layerColors = ['#9ab8ff', '#d4eaff', '#FFFFFF'];
       const layerSpeed = [0.6, 0.85, 1.0];
@@ -690,27 +712,6 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         }
       }
       ctx!.globalAlpha = 1;
-
-      // ── Planets — appear above threshold multiplier ───────────────────────
-      for (const pl of BG_PLANETS) {
-        const fadeIn = Math.min(1, Math.max(0, (m - pl.threshold) / 1.5));
-        if (fadeIn <= 0) continue;
-        const px = ((pl.bx + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
-        const py = ((pl.by + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
-        drawPlanet3D(ctx!, pl, px * W, py * H, fadeIn * 0.88);
-      }
-
-      // ── UFOs — appear above threshold, fly right→left periodically ────────
-      for (const ufo of BG_UFOS) {
-        const uFadeIn = Math.min(1, Math.max(0, (m - ufo.threshold) / 1.5));
-        if (uFadeIn <= 0) continue;
-        const phase2 = ((t + ufo.offset) % ufo.cycle) / ufo.cycle;
-        const ux = W * (1.08 - phase2 * 1.16);
-        const uy = ufo.y * H + Math.sin(t * 0.9 + ufo.offset) * 5;
-        const edgeFade = Math.min(1, Math.min(phase2 / 0.07, (1 - phase2) / 0.07));
-        const uAlpha = Math.max(0, edgeFade) * uFadeIn * 0.88;
-        if (uAlpha > 0.01) drawUFO(ctx!, ux, uy, ufo.sc, t, uAlpha);
-      }
 
       // Positions — exact Expo logic
       const origX = W * 0.09, origY = H * 0.88;
