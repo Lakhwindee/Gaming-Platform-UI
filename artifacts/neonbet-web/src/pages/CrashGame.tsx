@@ -325,96 +325,73 @@ const BG_PLANETS: PlanetDef[] = [
 function drawPlanet3D(ctx: CanvasRenderingContext2D, pl: PlanetDef, px: number, py: number, alpha: number) {
   if (alpha <= 0) return;
   const r = pl.r;
+  const hx = pl.lx * r, hy = pl.ly * r;
+
   ctx.save();
-  ctx.globalAlpha = alpha;
   ctx.translate(px, py);
 
-  // ── Ring back half (behind planet) ──────────────────────────────────
+  // ── Ring back half ────────────────────────────────────────────────────
   if (pl.ring) {
     ctx.save();
     ctx.scale(1, 0.28);
-    ctx.globalAlpha = alpha * 0.6;
-    ctx.strokeStyle = pl.ringCol + '0.85)';
-    ctx.lineWidth = r * 0.52;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.85, Math.PI * 0.08, Math.PI * 0.92);
-    ctx.stroke();
-    // Darker inner shadow on ring
-    ctx.strokeStyle = pl.ringCol + '0.25)';
-    ctx.lineWidth = r * 0.18;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.55, Math.PI * 0.1, Math.PI * 0.9);
-    ctx.stroke();
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.strokeStyle = pl.ringCol + '0.8)';
+    ctx.lineWidth = r * 0.5;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.85, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
     ctx.restore();
   }
 
-  // ── Clip to sphere ────────────────────────────────────────────────────
-  ctx.save();
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.clip();
-
-  // Shadow base (dark side)
+  // ── Dark base (shadow side) — arc fill ───────────────────────────────
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = pl.c[2];
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  // Main body gradient — off-center radial for 3D depth
-  const hx = pl.lx * r, hy = pl.ly * r;
-  const body = ctx.createRadialGradient(hx, hy, r * 0.06, hx * 0.5, hy * 0.5, r * 1.1);
-  body.addColorStop(0,   pl.c[0]);
-  body.addColorStop(0.42, pl.c[1]);
-  body.addColorStop(1,   pl.c[2]);
+  // ── Main 3D body gradient — arc fill ─────────────────────────────────
+  const body = ctx.createRadialGradient(hx * 0.8, hy * 0.8, r * 0.05, 0, 0, r);
+  body.addColorStop(0, pl.c[0]);
+  body.addColorStop(0.5, pl.c[1]);
+  body.addColorStop(1, pl.c[2]);
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = body;
-  ctx.globalAlpha = alpha;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  // Surface bands (horizontal stripes clipped to sphere)
-  if (pl.bands) {
-    ctx.globalAlpha = alpha;
-    for (let b = -2; b <= 2; b++) {
-      const by2 = b * r * 0.3;
-      const bw = Math.sqrt(Math.max(0, r * r - by2 * by2));
-      ctx.fillStyle = b % 2 === 0 ? pl.bands[0] : pl.bands[1];
-      ctx.fillRect(-bw, by2 - r * 0.13, bw * 2, r * 0.26);
-    }
-  }
-
-  // Terminator shadow (dark crescent on right side)
-  const shadow = ctx.createRadialGradient(r * 0.55, 0, r * 0.3, r * 0.4, 0, r * 1.2);
+  // ── Terminator shadow (right side darkening) — arc fill ───────────────
+  const shadow = ctx.createRadialGradient(r * 0.4, 0, r * 0.2, r * 0.35, 0, r * 1.05);
   shadow.addColorStop(0, 'rgba(0,0,0,0)');
-  shadow.addColorStop(0.55, 'rgba(0,0,10,0.25)');
-  shadow.addColorStop(1, 'rgba(0,0,15,0.78)');
-  ctx.fillStyle = shadow;
+  shadow.addColorStop(0.5, 'rgba(0,0,8,0.2)');
+  shadow.addColorStop(1, 'rgba(0,0,12,0.75)');
   ctx.globalAlpha = alpha;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.fillStyle = shadow;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  // Specular highlight (bright spot top-left)
-  const spec = ctx.createRadialGradient(hx * 1.05, hy * 1.05, 0, hx * 0.9, hy * 0.9, r * 0.48);
-  spec.addColorStop(0, 'rgba(255,255,255,0.55)');
-  spec.addColorStop(0.5, 'rgba(255,255,255,0.10)');
+  // ── Specular highlight — small bright arc ─────────────────────────────
+  const sx = hx * 0.95, sy = hy * 0.95;
+  const sr = r * 0.44;
+  const spec = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+  spec.addColorStop(0, 'rgba(255,255,255,0.52)');
+  spec.addColorStop(0.45, 'rgba(255,255,255,0.08)');
   spec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = spec;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
 
-  ctx.restore(); // un-clip
-
-  // Atmosphere rim glow
-  ctx.globalAlpha = alpha * 0.55;
-  const atm = ctx.createRadialGradient(0, 0, r * 0.78, 0, 0, r * 1.28);
+  // ── Atmosphere rim glow ───────────────────────────────────────────────
+  const atm = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.3);
   atm.addColorStop(0, 'rgba(0,0,0,0)');
-  atm.addColorStop(0.6, pl.atm);
+  atm.addColorStop(0.55, pl.atm);
   atm.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = alpha * 0.6;
   ctx.fillStyle = atm;
-  ctx.beginPath(); ctx.arc(0, 0, r * 1.28, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.3, 0, Math.PI * 2); ctx.fill();
 
-  // ── Ring front half (over planet) ────────────────────────────────────
+  // ── Ring front half ───────────────────────────────────────────────────
   if (pl.ring) {
     ctx.save();
     ctx.scale(1, 0.28);
-    ctx.globalAlpha = alpha * 0.6;
-    ctx.strokeStyle = pl.ringCol + '0.85)';
-    ctx.lineWidth = r * 0.52;
-    ctx.beginPath();
-    ctx.arc(0, 0, r * 1.85, Math.PI * 1.08, Math.PI * 1.92);
-    ctx.stroke();
+    ctx.globalAlpha = alpha * 0.55;
+    ctx.strokeStyle = pl.ringCol + '0.8)';
+    ctx.lineWidth = r * 0.5;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.85, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
     ctx.restore();
   }
 
