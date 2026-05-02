@@ -138,84 +138,112 @@ function drawRocket(ctx: CanvasRenderingContext2D, x: number, y: number, angle: 
 }
 
 // Pre-computed debris particles (deterministic — no random in draw loop)
-const BLAST_DEBRIS = Array.from({ length: 20 }, (_, i) => ({
-  angle: (i / 20) * Math.PI * 2 + (i % 3) * 0.18,
-  speed: 55 + (i % 5) * 22,
-  size: 1.8 + (i % 4) * 1.1,
-  col: i % 3 === 0 ? '#FFD700' : i % 3 === 1 ? '#FF6B00' : '#FF3A3A',
-  wobble: (i % 7) * 0.45,
+// Smaller fire-blast — smooth flame puffs + minimal debris
+const BLAST_FLAMES = Array.from({ length: 12 }, (_, i) => ({
+  angle: (i / 12) * Math.PI * 2 + (i % 3) * 0.2,
+  speed: 22 + (i % 4) * 8,    // slower outward push
+  rise: 14 + (i % 5) * 4,     // upward buoyancy (fire rises)
+  size: 5 + (i % 4) * 1.6,
+  delay: (i % 6) * 0.025,
+  hue: i % 3,                 // 0 yellow-white core, 1 orange, 2 deep red
 }));
 
-const BLAST_SPARKS = Array.from({ length: 14 }, (_, i) => ({
-  angle: (i / 14) * Math.PI * 2 + 0.22,
-  speed: 80 + (i % 4) * 30,
-  col: i % 2 === 0 ? '#FFD700' : '#FF9500',
+const BLAST_SPARKS = Array.from({ length: 10 }, (_, i) => ({
+  angle: (i / 10) * Math.PI * 2 + 0.15,
+  speed: 38 + (i % 4) * 12,
+  col: i % 2 === 0 ? '#FFE066' : '#FF8A2E',
 }));
+
+// Smoothstep easing for soft alpha curves
+function smoothstep(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
 
 function drawBlast(ctx: CanvasRenderingContext2D, x: number, y: number, age: number) {
   const a = Math.max(0, age); // seconds since crash
 
   ctx.save(); ctx.translate(x, y);
 
-  // ── 1. Initial white flash (0–0.18s) ──────────────────────────────────
-  if (a < 0.18) {
-    const flashA = (1 - a / 0.18) * 0.75;
-    ctx.globalAlpha = flashA;
-    const flashR = 80 + a * 400;
+  // ── 1. Soft flash (0–0.22s) — small & smooth ──────────────────────────
+  if (a < 0.22) {
+    const t = a / 0.22;
+    const flashA = (1 - smoothstep(t)) * 0.6;
+    const flashR = 18 + a * 110;
     const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, flashR);
-    grd.addColorStop(0, 'rgba(255,255,255,1)');
-    grd.addColorStop(0.4, 'rgba(255,220,100,0.6)');
-    grd.addColorStop(1, 'rgba(255,60,0,0)');
+    grd.addColorStop(0,    'rgba(255,255,240,1)');
+    grd.addColorStop(0.25, 'rgba(255,220,120,0.8)');
+    grd.addColorStop(0.55, 'rgba(255,140,40,0.45)');
+    grd.addColorStop(1,    'rgba(255,60,0,0)');
+    ctx.globalAlpha = flashA;
     ctx.fillStyle = grd;
     ctx.beginPath(); ctx.arc(0, 0, flashR, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   }
 
-  // ── 2. Expanding shockwave rings (0–0.9s) ─────────────────────────────
-  const ringDefs = [
-    { delay: 0,    speed: 110, thick: 5,  col: 'rgba(255,200,80,' },
-    { delay: 0.06, speed: 90,  thick: 3,  col: 'rgba(255,120,30,' },
-    { delay: 0.12, speed: 70,  thick: 2,  col: 'rgba(255,60,20,'  },
-  ];
-  for (const rd of ringDefs) {
-    const ra = a - rd.delay;
-    if (ra < 0 || ra > 0.9) continue;
-    const r = ra * rd.speed;
-    const alpha = Math.max(0, (1 - ra / 0.9) * 0.9);
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = `${rd.col}1)`;
-    ctx.lineWidth = rd.thick * (1 - ra / 0.9) + 0.5;
+  // ── 2. Single subtle shockwave ring ───────────────────────────────────
+  if (a < 0.55) {
+    const t = a / 0.55;
+    const r = 6 + smoothstep(t) * 38;
+    const ringA = (1 - smoothstep(t)) * 0.55;
+    ctx.globalAlpha = ringA;
+    ctx.strokeStyle = 'rgba(255,170,60,1)';
+    ctx.lineWidth = (1 - t) * 2.2 + 0.4;
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  // ── 3. Debris particles flying outward (0–1.2s) ───────────────────────
-  if (a < 1.2) {
-    for (const p of BLAST_DEBRIS) {
-      const pa = Math.max(0, a - 0.04);
-      const dist = pa * p.speed + pa * pa * 15;
-      const px = Math.cos(p.angle) * dist;
-      const py = Math.sin(p.angle) * dist + pa * pa * 30; // gravity pull
-      const alpha = Math.max(0, 1 - pa / 1.0);
-      const sz = p.size * (1 - pa * 0.4);
-      ctx.globalAlpha = alpha * 0.95;
-      ctx.fillStyle = p.col;
-      ctx.beginPath(); ctx.arc(px, py, Math.max(0.3, sz), 0, Math.PI * 2); ctx.fill();
-    }
     ctx.globalAlpha = 1;
   }
 
-  // ── 4. Spark streaks (0–0.6s) ─────────────────────────────────────────
-  if (a < 0.6) {
+  // ── 3. Fire flame puffs — rise and fade smoothly (0–1.1s) ─────────────
+  if (a < 1.1) {
+    ctx.globalCompositeOperation = 'lighter'; // additive for fire glow
+    for (const f of BLAST_FLAMES) {
+      const fa = a - f.delay;
+      if (fa <= 0) continue;
+      const life = 0.95;
+      const t = Math.min(1, fa / life);
+      if (t >= 1) continue;
+      // Outward + upward (buoyancy)
+      const dist = smoothstep(t * 0.7) * f.speed;
+      const px = Math.cos(f.angle) * dist;
+      const py = Math.sin(f.angle) * dist - smoothstep(t) * f.rise; // fire rises
+      // Puff grows then fades
+      const sz = f.size * (0.6 + smoothstep(t) * 1.4);
+      const alpha = (1 - smoothstep(t)) * 0.8;
+      // Color shifts hot→cool: white → orange → deep red
+      let inner: string, mid: string;
+      if (f.hue === 0) {
+        inner = `rgba(255,245,200,${alpha})`;
+        mid   = `rgba(255,170,60,${alpha * 0.5})`;
+      } else if (f.hue === 1) {
+        inner = `rgba(255,180,70,${alpha * 0.95})`;
+        mid   = `rgba(255,90,20,${alpha * 0.45})`;
+      } else {
+        inner = `rgba(255,90,30,${alpha * 0.85})`;
+        mid   = `rgba(180,30,10,${alpha * 0.4})`;
+      }
+      const grd = ctx.createRadialGradient(px, py, 0, px, py, sz);
+      grd.addColorStop(0,   inner);
+      grd.addColorStop(0.5, mid);
+      grd.addColorStop(1,   'rgba(120,20,0,0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath(); ctx.arc(px, py, sz, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  }
+
+  // ── 4. Thin spark streaks (0–0.45s) ───────────────────────────────────
+  if (a < 0.45) {
+    const t = a / 0.45;
+    const alpha = (1 - smoothstep(t)) * 0.85;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 1.1;
     for (const sp of BLAST_SPARKS) {
-      const sa = Math.max(0, a - 0.02);
-      const d1 = sa * sp.speed * 0.6;
+      const sa = Math.max(0, a - 0.015);
+      const d1 = sa * sp.speed * 0.55;
       const d2 = sa * sp.speed;
-      const alpha = Math.max(0, 1 - sa / 0.55) * 0.9;
       ctx.globalAlpha = alpha;
       ctx.strokeStyle = sp.col;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(Math.cos(sp.angle) * d1, Math.sin(sp.angle) * d1);
       ctx.lineTo(Math.cos(sp.angle) * d2, Math.sin(sp.angle) * d2);
@@ -224,26 +252,30 @@ function drawBlast(ctx: CanvasRenderingContext2D, x: number, y: number, age: num
     ctx.globalAlpha = 1;
   }
 
-  // ── 5. Core glow — bright center fades (0–0.7s) ───────────────────────
-  if (a < 0.7) {
-    const coreA = Math.max(0, 1 - a / 0.65);
-    const coreR = 6 + a * 18;
+  // ── 5. Bright core → ember (0–1.6s) ───────────────────────────────────
+  if (a < 0.55) {
+    const t = a / 0.55;
+    const coreA = (1 - smoothstep(t));
+    const coreR = 4 + smoothstep(t) * 10;
     const grd2 = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
-    grd2.addColorStop(0, `rgba(255,255,255,${coreA})`);
-    grd2.addColorStop(0.4, `rgba(255,200,50,${coreA * 0.8})`);
-    grd2.addColorStop(1, 'rgba(255,80,0,0)');
+    grd2.addColorStop(0,    `rgba(255,250,220,${coreA})`);
+    grd2.addColorStop(0.35, `rgba(255,200,80,${coreA * 0.85})`);
+    grd2.addColorStop(0.7,  `rgba(255,110,30,${coreA * 0.5})`);
+    grd2.addColorStop(1,    'rgba(255,50,0,0)');
     ctx.fillStyle = grd2;
-    ctx.globalAlpha = 1;
     ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
-  } else {
-    // Faint ember glow lingers
-    const emberA = Math.max(0, 1 - (a - 0.7) / 1.2) * 0.35;
-    ctx.globalAlpha = emberA;
-    const grd3 = ctx.createRadialGradient(0, 0, 0, 0, 0, 22);
-    grd3.addColorStop(0, 'rgba(255,100,20,1)');
-    grd3.addColorStop(1, 'rgba(255,40,0,0)');
+  } else if (a < 1.6) {
+    // Soft ember afterglow rising slightly
+    const t = (a - 0.55) / 1.05;
+    const emberA = (1 - smoothstep(t)) * 0.32;
+    const emberR = 12 + t * 4;
+    const yLift = -t * 6;
+    const grd3 = ctx.createRadialGradient(0, yLift, 0, 0, yLift, emberR);
+    grd3.addColorStop(0,   `rgba(255,140,40,${emberA})`);
+    grd3.addColorStop(0.5, `rgba(220,60,15,${emberA * 0.5})`);
+    grd3.addColorStop(1,   'rgba(120,20,0,0)');
     ctx.fillStyle = grd3;
-    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, yLift, emberR, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   }
 
