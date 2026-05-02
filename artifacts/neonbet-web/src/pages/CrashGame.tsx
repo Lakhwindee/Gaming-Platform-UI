@@ -258,163 +258,12 @@ const STARS = Array.from({ length: 120 }, (_, i) => ({
   layer: i % 3,
 }));
 
-// ── Realistic 3D Planets ─────────────────────────────────────────────────
-// Each planet appears only above a certain multiplier threshold
-type PlanetDef = {
-  // Base position in 0..1 canvas coordinates
-  bx: number; by: number;
-  // Visual radius (canvas pixels, before DPI scale)
-  r: number;
-  // Light direction offset (0..1 of radius)
-  lx: number; ly: number;
-  // Parallax speed factor
-  speed: number;
-  // Appears when multiplier >= threshold
-  threshold: number;
-  // Has a Saturn-style ring?
-  ring: boolean;
-  // Color stops for main gradient [highlight, midtone, shadow]
-  c: [string, string, string];
-  // Atmosphere tint
-  atm: string;
-  // Band colors [inner, outer] (null = no bands)
-  bands: [string, string] | null;
-  // Ring color (if ring=true)
-  ringCol: string;
-};
-
-// Realistic distant planets — spread across canvas, drift slowly with stars
-const BG_PLANETS: PlanetDef[] = [
-  // Distant blue ice giant — small, pale, upper area
-  {
-    bx: 0.78, by: 0.18, r: 11, lx: -0.34, ly: -0.32, speed: 0.0025, threshold: 0,
-    ring: false,
-    c: ['#9ec8ee', '#3e6a98', '#0d2440'],
-    atm: 'rgba(120,170,220,0.18)',
-    bands: ['rgba(180,210,235,0.06)', 'rgba(50,100,150,0.07)'],
-    ringCol: '',
-  },
-  // Saturn-like with subtle ring — mid-left
-  {
-    bx: 0.18, by: 0.32, r: 13, lx: -0.30, ly: -0.30, speed: 0.0021, threshold: 0,
-    ring: true,
-    c: ['#d8b97a', '#8c6230', '#3a2410'],
-    atm: 'rgba(190,150,90,0.14)',
-    bands: ['rgba(220,190,130,0.09)', 'rgba(130,80,30,0.08)'],
-    ringCol: 'rgba(200,170,110,',
-  },
-  // Mars-like dusty red — small, lower-mid
-  {
-    bx: 0.56, by: 0.62, r: 9, lx: -0.32, ly: -0.28, speed: 0.0030, threshold: 0,
-    ring: false,
-    c: ['#c47a5a', '#8a3d22', '#3a1408'],
-    atm: 'rgba(170,90,55,0.13)',
-    bands: ['rgba(200,140,100,0.07)', 'rgba(100,40,15,0.07)'],
-    ringCol: '',
-  },
-  // Tiny pale moon — distant background
-  {
-    bx: 0.42, by: 0.16, r: 6, lx: -0.28, ly: -0.32, speed: 0.0018, threshold: 0,
-    ring: false,
-    c: ['#d8d4c8', '#7a766a', '#2a2820'],
-    atm: 'rgba(180,175,160,0.10)',
-    bands: null,
-    ringCol: '',
-  },
-];
-
-function drawPlanet3D(ctx: CanvasRenderingContext2D, pl: PlanetDef, px: number, py: number, alpha: number) {
-  if (alpha <= 0) return;
-  const r = pl.r;
-  const hx = pl.lx * r, hy = pl.ly * r;
-
-  ctx.save();
-  ctx.translate(px, py);
-
-  // ── Ring back half ────────────────────────────────────────────────────
-  if (pl.ring) {
-    ctx.save();
-    ctx.scale(1, 0.28);
-    ctx.globalAlpha = alpha * 0.55;
-    ctx.strokeStyle = pl.ringCol + '0.8)';
-    ctx.lineWidth = r * 0.5;
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.85, Math.PI * 0.08, Math.PI * 0.92); ctx.stroke();
-    ctx.restore();
-  }
-
-  // ── Dark base (shadow side) — arc fill ───────────────────────────────
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = pl.c[2];
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-
-  // ── Main 3D body gradient — arc fill ─────────────────────────────────
-  const body = ctx.createRadialGradient(hx * 0.8, hy * 0.8, r * 0.05, 0, 0, r);
-  body.addColorStop(0, pl.c[0]);
-  body.addColorStop(0.5, pl.c[1]);
-  body.addColorStop(1, pl.c[2]);
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = body;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-
-  // ── Terminator shadow (right side darkening) — arc fill ───────────────
-  const shadow = ctx.createRadialGradient(r * 0.4, 0, r * 0.2, r * 0.35, 0, r * 1.05);
-  shadow.addColorStop(0, 'rgba(0,0,0,0)');
-  shadow.addColorStop(0.5, 'rgba(0,0,8,0.2)');
-  shadow.addColorStop(1, 'rgba(0,0,12,0.75)');
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = shadow;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-
-  // ── Subtle bands (only if defined — gas giants) ───────────────────────
-  if (pl.bands) {
-    ctx.globalAlpha = alpha;
-    for (let bi = 0; bi < 3; bi++) {
-      const by = (-r * 0.55) + bi * (r * 0.55);
-      const bh = r * 0.16;
-      ctx.fillStyle = bi % 2 === 0 ? pl.bands[0] : pl.bands[1];
-      ctx.beginPath(); ctx.ellipse(0, by, r * 0.95, bh, 0, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  // ── Specular highlight — soft, restrained ─────────────────────────────
-  const sx = hx * 0.95, sy = hy * 0.95;
-  const sr = r * 0.40;
-  const spec = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
-  spec.addColorStop(0, 'rgba(255,255,255,0.32)');
-  spec.addColorStop(0.4, 'rgba(255,255,255,0.04)');
-  spec.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = spec;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-
-  // ── Atmosphere rim glow — very subtle for distant look ────────────────
-  const atm = ctx.createRadialGradient(0, 0, r * 0.92, 0, 0, r * 1.18);
-  atm.addColorStop(0, 'rgba(0,0,0,0)');
-  atm.addColorStop(0.6, pl.atm);
-  atm.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.globalAlpha = alpha * 0.45;
-  ctx.fillStyle = atm;
-  ctx.beginPath(); ctx.arc(0, 0, r * 1.18, 0, Math.PI * 2); ctx.fill();
-
-  // ── Ring front half ───────────────────────────────────────────────────
-  if (pl.ring) {
-    ctx.save();
-    ctx.scale(1, 0.28);
-    ctx.globalAlpha = alpha * 0.55;
-    ctx.strokeStyle = pl.ringCol + '0.8)';
-    ctx.lineWidth = r * 0.5;
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.85, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.restore();
-}
-
-// ── UFOs — fixed positions, drift with stars (no fly-across, no bounce) ──
+// ── UFOs — fixed positions, drift with stars (slightly slower than stars) ─
 type UfoDef = { bx: number; by: number; sc: number; speed: number };
 const BG_UFOS: UfoDef[] = [
-  { bx: 0.30, by: 0.22, sc: 0.55, speed: 0.0024 },
-  { bx: 0.72, by: 0.46, sc: 0.42, speed: 0.0028 },
+  { bx: 0.22, by: 0.18, sc: 0.55, speed: 0.0020 },
+  { bx: 0.68, by: 0.30, sc: 0.45, speed: 0.0022 },
+  { bx: 0.46, by: 0.55, sc: 0.38, speed: 0.0018 },
 ];
 
 function drawUFO(ctx: CanvasRenderingContext2D, ux: number, uy: number, sc: number, t: number, alpha: number) {
@@ -665,18 +514,12 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const dirY = -Math.sin(ang);
       starOffXRef.current += dirX * dt * speedMult * 0.055;
       starOffYRef.current += dirY * dt * speedMult * 0.055;
-      // ── Planets (BEHIND stars) — always visible, slow drift with stars ───
-      for (const pl of BG_PLANETS) {
-        const px = ((pl.bx + starOffXRef.current * pl.speed * 9) % 1 + 1) % 1;
-        const py = ((pl.by + starOffYRef.current * pl.speed * 9) % 1 + 1) % 1;
-        drawPlanet3D(ctx!, pl, px * W, py * H, 0.85);
-      }
-
-      // ── UFOs (BEHIND stars) — fixed position, drift with stars ────────────
+      // ── UFOs (BEHIND stars) — drift with stars but slower than stars ──────
+      // Stars drift coefficient is ~14 (s.speed * ls * 14); UFOs use ~5 to feel slower
       for (const ufo of BG_UFOS) {
-        const ux = ((ufo.bx + starOffXRef.current * ufo.speed * 9) % 1 + 1) % 1;
-        const uy = ((ufo.by + starOffYRef.current * ufo.speed * 9) % 1 + 1) % 1;
-        drawUFO(ctx!, ux * W, uy * H, ufo.sc, t, 0.78);
+        const ux = ((ufo.bx + starOffXRef.current * ufo.speed * 5) % 1 + 1) % 1;
+        const uy = ((ufo.by + starOffYRef.current * ufo.speed * 5) % 1 + 1) % 1;
+        drawUFO(ctx!, ux * W, uy * H, ufo.sc, t, 0.72);
       }
       ctx!.globalAlpha = 1;
 
