@@ -34,12 +34,12 @@ function multColor(m: number): string {
 
 // ── Canvas geometry ───────────────────────────────────────────────────────
 const CV_H = 260;
-function getPos(elapsed: number, cvW: number): { x: number; y: number } {
-  const origX = cvW * 0.09, origY = CV_H * 0.88;
+function getPos(elapsed: number, cvW: number, cvH: number = CV_H): { x: number; y: number } {
+  const origX = cvW * 0.09, origY = cvH * 0.88;
   const MAX_T = 40;
   const t = Math.min(elapsed / MAX_T, 1);
   const x = origX + t * t * (cvW * 0.88 - origX);
-  const y = origY - Math.sqrt(t) * (CV_H * 0.76);
+  const y = origY - Math.sqrt(t) * (cvH * 0.76);
   return { x, y: Math.max(y, 22) };
 }
 function calcMult(elapsed: number): number {
@@ -610,7 +610,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
     const setupHiDpi = () => {
       const dpr = window.devicePixelRatio || 1;
       const displayW = canvas.clientWidth || 480;
-      const displayH = CV_H;
+      const displayH = canvas.clientHeight || CV_H;
       canvas.width = Math.round(displayW * dpr);
       canvas.height = Math.round(displayH * dpr);
       ctx.resetTransform();
@@ -622,7 +622,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
 
     function draw(now: number) {
       const phase = WSC.state.phase;
-      const W = (canvas!.clientWidth || 480), H = CV_H;
+      const W = (canvas!.clientWidth || 480), H = (canvas!.clientHeight || CV_H);
 
       // ── Elapsed — server-synced, same on all devices ──
       if (phase === 'flying') {
@@ -715,7 +715,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       // Positions — exact Expo logic
       const origX = W * 0.09, origY = H * 0.88;
       const pos = (isFlying || isCrashed)
-        ? getPos(elapsed, W)
+        ? getPos(elapsed, W, H)
         : { x: origX + 10, y: origY - 20 }; // waiting: same as Expo {ORIG_X+10, ORIG_Y-20}
 
       // Flight path — triple layer exactly like Expo
@@ -725,7 +725,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
         const steps = 40;
         for (let i = 0; i <= steps; i++) {
           const et = elapsed * (i / steps);
-          pathPoints.push(getPos(et, W));
+          pathPoints.push(getPos(et, W, H));
         }
         const drawPath = () => {
           ctx!.beginPath(); ctx!.moveTo(origX, origY);
@@ -753,8 +753,8 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
       const dT = 0.3;
       const e0 = Math.max(elapsed - dT, 0.001);
       const e1 = elapsed + dT;
-      const pA = (isFlying || isCrashed) ? getPos(e0, W) : { x: origX, y: origY - 30 };
-      const pB = (isFlying || isCrashed) ? getPos(e1, W) : { x: origX + 1, y: origY - 31 };
+      const pA = (isFlying || isCrashed) ? getPos(e0, W, H) : { x: origX, y: origY - 30 };
+      const pB = (isFlying || isCrashed) ? getPos(e1, W, H) : { x: origX + 1, y: origY - 31 };
       const rawAng = Math.atan2(pB.y - pA.y, pB.x - pA.x);
       smoothAngRef.current += (rawAng - smoothAngRef.current) * 0.12;
 
@@ -1314,7 +1314,7 @@ export default function CrashGame({ navigate }: { navigate: (t: string) => void 
   // ── Canvas element ────────────────────────────────────────────────────────
   const canvasEl = (
     <div style={{ position: 'relative', borderRadius: '16px', overflow: 'hidden', border: `1px solid ${C.border}`, background: 'rgba(4,0,12,0.9)', marginBottom: '12px' }}>
-      <canvas ref={canvasRef} width={480} height={CV_H} style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <canvas ref={canvasRef} width={480} height={CV_H} style={{ width: '100%', height: 'auto', aspectRatio: `480 / ${CV_H}`, display: 'block' }} />
       <div ref={multOverlayRef} style={{
         display: 'none',
         position: 'absolute',
