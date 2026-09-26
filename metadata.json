@@ -1,0 +1,6 @@
+{
+  "name": "NeonBet Gaming Platform",
+  "description": "Professional online gaming platform featuring Crash, Dice, Mines, Plinko, Slots, live chat, and wallet integration",
+  "request": "Migrate and run the NeonBet Gaming Platform web application in AI Studio",
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
