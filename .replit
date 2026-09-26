@@ -40,19 +40,3 @@ REVENUECAT_GOOGLE_PLAY_STORE_APP_ID = "app44131b8768"
 EXPO_PUBLIC_REVENUECAT_TEST_API_KEY = "test_hfKcIxmOlnxCkXThGsKJlHdNArr"
 EXPO_PUBLIC_REVENUECAT_IOS_API_KEY = "appl_ZjldOvBgzFTwbenmqyyawLwghuS"
 EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY = "goog_RJqBzVVGwmyUoBEsbDeZfEYtrni"
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
-localPort = 8081
-externalPort = 8081
-
-[[ports]]
-localPort = 19702
-externalPort = 80
-
-[[ports]]
-localPort = 25951
-externalPort = 3000
